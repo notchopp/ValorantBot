@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { validateEnv } from './_shared/vercel-config';
 
 interface RefreshRankRequest {
@@ -171,7 +171,7 @@ export default async function handler(
     // Get current player from database
     const { data: player, error: fetchError } = await supabase
       .from('players')
-      .select('id, discord_rank, current_mmr, discord_rank_value')
+      .select('id, discord_rank, current_mmr, discord_rank_value, peak_mmr')
       .eq('discord_user_id', userId)
       .single();
 
@@ -186,6 +186,7 @@ export default async function handler(
 
     const oldRank = player.discord_rank || 'Unranked';
     const oldMMR = player.current_mmr || 0;
+    const currentPeakMMR = player.peak_mmr || 0;
 
     // Get current Valorant rank
     console.log('Fetching current Valorant rank', { riotName, riotTag, region });
@@ -291,7 +292,7 @@ export default async function handler(
         discord_rank: discordRank,
         discord_rank_value: discordRankValue,
         current_mmr: newMMR,
-        peak_mmr: Math.max(player.peak_mmr || 0, newMMR),
+        peak_mmr: Math.max(currentPeakMMR, newMMR),
         updated_at: new Date().toISOString(),
       })
       .eq('discord_user_id', userId);
