@@ -193,7 +193,7 @@ async function getLastRankedRank(name: string, tag: string): Promise<{ rank: str
  */
 export default async function handler(
   req: VercelRequest,
-  res: VercelResponse<VerifyResponse>
+  res: VercelResponse
 ): Promise<void> {
   // Only allow POST
   if (req.method !== 'POST') {
@@ -273,11 +273,9 @@ export default async function handler(
 
     let valorantRank: string;
     let valorantELO: number;
-    let isUnrated = false;
 
     // Check if unrated
     if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
-      isUnrated = true;
       const lastRanked = await getLastRankedRank(riotName, riotTag);
       
       if (!lastRanked) {

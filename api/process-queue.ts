@@ -71,7 +71,7 @@ function balanceTeamsAuto(players: Array<{ userId: string; mmr: number }>): { te
  */
 export default async function handler(
   req: VercelRequest,
-  res: VercelResponse<ProcessQueueResponse>
+  res: VercelResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ success: false, error: 'Method not allowed' });

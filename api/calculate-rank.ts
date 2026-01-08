@@ -76,13 +76,12 @@ function calculateMatchPoints(
   won: boolean,
   kills: number,
   deaths: number,
-  assists: number,
+  _assists: number,
   mvp: boolean,
   currentMMR: number
 ): number {
   try {
     let basePoints = won ? 15 : -8; // Reduced for stickiness
-    let performanceBonus = 0;
     let mvpBonus = 0;
 
     const kd = deaths > 0 ? kills / deaths : kills;
@@ -128,7 +127,7 @@ function calculateMatchPoints(
  */
 export default async function handler(
   req: VercelRequest,
-  res: VercelResponse<CalculateRankResponse>
+  res: VercelResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ success: false, error: 'Method not allowed' });
