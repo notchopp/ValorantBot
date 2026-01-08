@@ -7,6 +7,9 @@ import {
 import { RiotIDService } from '../services/RiotIDService';
 import { PlayerService } from '../services/PlayerService';
 import { ValorantAPIService } from '../services/ValorantAPIService';
+import { VercelAPIService } from '../services/VercelAPIService';
+import { RoleUpdateService } from '../services/RoleUpdateService';
+import { DatabaseService } from '../services/DatabaseService';
 
 export const data = new SlashCommandBuilder()
   .setName('riot')
@@ -50,6 +53,9 @@ export async function execute(
     riotIDService: RiotIDService;
     playerService: PlayerService;
     valorantAPI?: ValorantAPIService;
+    vercelAPI?: VercelAPIService;
+    roleUpdateService?: RoleUpdateService;
+    databaseService?: DatabaseService;
   }
 ) {
   const subcommand = interaction.options.getSubcommand();
@@ -243,9 +249,13 @@ async function handleRefresh(
     riotIDService: RiotIDService;
     playerService: PlayerService;
     valorantAPI?: ValorantAPIService;
+    vercelAPI?: VercelAPIService;
+    roleUpdateService?: RoleUpdateService;
+    databaseService?: DatabaseService;
   }
 ) {
   const userId = interaction.user.id;
+  const username = interaction.user.username;
   
   // Defer reply immediately to prevent timeout (3 second limit)
   try {
@@ -260,22 +270,75 @@ async function handleRefresh(
     throw error;
   }
 
-  const { playerService, valorantAPI } = services;
+  const { riotIDService, vercelAPI, roleUpdateService, databaseService } = services;
 
-  if (!valorantAPI) {
-    await interaction.editReply('❌ Valorant API is not available.');
+  // Check if Riot ID is linked
+  const riotId = riotIDService.getRiotID(userId);
+  if (!riotId) {
+    await interaction.editReply('❌ No Riot ID linked. Use `/riot link` to link your account first.');
     return;
   }
 
-  const result = await playerService.fetchRankFromAPI(userId);
-  
-  if (result.success && result.rank) {
-    await interaction.editReply(
-      `✅ Rank refreshed: **${result.rank}** (Value: ${result.rankValue})`
-    );
-  } else {
-    await interaction.editReply(
-      `❌ ${result.message || 'Failed to refresh rank.'}`
-    );
+  // Check if player exists in database
+  const player = databaseService ? await databaseService.getPlayer(userId) : null;
+  if (!player || !player.discord_rank || player.discord_rank === 'Unranked') {
+    await interaction.editReply('❌ You need to verify first using `/verify` before you can refresh your rank.');
+    return;
   }
+
+  if (!vercelAPI) {
+    await interaction.editReply('❌ Vercel API is not available.');
+    return;
+  }
+
+  console.log('Calling Vercel refreshRank for user:', { userId, username });
+  const refreshResult = await vercelAPI.refreshRank({
+    userId,
+    riotName: riotId.name,
+    riotTag: riotId.tag,
+    region: riotId.region || 'na',
+  });
+  console.log('Vercel refreshRank response:', refreshResult);
+
+  if (!refreshResult.success) {
+    await interaction.editReply(
+      `❌ ${refreshResult.error || 'Failed to refresh rank. Please try again later.'}`
+    );
+    return;
+  }
+
+  // Update Discord role if rank changed
+  if (refreshResult.discordRank && refreshResult.oldRank && interaction.guild && roleUpdateService) {
+    try {
+      await roleUpdateService.updatePlayerRole(
+        userId,
+        refreshResult.oldRank,
+        refreshResult.discordRank,
+        interaction.guild
+      );
+    } catch (error) {
+      console.warn('Failed to update Discord role after refresh', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // Invalidate cache
+  services.playerService.invalidateCache(userId);
+
+  const embed = new EmbedBuilder()
+    .setTitle('✅ Rank Refreshed!')
+    .setColor(refreshResult.boosted ? 0x00ff00 : 0x0099ff)
+    .addFields(
+      { name: 'Riot ID', value: `${riotId.name}#${riotId.tag}`, inline: true },
+      { name: 'Region', value: (riotId.region || 'N/A').toUpperCase(), inline: true },
+      { name: 'Valorant Rank', value: refreshResult.valorantRank || 'Unrated', inline: true },
+      { name: 'Old Discord Rank', value: refreshResult.oldRank || 'Unknown', inline: true },
+      { name: 'New Discord Rank', value: refreshResult.discordRank || 'Unknown', inline: true },
+      { name: 'New MMR', value: refreshResult.newMMR?.toString() || '0', inline: true }
+    )
+    .setDescription(refreshResult.message || 'Rank refreshed successfully.');
+
+  await interaction.editReply({ embeds: [embed] });
 }

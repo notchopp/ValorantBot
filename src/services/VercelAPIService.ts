@@ -60,6 +60,26 @@ export interface ProcessQueueResponse {
   error?: string;
 }
 
+export interface RefreshRankRequest {
+  userId: string;
+  riotName: string;
+  riotTag: string;
+  region: string;
+}
+
+export interface RefreshRankResponse {
+  success: boolean;
+  discordRank?: string;
+  discordRankValue?: number;
+  newMMR?: number;
+  oldRank?: string;
+  oldMMR?: number;
+  valorantRank?: string;
+  boosted?: boolean;
+  message?: string;
+  error?: string;
+}
+
 /**
  * Service for calling Vercel Cloud Agent APIs
  */
@@ -206,6 +226,43 @@ export class VercelAPIService {
       return {
         success: false,
         error: error.message || 'Failed to process queue',
+      };
+    }
+  }
+
+  /**
+   * Refresh rank from Valorant API (uses highest of Valorant rank or current Discord rank, capped at GRNDS V)
+   * Follows guardrails: error handling, logging, timeouts
+   */
+  async refreshRank(request: RefreshRankRequest): Promise<RefreshRankResponse> {
+    if (!this.baseURL) {
+      return {
+        success: false,
+        error: 'Vercel API URL not configured',
+      };
+    }
+
+    try {
+      const response = await this.api.post<RefreshRankResponse>(
+        '/api/refresh-rank',
+        request
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Error calling refresh-rank API', {
+        userId: request.userId,
+        riotId: `${request.riotName}#${request.riotTag}`,
+        error: error.message,
+        status: error.response?.status,
+      });
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        error: error.message || 'Failed to refresh rank',
       };
     }
   }

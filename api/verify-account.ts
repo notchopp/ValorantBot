@@ -44,18 +44,6 @@ interface ValorantMMR {
   old: boolean;
 }
 
-interface ValorantMMRHistory {
-  name: string;
-  tag: string;
-  region: string;
-  currenttier: number;
-  currenttierpatched: string;
-  ranking_in_tier: number;
-  mmr_change_to_last_game: number;
-  elo: number;
-  date: string;
-  date_raw: number;
-}
 
 // Initialize Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -150,85 +138,6 @@ function calculateInitialMMR(valorantRank: string, valorantELO: number): number 
   }
 }
 
-/**
- * Get last ranked rank from MMR history (optimized - stops early)
- */
-async function getLastRankedRank(name: string, tag: string): Promise<{ rank: string; elo: number; date: string } | null> {
-  console.log('Fetching last ranked rank from MMR history', { name, tag });
-  
-  try {
-    const url = `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-    console.log('Calling Valorant API:', { url });
-    
-    const response = await valorantAPI.get<{ status: number; data: ValorantMMRHistory[] }>(url);
-    
-    console.log('MMR history response received', {
-      name,
-      tag,
-      status: response.status,
-      dataLength: response.data.data?.length || 0,
-    });
-    
-    if (!response.data.data || response.data.data.length === 0) {
-      console.log('No MMR history data found', { name, tag });
-      return null;
-    }
-
-    // Find first ranked entry (history is sorted by date, most recent first)
-    for (let i = 0; i < response.data.data.length; i++) {
-      const entry = response.data.data[i];
-      console.log(`Checking MMR history entry ${i}`, {
-        date: entry.date,
-        tier: entry.currenttier,
-        tierPatched: entry.currenttierpatched,
-        elo: entry.elo,
-      });
-      
-      if (
-        entry.currenttierpatched &&
-        !entry.currenttierpatched.toLowerCase().includes('unrated') &&
-        entry.currenttier > 0
-      ) {
-        console.log('Found ranked entry in history', {
-          name,
-          tag,
-          rank: entry.currenttierpatched,
-          elo: entry.elo,
-          date: entry.date,
-        });
-        
-        return {
-          rank: entry.currenttierpatched,
-          elo: entry.elo,
-          date: entry.date,
-        };
-      }
-    }
-
-    console.log('No ranked entries found in MMR history', {
-      name,
-      tag,
-      totalEntries: response.data.data.length,
-    });
-    
-    return null;
-  } catch (error: any) {
-    console.error('Error fetching last ranked rank', {
-      name,
-      tag,
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data,
-    });
-    
-    if (error.response?.status === 404) {
-      console.log('MMR history not found (404)', { name, tag });
-      return null;
-    }
-    
-    return null;
-  }
-}
 
 /**
  * Main verification handler
@@ -337,16 +246,15 @@ export default async function handler(
         message: error.message,
         data: error.response?.data,
       });
-      
-      if (error.response?.status !== 404) {
-        console.error('Non-404 error during MMR fetch - continuing with history check');
-      }
     }
 
     let valorantRank: string;
     let valorantELO: number;
+    let startingMMR: number;
+    let discordRank: string;
+    let discordRankValue: number;
 
-    // Check if unrated
+    // Check if unrated - if unrated, place directly in GRNDS I
     const isUnrated = !mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated');
     console.log('Checking rank status', {
       riotName,
@@ -356,48 +264,26 @@ export default async function handler(
     });
     
     if (isUnrated) {
-      console.log('User is currently unrated, checking ranked history', { riotName, riotTag });
-      const lastRanked = await getLastRankedRank(riotName, riotTag);
-      
-      if (!lastRanked) {
-        console.error('No ranked history found for user', { riotName, riotTag });
-        res.status(404).json({
-          success: false,
-          error: `Could not find a ranked rank from previous acts/seasons for "${riotName}#${riotTag}". Please complete your placement matches first, or ensure you have played ranked in a previous act.`,
-        });
-        return;
-      }
-
-      console.log('Using ranked history for placement', {
-        riotName,
-        riotTag,
-        rank: lastRanked.rank,
-        elo: lastRanked.elo,
-        date: lastRanked.date,
-      });
-      
-      valorantRank = lastRanked.rank;
-      valorantELO = lastRanked.elo;
+      console.log('User is currently unrated, placing in GRNDS I', { riotName, riotTag });
+      valorantRank = 'Unrated';
+      valorantELO = 0;
+      startingMMR = 0; // GRNDS I starts at 0 MMR
+      discordRank = 'GRNDS I';
+      discordRankValue = getRankValue(discordRank);
     } else {
-      // TypeScript knows mmr is not null here due to the condition above
-      const validMMR = mmr;
-      
+      // User is ranked - calculate MMR from Valorant rank (capped at GRNDS V)
+      valorantRank = mmr!.currenttierpatched;
+      valorantELO = mmr!.elo;
       console.log('Using current rank for placement', {
         riotName,
         riotTag,
-        rank: validMMR.currenttierpatched,
-        elo: validMMR.elo,
+        rank: valorantRank,
+        elo: valorantELO,
       });
-      
-      valorantRank = validMMR.currenttierpatched;
-      valorantELO = validMMR.elo;
+      startingMMR = calculateInitialMMR(valorantRank, valorantELO);
+      discordRank = getRankFromMMR(startingMMR);
+      discordRankValue = getRankValue(discordRank);
     }
-
-    // Step 2: Calculate initial MMR (capped at GRNDS V)
-    console.log('Calculating initial MMR', { valorantRank, valorantELO });
-    const startingMMR = calculateInitialMMR(valorantRank, valorantELO);
-    const discordRank = getRankFromMMR(startingMMR);
-    const discordRankValue = getRankValue(discordRank);
     
     console.log('Initial placement calculated', {
       userId,
@@ -471,7 +357,9 @@ export default async function handler(
       startingMMR,
       valorantRank,
       valorantELO,
-      message: `Placed at ${discordRank} (${startingMMR} MMR)`,
+      message: isUnrated 
+        ? `Placed at ${discordRank} (${startingMMR} MMR). You're unranked in Valorant, so you start at GRNDS I. Play customs to rank up! Once you get ranked in Valorant, use \`/riot refresh\` to boost your Discord rank (max GRNDS V).`
+        : `Placed at ${discordRank} (${startingMMR} MMR). Your Discord rank is based on your Valorant rank, capped at GRNDS V. Play customs to rank up further!`,
     };
     
     console.log('=== VERIFY ACCOUNT API SUCCESS ===', {
