@@ -69,7 +69,7 @@ async function handleReport(
     return;
   }
 
-  // Create modal for match reporting
+  // Create modal for match reporting with detailed stats
   const modal = new ModalBuilder()
     .setCustomId('match_report_modal')
     .setTitle('Report Match Results');
@@ -88,10 +88,27 @@ async function handleReport(
     .setRequired(false)
     .setPlaceholder('13-10');
 
+
+  const teamAStatsInput = new TextInputBuilder()
+    .setCustomId('team_a_stats')
+    .setLabel('Team A Stats (Format: username:K/D/A)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setPlaceholder(`Example:\n${currentMatch.teams.teamA.players[0]?.username || 'player1'}:15/10/5\n${currentMatch.teams.teamA.players[1]?.username || 'player2'}:12/8/7\nMVP:${currentMatch.teams.teamA.players[0]?.username || 'player1'}`);
+
+  const teamBStatsInput = new TextInputBuilder()
+    .setCustomId('team_b_stats')
+    .setLabel('Team B Stats (Format: username:K/D/A)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setPlaceholder(`Example:\n${currentMatch.teams.teamB.players[0]?.username || 'player1'}:18/11/4\n${currentMatch.teams.teamB.players[1]?.username || 'player2'}:10/12/6\nMVP:${currentMatch.teams.teamB.players[0]?.username || 'player1'}`);
+
   const firstRow = new ActionRowBuilder<TextInputBuilder>().addComponents(winnerInput);
   const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(scoreInput);
+  const thirdRow = new ActionRowBuilder<TextInputBuilder>().addComponents(teamAStatsInput);
+  const fourthRow = new ActionRowBuilder<TextInputBuilder>().addComponents(teamBStatsInput);
 
-  modal.addComponents(firstRow, secondRow);
+  modal.addComponents(firstRow, secondRow, thirdRow, fourthRow);
 
   await interaction.showModal(modal);
 }
@@ -180,6 +197,73 @@ async function handleInfo(
   await interaction.editReply({ embeds: [embed] });
 }
 
+// Helper function to parse player stats from text input
+// Format: username:K/D/A (e.g., "player1:15/10/5")
+// MVP line: MVP:username
+interface ParsedPlayerStats {
+  username: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  mvp: boolean;
+}
+
+function parseTeamStats(statsText: string, teamPlayers: any[]): Map<string, ParsedPlayerStats> {
+  const statsMap = new Map<string, ParsedPlayerStats>();
+  
+  if (!statsText || !statsText.trim()) {
+    // Return empty map if no stats provided
+    return statsMap;
+  }
+
+  const lines = statsText.trim().split('\n');
+  let mvpUsername: string | null = null;
+
+  // First pass: find MVP
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const mvpMatch = trimmed.match(/^MVP:(.+)$/i);
+    if (mvpMatch) {
+      mvpUsername = mvpMatch[1].trim();
+      break;
+    }
+  }
+
+  // Second pass: parse stats
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.toLowerCase().startsWith('mvp:')) continue;
+
+    // Match format: username:K/D/A or username: K/D/A
+    const match = trimmed.match(/^(.+?):\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/);
+    if (match) {
+      const username = match[1].trim();
+      const kills = parseInt(match[2], 10);
+      const deaths = parseInt(match[3], 10);
+      const assists = parseInt(match[4], 10);
+
+      // Check if this username exists in team
+      const playerExists = teamPlayers.some(p => 
+        p.username.toLowerCase() === username.toLowerCase()
+      );
+
+      if (playerExists) {
+        statsMap.set(username.toLowerCase(), {
+          username,
+          kills,
+          deaths,
+          assists,
+          mvp: mvpUsername ? username.toLowerCase() === mvpUsername.toLowerCase() : false,
+        });
+      }
+    }
+  }
+
+  return statsMap;
+}
+
 // Export handler for modal submission
 export async function handleMatchReportModal(
   interaction: ModalSubmitInteraction,
@@ -219,6 +303,8 @@ export async function handleMatchReportModal(
 
     const winner = interaction.fields.getTextInputValue('winner').toUpperCase();
     const scoreText = interaction.fields.getTextInputValue('score');
+    const teamAStatsText = interaction.fields.getTextInputValue('team_a_stats');
+    const teamBStatsText = interaction.fields.getTextInputValue('team_b_stats');
 
     // Input validation
     if (winner !== 'A' && winner !== 'B') {
@@ -239,6 +325,10 @@ export async function handleMatchReportModal(
         }
       }
     }
+
+    // Parse player stats from text inputs
+    const teamAStats = parseTeamStats(teamAStatsText, currentMatch.teams.teamA.players);
+    const teamBStats = parseTeamStats(teamBStatsText, currentMatch.teams.teamB.players);
 
     // Step 1: Save match to Supabase (if not already saved)
     let dbMatch = await databaseService.getMatch(currentMatch.matchId);
@@ -264,7 +354,7 @@ export async function handleMatchReportModal(
       }
     }
 
-    // Step 2: Save player stats to database (with defaults for now)
+    // Step 2: Save player stats to database with parsed values
     const allPlayers = [...currentMatch.teams.teamA.players, ...currentMatch.teams.teamB.players];
     const winningTeam = winner === 'A' ? currentMatch.teams.teamA : currentMatch.teams.teamB;
     
@@ -277,18 +367,22 @@ export async function handleMatchReportModal(
       // Get current MMR
       const currentMMR = dbPlayer.current_mmr || 0;
 
-      // Create player stats (defaults for now - can be enhanced later)
+      // Get parsed stats for this player (or use defaults)
+      const statsMap = team === 'A' ? teamAStats : teamBStats;
+      const playerStats = statsMap.get(player.username.toLowerCase());
+
+      // Create player stats with parsed values or defaults
       await databaseService.createMatchPlayerStats(
         currentMatch.matchId,
         player.userId,
         {
           team: team as 'A' | 'B',
-          kills: 0, // TODO: Collect from modal or match data
-          deaths: 0, // TODO: Collect from modal or match data
-          assists: 0, // TODO: Collect from modal or match data
-          mvp: false, // TODO: Collect from modal or match data
-          damage: 0, // TODO: Collect from modal or match data
-          score: 0, // TODO: Collect from modal or match data
+          kills: playerStats?.kills ?? 0,
+          deaths: playerStats?.deaths ?? 0,
+          assists: playerStats?.assists ?? 0,
+          mvp: playerStats?.mvp ?? false,
+          damage: 0, // Not collected in modal
+          score: 0, // Not collected in modal
           mmrBefore: currentMMR,
         }
       );
@@ -398,6 +492,67 @@ export async function handleMatchReportModal(
         name: 'Score',
         value: `${score.teamA}-${score.teamB}`,
         inline: true,
+      });
+    }
+
+    // Add player stats (K/D/A) and MVP
+    // Collect all stats and find MVPs
+    const teamAStatsArray = currentMatch.teams.teamA.players.map(p => {
+      const playerStats = teamAStats.get(p.username.toLowerCase());
+      return {
+        username: p.username,
+        kills: playerStats?.kills ?? 0,
+        deaths: playerStats?.deaths ?? 0,
+        assists: playerStats?.assists ?? 0,
+        mvp: playerStats?.mvp ?? false,
+      };
+    });
+
+    const teamBStatsArray = currentMatch.teams.teamB.players.map(p => {
+      const playerStats = teamBStats.get(p.username.toLowerCase());
+      return {
+        username: p.username,
+        kills: playerStats?.kills ?? 0,
+        deaths: playerStats?.deaths ?? 0,
+        assists: playerStats?.assists ?? 0,
+        mvp: playerStats?.mvp ?? false,
+      };
+    });
+
+    // Find MVPs
+    const mvpPlayers = [...teamAStatsArray, ...teamBStatsArray].filter(p => p.mvp);
+    if (mvpPlayers.length > 0) {
+      const mvpText = mvpPlayers.map(p => `🏆 **${p.username}**`).join(', ');
+      embed.addFields({
+        name: '🏆 MVP',
+        value: mvpText,
+        inline: false,
+      });
+    }
+
+    // Add top performers (highest K/D ratio)
+    const allStats = [...teamAStatsArray, ...teamBStatsArray];
+    const topPerformers = allStats
+      .filter(p => p.deaths > 0 || p.kills > 0) // Filter out players with no stats
+      .sort((a, b) => {
+        const kdA = a.deaths > 0 ? a.kills / a.deaths : a.kills;
+        const kdB = b.deaths > 0 ? b.kills / b.deaths : b.kills;
+        return kdB - kdA;
+      })
+      .slice(0, 3);
+
+    if (topPerformers.length > 0 && topPerformers.some(p => p.kills > 0 || p.deaths > 0)) {
+      const topPerformersText = topPerformers
+        .map(p => {
+          const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
+          return `**${p.username}**: ${p.kills}/${p.deaths}/${p.assists} (K/D: ${kd})`;
+        })
+        .join('\n');
+
+      embed.addFields({
+        name: '⭐ Top Performers',
+        value: topPerformersText,
+        inline: false,
       });
     }
 
