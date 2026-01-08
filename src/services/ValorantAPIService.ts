@@ -211,6 +211,8 @@ export class ValorantAPIService {
 
   /**
    * Get MMR history for a player
+   * Note: MMR history endpoint is region-agnostic and returns global match history
+   * The returned data includes region information for each match
    */
   async getMMRHistory(name: string, tag: string): Promise<ValorantMMRHistory[] | null> {
     try {
@@ -270,6 +272,7 @@ export class ValorantAPIService {
         if (match.currenttier > 0 && match.currenttierpatched && match.currenttierpatched.toLowerCase() !== 'unranked') {
           console.log(`Found last ranked match for ${name}#${tag}: ${match.currenttierpatched} (${match.elo} ELO)`);
           // Return the ranked match data in the same format as current MMR
+          // Mark as 'old' since this is historical data from MMR history
           return {
             currenttier: match.currenttier,
             currenttierpatched: match.currenttierpatched,
@@ -278,7 +281,7 @@ export class ValorantAPIService {
             elo: match.elo,
             name: match.name,
             tag: match.tag,
-            old: false,
+            old: true, // Historical data from last ranked match
           };
         }
       }
