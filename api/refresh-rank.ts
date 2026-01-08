@@ -52,7 +52,7 @@ const RANK_THRESHOLDS = [
   { rank: 'X', min: 3000, max: 99999 },
 ];
 
-// No cap on rank refresh - allow users to reach their actual Valorant rank tier
+const GRNDS_V_MAX_MMR = 900; // Cap at GRNDS V for initial boost from Valorant rank
 
 /**
  * Get rank from MMR
@@ -75,57 +75,28 @@ function getRankValue(rank: string): number {
 }
 
 /**
- * Calculate MMR from Valorant rank and ELO
- * Maps Valorant ranks to Discord MMR ranges without artificial caps
+ * Calculate MMR from Valorant rank and ELO (capped at GRNDS V for initial boost)
  */
 function calculateMMRFromValorantRank(valorantRank: string, valorantELO: number): number {
   try {
     const rankMMRMap: Record<string, { min: number; max: number }> = {
-      // Iron ranks (GRNDS I)
-      'Iron 1': { min: 0, max: 50 },
-      'Iron 2': { min: 50, max: 100 },
-      'Iron 3': { min: 100, max: 150 },
-      // Bronze ranks (GRNDS I-II)
-      'Bronze 1': { min: 150, max: 200 },
-      'Bronze 2': { min: 200, max: 250 },
-      'Bronze 3': { min: 250, max: 300 },
-      // Silver ranks (GRNDS II-III)
-      'Silver 1': { min: 300, max: 400 },
-      'Silver 2': { min: 400, max: 500 },
-      'Silver 3': { min: 500, max: 600 },
-      // Gold ranks (GRNDS III-V)
-      'Gold 1': { min: 600, max: 700 },
-      'Gold 2': { min: 700, max: 800 },
-      'Gold 3': { min: 800, max: 900 },
-      // Platinum ranks (GRNDS V - BREAKPOINT I)
-      'Platinum 1': { min: 900, max: 1000 },
-      'Platinum 2': { min: 1000, max: 1100 },
-      'Platinum 3': { min: 1100, max: 1200 },
-      // Diamond ranks (BREAKPOINT I-II)
-      'Diamond 1': { min: 1200, max: 1300 },
-      'Diamond 2': { min: 1300, max: 1400 },
-      'Diamond 3': { min: 1400, max: 1500 },
-      // Ascendant ranks (BREAKPOINT III-IV)
-      'Ascendant 1': { min: 1500, max: 1650 },
-      'Ascendant 2': { min: 1650, max: 1800 },
-      'Ascendant 3': { min: 1800, max: 1950 },
-      // Immortal ranks (BREAKPOINT V - CHALLENGER I)
-      'Immortal 1': { min: 1950, max: 2100 },
-      'Immortal 2': { min: 2100, max: 2300 },
-      'Immortal 3': { min: 2300, max: 2500 },
-      // Radiant (CHALLENGER II+)
-      'Radiant': { min: 2500, max: 3000 },
+      'Iron 1': { min: 0, max: 100 }, 'Iron 2': { min: 100, max: 200 }, 'Iron 3': { min: 200, max: 300 },
+      'Bronze 1': { min: 300, max: 400 }, 'Bronze 2': { min: 400, max: 500 }, 'Bronze 3': { min: 500, max: 600 },
+      'Silver 1': { min: 600, max: 700 }, 'Silver 2': { min: 700, max: 800 }, 'Silver 3': { min: 800, max: 900 },
+      'Gold 1': { min: 800, max: 900 }, 'Gold 2': { min: 800, max: 900 }, 'Gold 3': { min: 800, max: 900 },
+      'Platinum 1': { min: 800, max: 900 }, 'Platinum 2': { min: 800, max: 900 }, 'Platinum 3': { min: 800, max: 900 },
+      'Diamond 1': { min: 800, max: 900 }, 'Diamond 2': { min: 800, max: 900 }, 'Diamond 3': { min: 800, max: 900 },
+      'Ascendant 1': { min: 800, max: 900 }, 'Ascendant 2': { min: 800, max: 900 }, 'Ascendant 3': { min: 800, max: 900 },
+      'Immortal 1': { min: 800, max: 900 }, 'Immortal 2': { min: 800, max: 900 }, 'Immortal 3': { min: 800, max: 900 },
+      'Radiant': { min: 800, max: 900 },
     };
 
     const range = rankMMRMap[valorantRank] || { min: 0, max: 200 };
     const normalizedELO = Math.min(Math.max(valorantELO, 0), 5000);
     const eloPercentage = normalizedELO / 5000;
-    const calculatedMMR = range.min + Math.round((range.max - range.min) * eloPercentage);
+    const baseMMR = range.min + Math.round((range.max - range.min) * eloPercentage);
     
-    // Return calculated MMR without artificial caps
-    // Users can now be placed at any Discord rank (GRNDS I through CHALLENGER V) based on their Valorant rank
-    // MMR ranges: 0-199 (GRNDS I) up to 3000+ (X rank)
-    return Math.max(0, calculatedMMR);
+    return Math.min(baseMMR, GRNDS_V_MAX_MMR);
   } catch (error) {
     console.error('Error calculating MMR from Valorant rank', { valorantRank, valorantELO, error });
     return 100; // Safe fallback
@@ -500,7 +471,7 @@ export default async function handler(
       valorantRank,
       boosted,
       message: boosted
-        ? `Rank boosted to ${discordRank} (${newMMR} MMR) based on your Valorant rank (${valorantRank}). Your Discord rank can still go higher through customs!`
+        ? `Rank boosted to ${discordRank} (${newMMR} MMR) based on your Valorant rank (${valorantRank}). Note: Valorant rank boost is capped at GRNDS V. Play customs to rank up further!`
         : isUnrated
         ? `Still unrated in Valorant. Your Discord rank remains ${discordRank} (${newMMR} MMR).`
         : `Current Discord rank ${discordRank} (${newMMR} MMR) is higher than your Valorant rank (${valorantRank}). Keep playing customs to rank up!`,
