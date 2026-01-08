@@ -75,7 +75,8 @@ async function handleStart(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  // Don't use ephemeral - make it visible to everyone so they can use the buttons
+  await interaction.deferReply();
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -591,11 +592,24 @@ export async function handleButtonInteraction(
       stack: error instanceof Error ? error.stack : undefined,
     });
 
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '❌ An error occurred. Please try again.',
-        flags: MessageFlags.Ephemeral,
-      });
+    // Try to send ephemeral error message
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: '❌ An error occurred. Please try again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      } else if (interaction.deferred) {
+        await interaction.followUp({
+          content: '❌ An error occurred. Please try again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (replyError: any) {
+      // Ignore if interaction already expired or acknowledged
+      if (replyError?.code !== 10062 && replyError?.code !== 40060) {
+        console.error('Error sending button error message', { userId, error: replyError });
+      }
     }
   }
 }
@@ -617,10 +631,21 @@ async function handleJoinButton(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   const userId = interaction.user.id;
   const username = interaction.user.username;
+
+  // Defer update to prevent timeout, but handle errors gracefully
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferUpdate();
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Join button interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   try {
     const { queueService, playerService, rankService, matchService, databaseService, voiceChannelService, config } = services;
@@ -650,7 +675,14 @@ async function handleJoinButton(
     const result = await queueService.join(player);
 
     if (!result.success) {
-      await interaction.editReply(result.message);
+      // Send ephemeral error message
+      try {
+        await interaction.followUp({ content: result.message, flags: MessageFlags.Ephemeral });
+      } catch (error: any) {
+        if (error?.code !== 10062 && error?.code !== 40060) {
+          console.error('Error sending follow-up message', { userId, error: error.message });
+        }
+      }
       return;
     }
 
@@ -766,7 +798,17 @@ async function handleJoinButton(
       queueService.unlock();
 
       // Update the original queue message to show match created
-      await interaction.editReply('✅ Queue is full! Match created. Check your team voice channels!');
+      if (interaction.message && interaction.message.editable) {
+        try {
+          await interaction.message.edit({
+            content: '✅ Queue is full! Match created. Check your team voice channels!',
+            embeds: [],
+            components: [],
+          });
+        } catch (error) {
+          console.warn('Failed to update queue message after match creation', { error });
+        }
+      }
     } else {
       // Update the queue message with new player count
       const updatedEmbed = new EmbedBuilder()
@@ -780,7 +822,7 @@ async function handleJoinButton(
         })
         .addFields({
           name: 'Status',
-          value: '✅ Open',
+          value: queue.isLocked ? '🔒 Locked' : '✅ Open',
           inline: true,
         });
 
@@ -814,13 +856,38 @@ async function handleJoinButton(
       const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(joinButton, leaveButton);
 
-      // Update the original message
-      await interaction.message?.edit({
-        embeds: [updatedEmbed],
-        components: [row],
-      });
+      // Update the original message (not editReply since we used deferUpdate)
+      if (interaction.message && interaction.message.editable) {
+        try {
+          await interaction.message.edit({
+            embeds: [updatedEmbed],
+            components: [row],
+          });
+        } catch (error) {
+          console.error('Failed to update queue message', { userId, error });
+          // Send ephemeral error
+          try {
+            await interaction.followUp({
+              content: '❌ Failed to update queue message. Please try again.',
+              flags: MessageFlags.Ephemeral,
+            });
+          } catch (followUpError) {
+            // Ignore follow-up errors
+          }
+        }
+      }
 
-      await interaction.editReply(`✅ ${result.message}`);
+      // Send ephemeral confirmation message
+      try {
+        await interaction.followUp({
+          content: `✅ ${result.message}`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (error: any) {
+        if (error?.code !== 10062 && error?.code !== 40060) {
+          console.error('Error sending join confirmation', { userId, error: error.message });
+        }
+      }
     }
   } catch (error) {
     console.error('Join queue button error', {
@@ -852,9 +919,20 @@ async function handleLeaveButton(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   const userId = interaction.user.id;
+
+  // Defer update to prevent timeout, but handle errors gracefully
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferUpdate();
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Leave button interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   try {
     const { queueService } = services;
@@ -910,21 +988,57 @@ async function handleLeaveButton(
       const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(joinButton, leaveButton);
 
-      await interaction.message.edit({
-        embeds: [updatedEmbed],
-        components: [row],
-      });
+      try {
+        await interaction.message.edit({
+          embeds: [updatedEmbed],
+          components: [row],
+        });
+      } catch (error) {
+        console.error('Failed to update queue message after leave', { userId, error });
+        // Send ephemeral error
+        try {
+          await interaction.followUp({
+            content: '❌ Failed to update queue message. Please try again.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (followUpError) {
+          // Ignore follow-up errors
+        }
+      }
     }
 
-    await interaction.editReply(result.message);
+    // Send ephemeral confirmation message
+    if (result.message) {
+      try {
+        await interaction.followUp({
+          content: result.message,
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (error: any) {
+        if (error?.code !== 10062 && error?.code !== 40060) {
+          console.error('Error sending leave confirmation', { userId, error: error.message });
+        }
+      }
+    }
   } catch (error) {
     console.error('Leave queue button error', {
       userId,
       error: error instanceof Error ? error.message : String(error),
     });
     
-    await interaction.editReply({
-      content: '❌ An error occurred while leaving the queue. Please try again.',
-    });
+    // Try to send ephemeral error message
+    try {
+      if (!interaction.replied) {
+        await interaction.followUp({
+          content: '❌ An error occurred while leaving the queue. Please try again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (followUpError) {
+      // Ignore follow-up errors if interaction expired
+      if (followUpError instanceof Error && (followUpError as any).code !== 10062) {
+        console.error('Error sending leave error message', { userId, error: followUpError });
+      }
+    }
   }
 }
