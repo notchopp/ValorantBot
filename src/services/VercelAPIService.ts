@@ -71,7 +71,10 @@ export class VercelAPIService {
     this.baseURL = baseURL || process.env.VERCEL_API_URL || '';
     
     if (!this.baseURL) {
-      console.warn('VERCEL_API_URL not set - Vercel cloud agents will not be available');
+      console.error('❌ VERCEL_API_URL not set - Vercel cloud agents will not be available');
+      console.error('Set it with: fly secrets set VERCEL_API_URL=https://your-app.vercel.app');
+    } else {
+      console.log('✅ Vercel API initialized', { baseURL: this.baseURL });
     }
 
     this.api = axios.create({
@@ -90,24 +93,38 @@ export class VercelAPIService {
    */
   async verifyAccount(request: VerifyAccountRequest): Promise<VerifyAccountResponse> {
     if (!this.baseURL) {
+      console.error('verifyAccount called but VERCEL_API_URL is not set');
       return {
         success: false,
-        error: 'Vercel API URL not configured',
+        error: 'Vercel API URL not configured. Please set VERCEL_API_URL in Fly.io secrets.',
       };
     }
+
+    console.log('Calling Vercel verify-account API', {
+      url: `${this.baseURL}/api/verify-account`,
+      userId: request.userId,
+      riotId: `${request.riotName}#${request.riotTag}`,
+    });
 
     try {
       const response = await this.api.post<VerifyAccountResponse>(
         '/api/verify-account',
         request
       );
+      console.log('Vercel verify-account API success', {
+        userId: request.userId,
+        success: response.data.success,
+      });
       return response.data;
     } catch (error: any) {
       console.error('Error calling verify-account API', {
         userId: request.userId,
         riotId: `${request.riotName}#${request.riotTag}`,
+        url: `${this.baseURL}/api/verify-account`,
         error: error.message,
         status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
       });
 
       if (error.response?.data) {

@@ -42,6 +42,8 @@ export async function execute(
   try {
     const { databaseService, vercelAPI, roleUpdateService } = services;
 
+    console.log('Verify command started', { userId, username });
+
     // Check if Riot ID is linked (via /riot link) - check database directly
     const existingPlayer = await databaseService.getPlayer(userId);
     if (!existingPlayer?.riot_name || !existingPlayer?.riot_tag || !existingPlayer?.riot_region) {
@@ -60,12 +62,25 @@ export async function execute(
     }
 
     // Call Vercel Cloud Agent to handle verification
+    console.log('Calling Vercel API for verification', {
+      userId,
+      riotName: existingPlayer.riot_name,
+      riotTag: existingPlayer.riot_tag,
+      region: existingPlayer.riot_region,
+    });
+
     const verifyResult = await vercelAPI.verifyAccount({
       userId,
       username,
       riotName: existingPlayer.riot_name,
       riotTag: existingPlayer.riot_tag,
       region: existingPlayer.riot_region,
+    });
+
+    console.log('Vercel API response received', {
+      userId,
+      success: verifyResult.success,
+      error: verifyResult.error,
     });
 
     if (!verifyResult.success) {
