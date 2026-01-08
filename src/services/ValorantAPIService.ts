@@ -152,14 +152,24 @@ export interface ValorantMatch {
 export class ValorantAPIService {
   private api: AxiosInstance;
   private baseURL = 'https://api.henrikdev.xyz/valorant/v1';
+  private apiKey?: string;
 
-  constructor() {
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+    const headers: Record<string, string> = {
+      'User-Agent': 'ValorantBot-Discord/1.0',
+    };
+
+    // Add API key to headers if provided
+    // HenrikDev API uses Authorization header with the API key
+    if (this.apiKey) {
+      headers['Authorization'] = this.apiKey;
+    }
+
     this.api = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,
-      headers: {
-        'User-Agent': 'ValorantBot-Discord/1.0',
-      },
+      headers,
     });
   }
 

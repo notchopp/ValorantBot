@@ -7,6 +7,7 @@ export interface Config {
   valorantAPI: {
     enabled: boolean;
     defaultRegion: string;
+    apiKey?: string;
   };
   queue: {
     maxPlayers: number;
@@ -36,6 +37,7 @@ export const defaultConfig: Config = {
   valorantAPI: {
     enabled: process.env.VALORANT_API_ENABLED !== 'false',
     defaultRegion: process.env.VALORANT_DEFAULT_REGION || 'na',
+    apiKey: process.env.VALORANT_API_KEY,
   },
   queue: {
     maxPlayers: 10,

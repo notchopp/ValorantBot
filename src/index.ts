@@ -51,7 +51,7 @@ const customRankService = new CustomRankService(databaseService);
 
 // Initialize Valorant API service
 const valorantAPI = appConfig.valorantAPI.enabled
-  ? new ValorantAPIService()
+  ? new ValorantAPIService(appConfig.valorantAPI.apiKey)
   : undefined;
 
 // Initialize core services
