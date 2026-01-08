@@ -99,12 +99,12 @@ async function handleLink(
     
     await riotIDService.linkRiotID(userId, name, tag, detectedRegion);
     
-    // Fetch and update rank immediately
+    // Fetch and update rank immediately (handles unranked/placement players)
     const player = await playerService.getPlayer(userId);
     if (player) {
-      const mmr = await valorantAPI.getMMR(detectedRegion, name, tag);
+      const mmr = await valorantAPI.getRankWithFallback(detectedRegion, name, tag);
       if (mmr) {
-        player.rank = mmr.currenttierpatched;
+        player.rank = mmr.currenttierpatched || 'Unranked';
         player.rankValue = valorantAPI.getRankValueFromMMR(mmr);
       }
     }
@@ -187,7 +187,7 @@ async function handleInfo(
   // Fetch fresh data from API if available
   if (valorantAPI && riotId.region) {
     try {
-      const mmr = await valorantAPI.getMMR(riotId.region, riotId.name, riotId.tag);
+      const mmr = await valorantAPI.getRankWithFallback(riotId.region, riotId.name, riotId.tag);
       if (mmr) {
         embed.addFields({
           name: 'MMR',

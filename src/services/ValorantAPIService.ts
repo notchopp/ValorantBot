@@ -228,6 +228,71 @@ export class ValorantAPIService {
   }
 
   /**
+   * Get rank for a player, handling unranked/placement players
+   * If player is unranked, searches through MMR history to find last ranked match
+   * This handles placement matches (up to 5 games where player is unranked)
+   */
+  async getRankWithFallback(region: string, name: string, tag: string): Promise<ValorantMMR | null> {
+    try {
+      // First, try to get current MMR
+      const currentMMR = await this.getMMR(region, name, tag);
+      
+      // If no MMR data at all, player hasn't played ranked
+      if (!currentMMR) {
+        return null;
+      }
+
+      // Check if player is unranked (tier 0 or "Unranked" string)
+      const isUnranked = 
+        currentMMR.currenttier === 0 || 
+        currentMMR.currenttierpatched?.toLowerCase() === 'unranked' ||
+        !currentMMR.currenttierpatched;
+
+      // If player has a rank, return it
+      if (!isUnranked) {
+        return currentMMR;
+      }
+
+      // Player is unranked, likely in placement matches
+      // Try to find last ranked match from MMR history
+      console.log(`Player ${name}#${tag} is unranked, checking MMR history for last ranked match`);
+      
+      const mmrHistory = await this.getMMRHistory(name, tag);
+      
+      if (!mmrHistory || mmrHistory.length === 0) {
+        // No history available, return current (unranked) data
+        console.log(`No MMR history found for ${name}#${tag}, using unranked status`);
+        return currentMMR;
+      }
+
+      // Find the most recent ranked match (non-zero tier)
+      for (const match of mmrHistory) {
+        if (match.currenttier > 0 && match.currenttierpatched && match.currenttierpatched.toLowerCase() !== 'unranked') {
+          console.log(`Found last ranked match for ${name}#${tag}: ${match.currenttierpatched} (${match.elo} ELO)`);
+          // Return the ranked match data in the same format as current MMR
+          return {
+            currenttier: match.currenttier,
+            currenttierpatched: match.currenttierpatched,
+            ranking_in_tier: match.ranking_in_tier,
+            mmr_change_to_last_game: match.mmr_change_to_last_game,
+            elo: match.elo,
+            name: match.name,
+            tag: match.tag,
+            old: false,
+          };
+        }
+      }
+
+      // No ranked matches found in history, player may be truly new to ranked
+      console.log(`No ranked matches found in history for ${name}#${tag}, using unranked status`);
+      return currentMMR;
+    } catch (error: any) {
+      console.error(`Error fetching rank with fallback for ${name}#${tag}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
    * Get match history for a player
    */
   async getMatches(region: string, name: string, tag: string, mode?: string): Promise<ValorantMatch[] | null> {

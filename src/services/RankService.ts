@@ -24,7 +24,8 @@ export class RankService {
     if (player?.riotId && this.valorantAPI) {
       try {
         const region = player.riotId.region || this.config.valorantAPI.defaultRegion;
-        const mmr = await this.valorantAPI.getMMR(
+        // Use getRankWithFallback to handle unranked/placement players
+        const mmr = await this.valorantAPI.getRankWithFallback(
           region,
           player.riotId.name,
           player.riotId.tag

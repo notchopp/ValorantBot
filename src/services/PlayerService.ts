@@ -74,6 +74,7 @@ export class PlayerService {
   /**
    * Fetch and update player rank from Valorant API
    * Requires Riot ID to be linked
+   * Handles unranked/placement players by checking MMR history
    */
   async fetchRankFromAPI(userId: string): Promise<{ success: boolean; rank?: string; rankValue?: number; message?: string }> {
     const player = this.players.get(userId);
@@ -93,7 +94,8 @@ export class PlayerService {
     const region = player.riotId.region || 'na';
     
     try {
-      const mmr = await this.valorantAPI.getMMR(
+      // Use getRankWithFallback to handle unranked/placement players
+      const mmr = await this.valorantAPI.getRankWithFallback(
         region,
         player.riotId.name,
         player.riotId.tag
@@ -104,12 +106,12 @@ export class PlayerService {
       }
 
       const rankValue = this.valorantAPI.getRankValueFromMMR(mmr);
-      player.rank = mmr.currenttierpatched;
+      player.rank = mmr.currenttierpatched || 'Unranked';
       player.rankValue = rankValue;
 
       return {
         success: true,
-        rank: mmr.currenttierpatched,
+        rank: mmr.currenttierpatched || 'Unranked',
         rankValue,
       };
     } catch (error: any) {

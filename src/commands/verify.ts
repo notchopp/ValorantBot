@@ -94,8 +94,9 @@ export async function execute(
         return;
       }
 
-      // Step 2: Get current Valorant rank
-      const mmr = await valorantAPI.getMMR(region, name, tag);
+      // Step 2: Get current Valorant rank (handles unranked/placement players)
+      // This will automatically check MMR history if player is unranked
+      const mmr = await valorantAPI.getRankWithFallback(region, name, tag);
       if (!mmr) {
         await interaction.editReply(
           `❌ Could not fetch rank for "${name}#${tag}". The account may not have played ranked matches yet.`
@@ -104,45 +105,16 @@ export async function execute(
       }
 
       // Step 3: Map Valorant rank to custom Discord rank and MMR (capped at GRNDS V)
-      const valorantRank = mmr.currenttierpatched; // e.g., "Diamond 2"
+      const valorantRank = mmr.currenttierpatched || 'Unranked'; // e.g., "Diamond 2"
       const { customRankService } = services;
-      
-      // Get lifetime stats for confidence boosting (optional)
-      // Note: MMR history may be slow, so we'll make it optional/non-blocking
-      let lifetimeStats;
-      try {
-        const mmrHistory = await valorantAPI.getMMRHistory(name, tag);
-        if (mmrHistory && mmrHistory.length > 0) {
-          // Calculate peak rank from history
-          let peakRank = mmrHistory[0].currenttierpatched;
-          for (const m of mmrHistory) {
-            const peakValue = customRankService.getValorantRankValue(peakRank);
-            const currentValue = customRankService.getValorantRankValue(m.currenttierpatched);
-            if (currentValue > peakValue) {
-              peakRank = m.currenttierpatched;
-            }
-          }
-
-          lifetimeStats = {
-            gamesPlayed: mmrHistory.length,
-            wins: mmrHistory.filter(m => m.mmr_change_to_last_game > 0).length,
-            peakRank,
-          };
-        }
-      } catch (error) {
-        // Non-critical - continue without lifetime stats
-        console.warn('Could not fetch MMR history for confidence boosting', {
-          name,
-          tag,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
 
       // Calculate initial MMR (capped at GRNDS V)
+      // Note: We removed the slow MMR history fetch for lifetime stats to prevent timeouts
+      // The getRankWithFallback already handles placement/unranked players
       const startingMMR = customRankService.calculateInitialMMR(
         valorantRank,
         mmr.elo,
-        lifetimeStats
+        undefined // No lifetime stats to avoid slow API calls
       );
 
       // Get custom rank from MMR
