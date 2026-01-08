@@ -77,6 +77,7 @@ async function handleLink(
     riotIDService: RiotIDService;
     playerService: PlayerService;
     valorantAPI?: ValorantAPIService;
+    databaseService?: DatabaseService;
   }
 ) {
   const userId = interaction.user.id;
@@ -94,7 +95,7 @@ async function handleLink(
     throw error;
   }
 
-  const { riotIDService, playerService, valorantAPI } = services;
+  const { riotIDService, playerService, valorantAPI, databaseService } = services;
   const username = interaction.user.username;
   const name = interaction.options.getString('name', true);
   const tag = interaction.options.getString('tag', true);
@@ -116,7 +117,28 @@ async function handleLink(
     // Auto-detect region if not provided
     const detectedRegion = region || account.region || 'na';
     
-    // Link Riot ID to database (stores account info, no Discord rank assignment)
+    // Update database first if available (ensures Supabase gets updated)
+    if (databaseService) {
+      const dbUpdateSuccess = await databaseService.updatePlayerRiotID(
+        userId,
+        name,
+        tag,
+        account.puuid,
+        detectedRegion
+      );
+      
+      if (!dbUpdateSuccess) {
+        console.error('Failed to update database with Riot ID', {
+          userId,
+          name,
+          tag,
+          puuid: account.puuid,
+          region: detectedRegion,
+        });
+      }
+    }
+    
+    // Link Riot ID in memory (stores account info, no Discord rank assignment)
     await riotIDService.linkRiotID(userId, name, tag, detectedRegion, account.puuid);
 
     await interaction.editReply(

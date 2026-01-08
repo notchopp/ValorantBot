@@ -23,6 +23,17 @@ export interface ValorantMMR {
   name: string;
   tag: string;
   old: boolean;
+  games_needed_for_rating?: number; // v3 API field for placement matches
+}
+
+export interface ValorantMMRHistoryEntry {
+  tier?: {
+    id: number;
+    name: string;
+  };
+  elo?: number;
+  match_id?: string;
+  date?: string;
 }
 
 export interface ValorantMMRHistory {
@@ -151,7 +162,7 @@ export interface ValorantMatch {
 
 export class ValorantAPIService {
   private api: AxiosInstance;
-  private baseURL = 'https://api.henrikdev.xyz/valorant/v1';
+  private baseURL = 'https://api.henrikdev.xyz/valorant';
   private apiKey?: string;
   private readonly RATE_LIMIT = 30; // 30 requests per minute
   private readonly RATE_WINDOW = 60000; // 1 minute in milliseconds
@@ -225,13 +236,13 @@ export class ValorantAPIService {
   }
 
   /**
-   * Get account information by Riot ID
+   * Get account information by Riot ID (using v2 for console support)
    */
   async getAccount(name: string, tag: string): Promise<ValorantAccount | null> {
     await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantAccount }>(
-        `/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
+        `/v2/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
       );
       return response.data.data;
     } catch (error: any) {
@@ -244,15 +255,17 @@ export class ValorantAPIService {
   }
 
   /**
-   * Get current MMR/rank by region and Riot ID
+   * Get current MMR/rank by region and Riot ID (v1 - kept for backward compatibility)
    */
   async getMMR(region: string, name: string, tag: string): Promise<ValorantMMR | null> {
     await this.waitForRateLimit();
     try {
-      const response = await this.api.get<{ status: number; data: ValorantMMR }>(
-        `/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
-      );
-      return response.data.data;
+      // First get account to get PUUID
+      const account = await this.getAccount(name, tag);
+      if (!account) return null;
+      
+      // Use v3 endpoint with PUUID
+      return await this.getMMRByPUUID(region, account.puuid);
     } catch (error: any) {
       if (error.response?.status === 404) {
         return null;
@@ -263,20 +276,75 @@ export class ValorantAPIService {
   }
 
   /**
-   * Get MMR history for a player
+   * Get current MMR/rank by PUUID (v3 API)
+   */
+  async getMMRByPUUID(region: string, puuid: string, platform: string = 'pc'): Promise<ValorantMMR | null> {
+    await this.waitForRateLimit();
+    try {
+      const response = await this.api.get<{ status: number; data: any }>(
+        `/v3/by-puuid/mmr/${region}/${platform}/${puuid}`
+      );
+      
+      const data = response.data.data;
+      if (!data) return null;
+      
+      // Map v3 response to ValorantMMR interface
+      return {
+        currenttier: data.current?.tier?.id || 0,
+        currenttierpatched: data.current?.tier?.name || 'Unrated',
+        ranking_in_tier: data.current?.ranking_in_tier || 0,
+        mmr_change_to_last_game: data.current?.mmr_change_to_last_game || 0,
+        elo: data.current?.elo || 0,
+        name: data.name || '',
+        tag: data.tag || '',
+        old: data.old || false,
+        games_needed_for_rating: data.current?.games_needed_for_rating || 0,
+      };
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      console.error(`Error fetching MMR by PUUID ${puuid}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get MMR history for a player (v2 by-puuid endpoint)
    */
   async getMMRHistory(name: string, tag: string): Promise<ValorantMMRHistory[] | null> {
     await this.waitForRateLimit();
     try {
-      const response = await this.api.get<{ status: number; data: ValorantMMRHistory[] }>(
-        `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
+      // First get account to get PUUID
+      const account = await this.getAccount(name, tag);
+      if (!account) return null;
+      
+      // Use v2 by-puuid endpoint
+      return await this.getMMRHistoryByPUUID(account.region, account.puuid);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      console.error(`Error fetching MMR history for ${name}#${tag}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get MMR history by PUUID (v2 API)
+   */
+  async getMMRHistoryByPUUID(region: string, puuid: string, platform: string = 'pc'): Promise<ValorantMMRHistory[] | null> {
+    await this.waitForRateLimit();
+    try {
+      const response = await this.api.get<{ status: number; data: any }>(
+        `/v2/by-puuid/mmr-history/${region}/${platform}/${puuid}`
       );
       return response.data.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return null;
       }
-      console.error(`Error fetching MMR history for ${name}#${tag}:`, error.message);
+      console.error(`Error fetching MMR history by PUUID ${puuid}:`, error.message);
       return null;
     }
   }
@@ -288,26 +356,31 @@ export class ValorantAPIService {
   async getLastRankedRank(name: string, tag: string): Promise<{ rank: string; elo: number; date: string } | null> {
     await this.waitForRateLimit();
     try {
-      const response = await this.api.get<{ status: number; data: ValorantMMRHistory[] }>(
-        `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
+      // First get account to get PUUID
+      const account = await this.getAccount(name, tag);
+      if (!account) return null;
+      
+      const response = await this.api.get<{ status: number; data: any }>(
+        `/v2/by-puuid/mmr-history/${account.region}/pc/${account.puuid}`
       );
       
-      if (!response.data.data || response.data.data.length === 0) {
+      if (!response.data.data || !response.data.data.history || response.data.data.history.length === 0) {
         return null;
       }
 
       // MMR history is typically sorted by date (most recent first)
       // Find the first ranked entry (not unrated) - this is the last ranked rank
-      for (const entry of response.data.data) {
+      for (const entry of response.data.data.history) {
         if (
-          entry.currenttierpatched &&
-          !entry.currenttierpatched.toLowerCase().includes('unrated') &&
-          entry.currenttier > 0
+          entry.tier &&
+          entry.tier.name &&
+          !entry.tier.name.toLowerCase().includes('unrated') &&
+          entry.tier.id > 0
         ) {
           return {
-            rank: entry.currenttierpatched,
-            elo: entry.elo,
-            date: entry.date,
+            rank: entry.tier.name,
+            elo: entry.elo || 0,
+            date: entry.date || new Date().toISOString(),
           };
         }
       }
@@ -329,8 +402,8 @@ export class ValorantAPIService {
     await this.waitForRateLimit();
     try {
       const url = mode
-        ? `/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=${mode}`
-        : `/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+        ? `/v1/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=${mode}`
+        : `/v1/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
       
       const response = await this.api.get<{ status: number; data: ValorantMatch[] }>(url);
       return response.data.data;
@@ -350,7 +423,7 @@ export class ValorantAPIService {
     await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantMatch }>(
-        `/match/${matchId}`
+        `/v1/match/${matchId}`
       );
       return response.data.data;
     } catch (error: any) {

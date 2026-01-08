@@ -29,6 +29,7 @@ interface ValorantMMR {
   ranking_in_tier: number;
   mmr_change_to_last_game: number;
   elo: number;
+  games_needed_for_rating?: number;
 }
 
 // Custom rank thresholds (from CUSTOM_RANK_SYSTEM.md)
@@ -131,7 +132,7 @@ export default async function handler(
 
     // Initialize Valorant API
     const valorantAPI = axios.create({
-      baseURL: 'https://api.henrikdev.xyz/valorant/v1',
+      baseURL: 'https://api.henrikdev.xyz/valorant',
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -188,16 +189,74 @@ export default async function handler(
     const oldMMR = player.current_mmr || 0;
     const currentPeakMMR = player.peak_mmr || 0;
 
-    // Get current Valorant rank
-    console.log('Fetching current Valorant rank', { riotName, riotTag, region });
+    // Step 1: Get account for PUUID
+    console.log('Fetching account information', { riotName, riotTag });
+    
+    let puuid: string | null = null;
+    let accountRegion: string = region;
+    try {
+      const accountUrl = `/v2/account/${encodeURIComponent(riotName)}/${encodeURIComponent(riotTag)}`;
+      console.log('Calling Valorant Account API', { url: accountUrl });
+      
+      const accountResponse = await valorantAPI.get<{ status: number; data: any }>(accountUrl);
+      puuid = accountResponse.data.data?.puuid;
+      accountRegion = accountResponse.data.data?.region || region;
+      
+      console.log('Account response received', {
+        riotName,
+        riotTag,
+        puuid: puuid ? 'found' : 'not found',
+        accountRegion,
+      });
+      
+      if (!puuid) {
+        console.error('PUUID not found in account response');
+        res.status(404).json({
+          success: false,
+          error: 'Could not find Riot account. Please check your Riot ID.',
+        });
+        return;
+      }
+    } catch (error: any) {
+      console.error('Error fetching account', {
+        riotName,
+        riotTag,
+        status: error.response?.status,
+        message: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch account information. Please try again.',
+      });
+      return;
+    }
+
+    // Step 2: Get current Valorant rank using v3 API
+    console.log('Fetching current Valorant rank', { riotName, riotTag, region: accountRegion });
     
     let mmr: ValorantMMR | null = null;
+    const platform = 'pc'; // Default to PC
     try {
-      const mmrUrl = `/mmr/${region}/${encodeURIComponent(riotName)}/${encodeURIComponent(riotTag)}`;
-      console.log('Calling Valorant MMR API', { url: mmrUrl });
+      const mmrUrl = `/v3/by-puuid/mmr/${accountRegion}/${platform}/${puuid}`;
+      console.log('Calling Valorant MMR API v3', { url: mmrUrl });
       
-      const mmrResponse = await valorantAPI.get<{ status: number; data: ValorantMMR }>(mmrUrl);
-      mmr = mmrResponse.data.data;
+      const mmrResponse = await valorantAPI.get<{ status: number; data: any }>(mmrUrl);
+      const mmrData = mmrResponse.data.data;
+      
+      // Map v3 response to ValorantMMR interface
+      if (mmrData) {
+        mmr = {
+          currenttier: mmrData.current?.tier?.id || 0,
+          currenttierpatched: mmrData.current?.tier?.name || 'Unrated',
+          ranking_in_tier: mmrData.current?.ranking_in_tier || 0,
+          mmr_change_to_last_game: mmrData.current?.mmr_change_to_last_game || 0,
+          elo: mmrData.current?.elo || 0,
+          name: mmrData.name || riotName,
+          tag: mmrData.tag || riotTag,
+          old: mmrData.old || false,
+          games_needed_for_rating: mmrData.current?.games_needed_for_rating || 0,
+        };
+      }
       
       console.log('Valorant MMR response received', {
         riotName,
@@ -205,12 +264,13 @@ export default async function handler(
         currentTier: mmr?.currenttier,
         currentTierPatched: mmr?.currenttierpatched,
         elo: mmr?.elo,
+        gamesNeededForRating: mmr?.games_needed_for_rating,
       });
     } catch (error: any) {
       console.error('Error fetching current MMR', {
         riotName,
         riotTag,
-        region,
+        region: accountRegion,
         status: error.response?.status,
         message: error.message,
       });
@@ -222,8 +282,9 @@ export default async function handler(
       return;
     }
 
-    // Check if unrated
+    // Check if unrated or in placement matches
     const isUnrated = !mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated');
+    const isInPlacements = mmr && mmr.games_needed_for_rating && mmr.games_needed_for_rating > 0;
     
     let valorantRank: string;
     let valorantELO: number;
@@ -232,7 +293,79 @@ export default async function handler(
     let discordRankValue: number;
     let boosted = false;
 
-    if (isUnrated) {
+    if (isInPlacements) {
+      // Player is in placement matches - check MMR history for last ranked match
+      console.log('Player is in placement matches, checking MMR history', { riotName, riotTag, gamesNeeded: mmr?.games_needed_for_rating });
+      
+      try {
+        const historyUrl = `/v2/by-puuid/mmr-history/${accountRegion}/${platform}/${puuid}`;
+        console.log('Calling Valorant MMR History API', { url: historyUrl });
+        
+        const historyResponse = await valorantAPI.get<{ status: number; data: any }>(historyUrl);
+        const history = historyResponse.data.data?.history;
+        
+        if (history && history.length > 0) {
+          // Find last ranked match with tier data
+          const lastRanked = history.find((entry: any) => entry.tier && entry.tier.id > 0);
+          
+          if (lastRanked) {
+            console.log('Found last ranked match in history', {
+              rank: lastRanked.tier.name,
+              elo: lastRanked.elo,
+            });
+            
+            valorantRank = lastRanked.tier.name;
+            valorantELO = lastRanked.elo || 0;
+            const valorantMMR = calculateMMRFromValorantRank(valorantRank, valorantELO);
+            const valorantDiscordRank = getRankFromMMR(valorantMMR);
+            const valorantDiscordRankValue = getRankValue(valorantDiscordRank);
+            
+            // Get current Discord rank values
+            const currentDiscordRankValue = player.discord_rank_value || getRankValue(oldRank);
+            
+            // Use the HIGHER of the two
+            if (valorantDiscordRankValue > currentDiscordRankValue) {
+              newMMR = valorantMMR;
+              discordRank = valorantDiscordRank;
+              discordRankValue = valorantDiscordRankValue;
+              boosted = true;
+            } else {
+              newMMR = oldMMR;
+              discordRank = oldRank;
+              discordRankValue = currentDiscordRankValue;
+            }
+          } else {
+            // No ranked history - keep current rank
+            console.log('No ranked history found, keeping current rank', { riotName, riotTag });
+            valorantRank = 'Unrated (in placements)';
+            valorantELO = 0;
+            newMMR = oldMMR;
+            discordRank = oldRank;
+            discordRankValue = player.discord_rank_value || getRankValue(oldRank);
+          }
+        } else {
+          // No history - keep current rank
+          console.log('No MMR history available, keeping current rank', { riotName, riotTag });
+          valorantRank = 'Unrated (in placements)';
+          valorantELO = 0;
+          newMMR = oldMMR;
+          discordRank = oldRank;
+          discordRankValue = player.discord_rank_value || getRankValue(oldRank);
+        }
+      } catch (error: any) {
+        console.error('Error fetching MMR history', {
+          riotName,
+          riotTag,
+          error: error.message,
+        });
+        // Keep current rank if history fetch fails
+        valorantRank = 'Unrated (in placements)';
+        valorantELO = 0;
+        newMMR = oldMMR;
+        discordRank = oldRank;
+        discordRankValue = player.discord_rank_value || getRankValue(oldRank);
+      }
+    } else if (isUnrated) {
       // If unrated, keep current Discord rank (don't downgrade)
       console.log('User is unrated, keeping current Discord rank', {
         userId,
