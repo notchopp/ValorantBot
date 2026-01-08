@@ -15,6 +15,7 @@ import { DatabaseService } from '../services/DatabaseService';
 import { CustomRankService } from '../services/CustomRankService';
 import { RoleUpdateService } from '../services/RoleUpdateService';
 import { Config } from '../config/config';
+import { Player } from '../models/Player';
 
 export const data = new SlashCommandBuilder()
   .setName('match')
@@ -94,14 +95,14 @@ async function handleReport(
     .setLabel('Team A Stats (Format: username:K/D/A)')
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(false)
-    .setPlaceholder(`Example:\n${currentMatch.teams.teamA.players[0]?.username || 'player1'}:15/10/5\n${currentMatch.teams.teamA.players[1]?.username || 'player2'}:12/8/7\nMVP:${currentMatch.teams.teamA.players[0]?.username || 'player1'}`);
+    .setPlaceholder(generateStatsPlaceholder(currentMatch.teams.teamA.players));
 
   const teamBStatsInput = new TextInputBuilder()
     .setCustomId('team_b_stats')
     .setLabel('Team B Stats (Format: username:K/D/A)')
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(false)
-    .setPlaceholder(`Example:\n${currentMatch.teams.teamB.players[0]?.username || 'player1'}:18/11/4\n${currentMatch.teams.teamB.players[1]?.username || 'player2'}:10/12/6\nMVP:${currentMatch.teams.teamB.players[0]?.username || 'player1'}`);
+    .setPlaceholder(generateStatsPlaceholder(currentMatch.teams.teamB.players));
 
   const firstRow = new ActionRowBuilder<TextInputBuilder>().addComponents(winnerInput);
   const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(scoreInput);
@@ -197,6 +198,13 @@ async function handleInfo(
   await interaction.editReply({ embeds: [embed] });
 }
 
+// Helper function to generate placeholder text for stat input fields
+function generateStatsPlaceholder(teamPlayers: Player[]): string {
+  const player1 = teamPlayers[0]?.username || 'player1';
+  const player2 = teamPlayers[1]?.username || 'player2';
+  return `Example:\n${player1}:15/10/5\n${player2}:12/8/7\nMVP:${player1}`;
+}
+
 // Helper function to parse player stats from text input
 // Format: username:K/D/A (e.g., "player1:15/10/5")
 // MVP line: MVP:username
@@ -208,7 +216,7 @@ interface ParsedPlayerStats {
   mvp: boolean;
 }
 
-function parseTeamStats(statsText: string, teamPlayers: any[]): Map<string, ParsedPlayerStats> {
+function parseTeamStats(statsText: string, teamPlayers: Player[]): Map<string, ParsedPlayerStats> {
   const statsMap = new Map<string, ParsedPlayerStats>();
   
   if (!statsText || !statsText.trim()) {
@@ -533,7 +541,7 @@ export async function handleMatchReportModal(
     // Add top performers (highest K/D ratio)
     const allStats = [...teamAStatsArray, ...teamBStatsArray];
     const topPerformers = allStats
-      .filter(p => p.deaths > 0 || p.kills > 0) // Filter out players with no stats
+      .filter(p => p.kills > 0 || p.deaths > 0 || p.assists > 0) // Filter out players with no stats
       .sort((a, b) => {
         const kdA = a.deaths > 0 ? a.kills / a.deaths : a.kills;
         const kdB = b.deaths > 0 ? b.kills / b.deaths : b.kills;
@@ -541,7 +549,7 @@ export async function handleMatchReportModal(
       })
       .slice(0, 3);
 
-    if (topPerformers.length > 0 && topPerformers.some(p => p.kills > 0 || p.deaths > 0)) {
+    if (topPerformers.length > 0 && topPerformers.some(p => p.kills > 0 || p.deaths > 0 || p.assists > 0)) {
       const topPerformersText = topPerformers
         .map(p => {
           const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
