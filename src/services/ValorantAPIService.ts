@@ -282,6 +282,47 @@ export class ValorantAPIService {
   }
 
   /**
+   * Get the last ranked rank from MMR history (more efficient - stops early)
+   * Returns the most recent ranked entry (not unrated) from previous acts/seasons
+   */
+  async getLastRankedRank(name: string, tag: string): Promise<{ rank: string; elo: number; date: string } | null> {
+    await this.waitForRateLimit();
+    try {
+      const response = await this.api.get<{ status: number; data: ValorantMMRHistory[] }>(
+        `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
+      );
+      
+      if (!response.data.data || response.data.data.length === 0) {
+        return null;
+      }
+
+      // MMR history is typically sorted by date (most recent first)
+      // Find the first ranked entry (not unrated) - this is the last ranked rank
+      for (const entry of response.data.data) {
+        if (
+          entry.currenttierpatched &&
+          !entry.currenttierpatched.toLowerCase().includes('unrated') &&
+          entry.currenttier > 0
+        ) {
+          return {
+            rank: entry.currenttierpatched,
+            elo: entry.elo,
+            date: entry.date,
+          };
+        }
+      }
+
+      return null; // No ranked entries found
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      console.error(`Error fetching last ranked rank for ${name}#${tag}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
    * Get match history for a player
    */
   async getMatches(region: string, name: string, tag: string, mode?: string): Promise<ValorantMatch[] | null> {

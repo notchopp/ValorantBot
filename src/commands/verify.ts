@@ -81,35 +81,17 @@ export async function execute(
     
     // Check if player is unrated (no current rank or unrated status)
     if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
-      // Player is unrated - get last ranked rank from previous act/season
+      // Player is unrated - get last ranked rank from previous act/season (optimized method)
       isUnrated = true;
       try {
-        mmrHistory = await valorantAPI.getMMRHistory(name, tag);
-        if (mmrHistory && mmrHistory.length > 0) {
-          // Filter out all unrated entries and find the most recent ranked entry
-          // This will be from a previous act/season (before current placements)
-          const rankedEntries = mmrHistory.filter((m: ValorantMMRHistory) => 
-            m.currenttierpatched && 
-            !m.currenttierpatched.toLowerCase().includes('unrated') &&
-            m.currenttier > 0 // Ensure it's an actual rank tier
-          );
-          
-          if (rankedEntries.length > 0) {
-            // Sort by date (most recent first) to get the last ranked rank
-            const sortedRanked = [...rankedEntries].sort((a, b) => b.date_raw - a.date_raw);
-            const lastRanked = sortedRanked[0]; // Most recent ranked entry
-            
-            valorantRank = lastRanked.currenttierpatched;
-            valorantELO = lastRanked.elo;
-          } else {
-            await interaction.editReply(
-              `❌ Could not find a ranked rank from previous acts/seasons for "${name}#${tag}". Please complete your placement matches first, or ensure you have played ranked in a previous act.`
-            );
-            return;
-          }
+        const lastRanked = await valorantAPI.getLastRankedRank(name, tag);
+        
+        if (lastRanked) {
+          valorantRank = lastRanked.rank;
+          valorantELO = lastRanked.elo;
         } else {
           await interaction.editReply(
-            `❌ Could not fetch rank history for "${name}#${tag}". The account may not have played ranked matches yet.`
+            `❌ Could not find a ranked rank from previous acts/seasons for "${name}#${tag}". Please complete your placement matches first, or ensure you have played ranked in a previous act.`
           );
           return;
         }
