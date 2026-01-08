@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes, Interaction } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, Interaction, MessageFlags } from 'discord.js';
 import { config } from 'dotenv';
 import { defaultConfig, Config } from './config/config';
 import { PlayerService } from './services/PlayerService';
@@ -173,17 +173,31 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
     try {
       await command.execute(interaction, services);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error executing ${interaction.commandName}:`, error);
+      
+      // Handle interaction timeout errors gracefully
+      if (error?.code === 10062) {
+        console.warn(`Interaction ${interaction.commandName} timed out - user may have clicked command multiple times`);
+        return; // Silently ignore timeout errors
+      }
+
       const reply = {
         content: 'There was an error while executing this command!',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral as any,
       };
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(reply);
+        } else {
+          await interaction.reply(reply);
+        }
+      } catch (replyError: any) {
+        // If we can't reply (e.g., interaction expired), just log it
+        if (replyError?.code !== 10062) {
+          console.error('Failed to send error reply:', replyError);
+        }
       }
     }
   } else if (interaction.isModalSubmit()) {

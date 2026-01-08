@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
@@ -22,7 +23,7 @@ export async function execute(
     rankCalculationService: RankCalculationService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;

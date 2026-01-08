@@ -7,6 +7,7 @@ import {
   TextInputStyle,
   ActionRowBuilder,
   ModalSubmitInteraction,
+  MessageFlags,
 } from 'discord.js';
 import { MatchService } from '../services/MatchService';
 import { PlayerService } from '../services/PlayerService';
@@ -61,7 +62,7 @@ async function handleReport(
   if (!currentMatch || currentMatch.status === 'completed') {
     await interaction.reply({
       content: '❌ No active match found to report.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

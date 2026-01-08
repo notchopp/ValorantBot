@@ -5,6 +5,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } from 'discord.js';
 import { QueueService } from '../services/QueueService';
 import { PlayerService } from '../services/PlayerService';
@@ -72,7 +73,7 @@ async function handleStart(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -184,7 +185,7 @@ async function handleStop(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -222,7 +223,7 @@ async function handleJoin(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -352,7 +353,7 @@ async function handleLeave(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
 
@@ -512,7 +513,7 @@ export async function handleButtonInteraction(
     if (!interaction.guild) {
       await interaction.reply({
         content: '❌ This can only be used in a server.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -524,7 +525,7 @@ export async function handleButtonInteraction(
     } else {
       await interaction.reply({
         content: '❌ Unknown button interaction.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   } catch (error) {
@@ -539,7 +540,7 @@ export async function handleButtonInteraction(
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: '❌ An error occurred. Please try again.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -561,7 +562,7 @@ async function handleJoinButton(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -773,7 +774,7 @@ async function handleLeaveButton(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
 

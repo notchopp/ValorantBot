@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  MessageFlags,
 } from 'discord.js';
 import { RiotIDService } from '../services/RiotIDService';
 import { PlayerService } from '../services/PlayerService';
@@ -72,7 +73,7 @@ async function handleLink(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const { riotIDService, playerService, valorantAPI } = services;
   const userId = interaction.user.id;
@@ -128,7 +129,7 @@ async function handleUnlink(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const { riotIDService } = services;
   const userId = interaction.user.id;
@@ -149,7 +150,7 @@ async function handleInfo(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const { riotIDService, playerService, valorantAPI } = services;
   const userId = interaction.user.id;
@@ -216,7 +217,7 @@ async function handleRefresh(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const { playerService, valorantAPI } = services;
   const userId = interaction.user.id;

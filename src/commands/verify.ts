@@ -4,6 +4,7 @@ import {
   EmbedBuilder,
   GuildMember,
   Role,
+  MessageFlags,
 } from 'discord.js';
 import { ValorantAPIService } from '../services/ValorantAPIService';
 import { DatabaseService } from '../services/DatabaseService';
@@ -41,7 +42,7 @@ export async function execute(
     customRankService: CustomRankService;
   }
 ) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
