@@ -60,8 +60,9 @@ export async function execute(
       return;
     }
 
-    if (!tag || tag.length > 10 || !/^[0-9]+$/.test(tag)) {
-      await interaction.editReply('❌ Invalid Riot tag. Use only numbers (1-10 characters).');
+    // Riot tags can contain letters and numbers (alphanumeric)
+    if (!tag || tag.length < 1 || tag.length > 10 || !/^[a-zA-Z0-9]+$/.test(tag)) {
+      await interaction.editReply('❌ Invalid Riot tag. Use only letters and numbers (1-10 characters).');
       return;
     }
 
