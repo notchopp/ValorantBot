@@ -73,10 +73,22 @@ async function handleLink(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const userId = interaction.user.id;
+  
+  // Defer reply immediately to prevent timeout (3 second limit)
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Riot link interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   const { riotIDService, playerService, valorantAPI } = services;
-  const userId = interaction.user.id;
   const username = interaction.user.username;
   const name = interaction.options.getString('name', true);
   const tag = interaction.options.getString('tag', true);
@@ -120,10 +132,22 @@ async function handleUnlink(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const userId = interaction.user.id;
+  
+  // Defer reply immediately to prevent timeout (3 second limit)
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Riot unlink interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   const { riotIDService } = services;
-  const userId = interaction.user.id;
 
     const unlinked = await riotIDService.unlinkRiotID(userId);
   if (unlinked) {
@@ -141,10 +165,22 @@ async function handleInfo(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const userId = interaction.user.id;
+  
+  // Defer reply immediately to prevent timeout (3 second limit)
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Riot info interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   const { riotIDService, playerService, valorantAPI } = services;
-  const userId = interaction.user.id;
 
   const riotId = riotIDService.getRiotID(userId);
     // Force refresh from database to get latest data
@@ -209,10 +245,22 @@ async function handleRefresh(
     valorantAPI?: ValorantAPIService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const userId = interaction.user.id;
+  
+  // Defer reply immediately to prevent timeout (3 second limit)
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn(`Riot refresh interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    throw error;
+  }
 
   const { playerService, valorantAPI } = services;
-  const userId = interaction.user.id;
 
   if (!valorantAPI) {
     await interaction.editReply('❌ Valorant API is not available.');
