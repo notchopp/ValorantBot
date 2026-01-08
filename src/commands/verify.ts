@@ -93,7 +93,7 @@ export async function execute(
     // Update Discord role if verification succeeded
     if (interaction.guild && verifyResult.discordRank && roleUpdateService) {
       try {
-        console.log('Assigning Discord role after verification', {
+        console.info('Assigning Discord role after verification', {
           userId,
           oldRank: existingPlayer.discord_rank || 'Unranked',
           newRank: verifyResult.discordRank,
@@ -106,7 +106,7 @@ export async function execute(
           interaction.guild
         );
 
-        console.log('✅ Discord role assigned successfully', {
+        console.info('✅ Discord role assigned successfully', {
           userId,
           rank: verifyResult.discordRank,
         });
@@ -139,7 +139,9 @@ export async function execute(
           inline: true,
         },
         {
-          name: '\u200B', // Empty field for spacing
+          // Empty field for Discord's 3-column embed layout spacing
+          // Unicode zero-width space (\u200B) creates a blank column
+          name: '\u200B',
           value: '\u200B',
           inline: true,
         },

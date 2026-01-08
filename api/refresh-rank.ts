@@ -122,7 +122,9 @@ function calculateMMRFromValorantRank(valorantRank: string, valorantELO: number)
     const eloPercentage = normalizedELO / 5000;
     const calculatedMMR = range.min + Math.round((range.max - range.min) * eloPercentage);
     
-    // Only ensure non-negative, no artificial cap
+    // Return calculated MMR without artificial caps
+    // Users can now be placed at any Discord rank (GRNDS I through CHALLENGER V) based on their Valorant rank
+    // MMR ranges: 0-199 (GRNDS I) up to 3000+ (X rank)
     return Math.max(0, calculatedMMR);
   } catch (error) {
     console.error('Error calculating MMR from Valorant rank', { valorantRank, valorantELO, error });
