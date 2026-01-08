@@ -39,8 +39,19 @@ export class PlayerService {
     return player;
   }
 
-  async getPlayer(userId: string): Promise<Player | undefined> {
-    // Try cache first
+  async getPlayer(userId: string, forceRefresh: boolean = false): Promise<Player | undefined> {
+    // If force refresh, skip cache and go straight to database
+    if (forceRefresh) {
+      const dbPlayer = await this.dbService.getPlayer(userId);
+      if (dbPlayer) {
+        const player = this.dbService.databasePlayerToModel(dbPlayer);
+        this.players.set(userId, player); // Update cache
+        return player;
+      }
+      return undefined;
+    }
+
+    // Try cache first (for performance)
     let player = this.players.get(userId);
     if (player) return player;
 

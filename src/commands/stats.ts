@@ -27,7 +27,8 @@ export async function execute(
 
   try {
     const { playerService } = services;
-    const player = await playerService.getPlayer(userId);
+    // Force refresh from database to get latest stats
+    const player = await playerService.getPlayer(userId, true);
 
     if (!player) {
       await interaction.editReply(

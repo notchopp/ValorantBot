@@ -87,6 +87,15 @@ export async function execute(
         return;
       }
 
+      // Check if Riot ID is linked (via /riot link) - check database directly
+      const dbPlayerCheck = await databaseService.getPlayer(userId);
+      if (!dbPlayerCheck?.riot_name || !dbPlayerCheck?.riot_tag) {
+        await interaction.editReply(
+          `❌ Please link your Riot ID first using \`/riot link\` before verifying. This allows the bot to fetch your rank and stats.\n\n**Steps:**\n1. Use \`/riot link name:<your_riot_name> tag:<your_riot_tag>\`\n2. Then use \`/verify\` to get your initial rank placement.`
+        );
+        return;
+      }
+
       // Step 1: Verify account exists
       const account = await valorantAPI.getAccount(name, tag);
       if (!account) {

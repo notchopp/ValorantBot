@@ -326,7 +326,8 @@ export async function handleMatchReportModal(
     // Step 5: Update player stats (games played, wins, losses)
     for (const player of allPlayers) {
       const isWinner = winningTeam.players.some(p => p.userId === player.userId);
-      const p = await playerService.getPlayer(player.userId);
+      // Force refresh from database to get accurate current stats
+      const p = await playerService.getPlayer(player.userId, true);
       if (p) {
         await playerService.updatePlayerStats(player.userId, {
           gamesPlayed: p.stats.gamesPlayed + 1,

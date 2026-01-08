@@ -100,8 +100,8 @@ async function handleLink(
     
     await riotIDService.linkRiotID(userId, name, tag, detectedRegion, account.puuid);
     
-    // Fetch and update rank immediately
-    const player = await playerService.getPlayer(userId);
+    // Fetch and update rank immediately (force refresh from DB)
+    const player = await playerService.getPlayer(userId, true);
     if (player) {
       const mmr = await valorantAPI.getMMR(detectedRegion, name, tag);
       if (mmr) {
@@ -156,7 +156,8 @@ async function handleInfo(
   const userId = interaction.user.id;
 
   const riotId = riotIDService.getRiotID(userId);
-    const player = await playerService.getPlayer(userId);
+    // Force refresh from database to get latest data
+    const player = await playerService.getPlayer(userId, true);
 
   if (!riotId) {
     await interaction.editReply('❌ You do not have a Riot ID linked. Use `/riot link` to link your account.');
