@@ -667,6 +667,49 @@ export class DatabaseService {
   }
 
   /**
+   * Get rank history for a player
+   */
+  async getRankHistory(discordUserId: string, limit: number = 10): Promise<Array<{
+    old_rank: string;
+    new_rank: string;
+    old_mmr: number;
+    new_mmr: number;
+    reason: string;
+    created_at: string;
+  }> | null> {
+    try {
+      const supabase = this.getSupabase();
+      const player = await this.getPlayer(discordUserId);
+      if (!player) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('rank_history')
+        .select('old_rank, new_rank, old_mmr, new_mmr, reason, created_at')
+        .eq('player_id', player.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error getting rank history', {
+          discordUserId,
+          error: error.message,
+        });
+        return null;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error getting rank history', {
+        discordUserId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Helper: Get rank value from rank name
    */
   private getRankValue(rank: string): number {
