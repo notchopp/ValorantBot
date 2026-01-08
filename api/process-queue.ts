@@ -77,8 +77,9 @@ export default async function handler(
   console.log('=== PROCESS QUEUE API CALLED ===', {
     timestamp: new Date().toISOString(),
     method: req.method,
-    headers: req.headers,
-    body: req.body,
+    contentType: req.headers['content-type'],
+    userAgent: req.headers['user-agent'],
+    bodyKeys: req.body ? Object.keys(req.body) : [],
   });
 
   if (req.method !== 'POST') {
