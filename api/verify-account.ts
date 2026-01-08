@@ -22,7 +22,7 @@ interface VerifyRequest {
   webhookUrl?: string; // Fly.io webhook endpoint
 }
 
-interface VerifyResponse {
+export interface VerifyResponse {
   success: boolean;
   discordRank?: string;
   discordRankValue?: number;

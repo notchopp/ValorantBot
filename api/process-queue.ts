@@ -17,7 +17,7 @@ interface ProcessQueueRequest {
   webhookUrl?: string; // Fly.io webhook endpoint
 }
 
-interface ProcessQueueResponse {
+export interface ProcessQueueResponse {
   success: boolean;
   match?: {
     matchId: string;

@@ -16,7 +16,7 @@ interface CalculateRankRequest {
   webhookUrl?: string; // Fly.io webhook endpoint for callbacks
 }
 
-interface CalculateRankResponse {
+export interface CalculateRankResponse {
   success: boolean;
   results?: Array<{
     playerId: string;
