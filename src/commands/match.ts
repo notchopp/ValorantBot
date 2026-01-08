@@ -316,6 +316,17 @@ export async function handleMatchReportModal(
     }> = [];
     try {
       const { vercelAPI } = services;
+      
+      if (!vercelAPI) {
+        console.error('vercelAPI is not available in services', { matchId: currentMatch.matchId });
+        throw new Error('Vercel API service is not available');
+      }
+
+      console.log('Calling Vercel calculateRank API from match report', {
+        matchId: currentMatch.matchId,
+        hasVercelAPI: !!vercelAPI,
+      });
+
       const calculateResult = await vercelAPI.calculateRank({
         matchId: currentMatch.matchId,
       });

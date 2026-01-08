@@ -164,23 +164,36 @@ export class VercelAPIService {
    */
   async calculateRank(request: CalculateRankRequest): Promise<CalculateRankResponse> {
     if (!this.baseURL) {
+      console.error('calculateRank called but VERCEL_API_URL is not set');
       return {
         success: false,
-        error: 'Vercel API URL not configured',
+        error: 'Vercel API URL not configured. Please set VERCEL_API_URL in Fly.io secrets.',
       };
     }
+
+    console.log('Calling Vercel calculate-rank API', {
+      url: `${this.baseURL}/api/calculate-rank`,
+      matchId: request.matchId,
+    });
 
     try {
       const response = await this.api.post<CalculateRankResponse>(
         '/api/calculate-rank',
         request
       );
+      console.log('Vercel calculate-rank API success', {
+        matchId: request.matchId,
+        success: response.data.success,
+        resultsCount: response.data.results?.length || 0,
+      });
       return response.data;
     } catch (error: any) {
       console.error('Error calling calculate-rank API', {
         matchId: request.matchId,
+        url: `${this.baseURL}/api/calculate-rank`,
         error: error.message,
         status: error.response?.status,
+        data: error.response?.data,
       });
 
       if (error.response?.data) {
@@ -200,23 +213,35 @@ export class VercelAPIService {
    */
   async processQueue(request: ProcessQueueRequest = {}): Promise<ProcessQueueResponse> {
     if (!this.baseURL) {
+      console.error('processQueue called but VERCEL_API_URL is not set');
       return {
         success: false,
-        error: 'Vercel API URL not configured',
+        error: 'Vercel API URL not configured. Please set VERCEL_API_URL in Fly.io secrets.',
       };
     }
+
+    console.log('Calling Vercel process-queue API', {
+      url: `${this.baseURL}/api/process-queue`,
+      balancingMode: request.balancingMode || 'auto',
+    });
 
     try {
       const response = await this.api.post<ProcessQueueResponse>(
         '/api/process-queue',
         request
       );
+      console.log('Vercel process-queue API success', {
+        success: response.data.success,
+        matchId: response.data.match?.matchId,
+      });
       return response.data;
     } catch (error: any) {
       console.error('Error calling process-queue API', {
         balancingMode: request.balancingMode,
+        url: `${this.baseURL}/api/process-queue`,
         error: error.message,
         status: error.response?.status,
+        data: error.response?.data,
       });
 
       if (error.response?.data) {
@@ -236,24 +261,40 @@ export class VercelAPIService {
    */
   async refreshRank(request: RefreshRankRequest): Promise<RefreshRankResponse> {
     if (!this.baseURL) {
+      console.error('refreshRank called but VERCEL_API_URL is not set');
       return {
         success: false,
-        error: 'Vercel API URL not configured',
+        error: 'Vercel API URL not configured. Please set VERCEL_API_URL in Fly.io secrets.',
       };
     }
+
+    console.log('Calling Vercel refresh-rank API', {
+      url: `${this.baseURL}/api/refresh-rank`,
+      userId: request.userId,
+      riotId: `${request.riotName}#${request.riotTag}`,
+      region: request.region,
+    });
 
     try {
       const response = await this.api.post<RefreshRankResponse>(
         '/api/refresh-rank',
         request
       );
+      console.log('Vercel refresh-rank API success', {
+        userId: request.userId,
+        success: response.data.success,
+        boosted: response.data.boosted,
+        newRank: response.data.discordRank,
+      });
       return response.data;
     } catch (error: any) {
       console.error('Error calling refresh-rank API', {
         userId: request.userId,
         riotId: `${request.riotName}#${request.riotTag}`,
+        url: `${this.baseURL}/api/refresh-rank`,
         error: error.message,
         status: error.response?.status,
+        data: error.response?.data,
       });
 
       if (error.response?.data) {

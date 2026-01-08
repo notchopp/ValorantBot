@@ -64,7 +64,16 @@ const riotIDService = new RiotIDService(playerService, databaseService);
 const rankCalculationService = new RankCalculationService(databaseService, customRankService);
 const roleUpdateService = new RoleUpdateService(databaseService, appConfig);
 const voiceChannelService = new VoiceChannelService();
+// Initialize Vercel API Service
 const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
+
+// Log Vercel API status on startup
+if (process.env.VERCEL_API_URL) {
+  console.log('✅ VERCEL_API_URL is set:', process.env.VERCEL_API_URL);
+} else {
+  console.warn('⚠️  VERCEL_API_URL is NOT set - Vercel cloud agents will not work!');
+  console.warn('Set it with: fly secrets set VERCEL_API_URL=https://your-app.vercel.app');
+}
 
 // Services object to pass to commands
 const services = {

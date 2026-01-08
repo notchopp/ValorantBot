@@ -264,8 +264,12 @@ async function handleJoin(
     return;
   }
 
-    // Check if queue is full (async)
-    if (await queueService.isFull()) {
+  // Get updated queue status
+  const queue = await queueService.getStatus();
+  const queueSize = queue.players.length;
+
+  // Check if queue is full (async)
+  if (await queueService.isFull()) {
       // Validate guild exists for voice channels
       if (!interaction.guild) {
         await interaction.editReply('❌ Cannot create match: guild not found.');
@@ -277,6 +281,20 @@ async function handleJoin(
 
       // Call Vercel Cloud Agent to process queue and create match
       const { vercelAPI } = services;
+      
+      if (!vercelAPI) {
+        console.error('vercelAPI is not available in services for queue processing (handleJoin command)');
+        queueService.unlock();
+        await interaction.editReply('❌ Vercel API service is not available. Please configure VERCEL_API_URL.');
+        return;
+      }
+
+      console.log('Calling Vercel processQueue API from /queue join command', {
+        queueSize: queueSize,
+        hasVercelAPI: !!vercelAPI,
+        balancingMode: config.teamBalancing.defaultMode,
+      });
+
       const processResult = await vercelAPI.processQueue({
         balancingMode: config.teamBalancing.defaultMode,
       });
@@ -718,7 +736,14 @@ async function handleJoinButton(
     if (await queueService.isFull()) {
       // Validate guild exists for voice channels
       if (!interaction.guild) {
-        await interaction.editReply('❌ Cannot create match: guild not found.');
+        try {
+          await interaction.followUp({
+            content: '❌ Cannot create match: guild not found.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error) {
+          // Ignore follow-up errors
+        }
         return;
       }
 
@@ -727,6 +752,27 @@ async function handleJoinButton(
 
       // Call Vercel Cloud Agent to process queue and create match
       const { vercelAPI } = services;
+      
+      if (!vercelAPI) {
+        console.error('vercelAPI is not available in services for queue processing (handleJoinButton)');
+        queueService.unlock();
+        try {
+          await interaction.followUp({
+            content: '❌ Vercel API service is not available. Please configure VERCEL_API_URL.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error) {
+          // Ignore follow-up errors
+        }
+        return;
+      }
+
+      console.log('Calling Vercel processQueue API from queue join button', {
+        queueSize,
+        hasVercelAPI: !!vercelAPI,
+        balancingMode: config.teamBalancing.defaultMode,
+      });
+
       const processResult = await vercelAPI.processQueue({
         balancingMode: config.teamBalancing.defaultMode,
       });
