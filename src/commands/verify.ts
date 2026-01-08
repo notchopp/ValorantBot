@@ -125,7 +125,7 @@ export async function execute(
         // Add a follow-up message to inform user
         try {
           await interaction.followUp({
-            content: '⚠️ Verification complete but role assignment failed. Please contact an admin.',
+            content: `⚠️ Verification complete but role assignment failed for rank **${verifyResult.discordRank}**. Please contact an admin.`,
             flags: MessageFlags.Ephemeral,
           });
         } catch (followUpError) {

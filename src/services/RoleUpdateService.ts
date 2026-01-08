@@ -7,6 +7,9 @@ import { Config } from '../config/config';
  * Follows guardrails: error handling, logging, type safety
  */
 export class RoleUpdateService {
+  // Standard rank names used across the bot
+  private static readonly RANK_NAMES = ['grnds', 'breakpoint', 'challenger', 'x'];
+
   constructor(_dbService: DatabaseService, _config: Config) {
     // Services stored for future use (logging, config access)
   }
@@ -105,11 +108,11 @@ export class RoleUpdateService {
         newRank,
       });
 
-      // Find all rank roles that match the old rank or any existing rank roles
-      const rankNames = ['grnds', 'breakpoint', 'challenger', 'x'];
+      // Find all rank roles using the standard rank names
       const rolesToRemove = member.roles.cache.filter((role: Role) => {
+        if (!role?.name) return false;
         const roleNameLower = role.name.toLowerCase();
-        return rankNames.some((rn) => roleNameLower.includes(rn));
+        return RoleUpdateService.RANK_NAMES.some((rn) => roleNameLower.includes(rn));
       });
 
       if (rolesToRemove.size === 0) {
@@ -174,7 +177,7 @@ export class RoleUpdateService {
 
       // Find the exact rank role (case-insensitive exact match)
       const rankRole = guild.roles.cache.find((role: Role) => {
-        if (!role || !role.name) return false;
+        if (!role?.name) return false;
         const roleName = role.name.toLowerCase().trim();
         const rankLower = rank.toLowerCase().trim();
         // Exact match only (e.g., "grnds v" === "grnds v")
@@ -187,10 +190,7 @@ export class RoleUpdateService {
           guildId: guild.id,
           guildName: guild.name,
           searchedFor: rank.toLowerCase().trim(),
-          availableRoles: guild.roles.cache
-            .filter(r => !r.managed && r.name !== '@everyone')
-            .map((r: Role) => r.name)
-            .slice(0, 20),
+          totalRoles: guild.roles.cache.size,
         });
         return;
       }
@@ -330,10 +330,10 @@ export class RoleUpdateService {
         return;
       }
 
-      const rankNames = ['grnds', 'breakpoint', 'challenger', 'x'];
       const rolesToRemove = member.roles.cache.filter((role: Role) => {
+        if (!role?.name) return false;
         const roleNameLower = role.name.toLowerCase();
-        return rankNames.some((rn) => roleNameLower.includes(rn));
+        return RoleUpdateService.RANK_NAMES.some((rn) => roleNameLower.includes(rn));
       });
 
       if (rolesToRemove.size === 0) {
@@ -377,10 +377,10 @@ export class RoleUpdateService {
       const member = await guild.members.fetch(userId);
       if (!member) return false;
 
-      const rankNames = ['grnds', 'breakpoint', 'challenger', 'x'];
       return member.roles.cache.some((role: Role) => {
+        if (!role?.name) return false;
         const roleNameLower = role.name.toLowerCase();
-        return rankNames.some((rn) => roleNameLower.includes(rn));
+        return RoleUpdateService.RANK_NAMES.some((rn) => roleNameLower.includes(rn));
       });
     } catch (error) {
       console.error('Error checking rank role', {
