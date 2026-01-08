@@ -135,9 +135,19 @@ export default async function handler(
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
-        ...(env.VALORANT_API_KEY ? { Authorization: env.VALORANT_API_KEY } : {}),
+        'User-Agent': 'ValorantBot-Vercel/1.0',
+        ...(env.VALORANT_API_KEY ? { 
+          'Authorization': env.VALORANT_API_KEY,
+        } : {}),
       },
     });
+
+    // Log API key status (don't log the actual key)
+    if (env.VALORANT_API_KEY) {
+      console.log('✅ Valorant API key is configured for refresh-rank');
+    } else {
+      console.warn('⚠️  VALORANT_API_KEY is not set - API calls may be rate limited (30 req/min without key)');
+    }
 
     // Input validation
     const { userId, riotName, riotTag, region } = req.body as RefreshRankRequest;

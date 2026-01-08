@@ -61,11 +61,19 @@ const valorantAPI: AxiosInstance = axios.create({
   timeout: 10000,
   headers: {
     'User-Agent': 'ValorantBot-Vercel/1.0',
-    ...(process.env.VALORANT_API_KEY && {
+    'Content-Type': 'application/json',
+    ...(process.env.VALORANT_API_KEY ? {
       'Authorization': process.env.VALORANT_API_KEY,
-    }),
+    } : {}),
   },
 });
+
+// Log API key status (don't log the actual key)
+if (process.env.VALORANT_API_KEY) {
+  console.log('✅ Valorant API key is configured');
+} else {
+  console.warn('⚠️  VALORANT_API_KEY is not set - API calls may be rate limited (30 req/min without key)');
+}
 
 // Custom rank thresholds (from CUSTOM_RANK_SYSTEM.md)
 const RANK_THRESHOLDS = [

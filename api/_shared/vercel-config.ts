@@ -12,15 +12,25 @@ export const VERCEL_CONFIG = {
 };
 
 /**
- * Validate environment variables
+ * Validate environment variables and return env object
  */
-export function validateEnv(): void {
+export function validateEnv(): {
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
+  VALORANT_API_KEY?: string;
+} {
   const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+
+  return {
+    SUPABASE_URL: process.env.SUPABASE_URL!,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY!,
+    VALORANT_API_KEY: process.env.VALORANT_API_KEY,
+  };
 }
 
 /**
