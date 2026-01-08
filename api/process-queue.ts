@@ -73,7 +73,17 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
+  // Log all incoming requests for debugging
+  console.log('=== PROCESS QUEUE API CALLED ===', {
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    contentType: req.headers['content-type'],
+    userAgent: req.headers['user-agent'],
+    bodyKeys: req.body ? Object.keys(req.body) : [],
+  });
+
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     res.status(405).json({ success: false, error: 'Method not allowed' });
     return;
   }
@@ -164,7 +174,7 @@ export default async function handler(
 
     console.log('Queue processed successfully', { matchId, teamASize: teamA.length, teamBSize: teamB.length });
 
-    res.status(200).json({
+    const successResponse = {
       success: true,
       match: {
         matchId,
@@ -173,9 +183,18 @@ export default async function handler(
         teamA,
         teamB,
       },
+    };
+    
+    console.log('=== PROCESS QUEUE API SUCCESS ===', {
+      timestamp: new Date().toISOString(),
+      matchId,
+      map: selectedMap,
     });
+
+    res.status(200).json(successResponse);
   } catch (error) {
-    console.error('Process queue error', {
+    console.error('=== PROCESS QUEUE API ERROR ===', {
+      timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
