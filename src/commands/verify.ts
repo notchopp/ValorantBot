@@ -60,18 +60,54 @@ export async function execute(
     const region = existingPlayer.riot_region;
 
     // Step 1: Get current Valorant rank (refresh from API)
-    const mmr = await valorantAPI.getMMR(region, name, tag);
-    if (!mmr) {
-      await interaction.editReply(
-        `❌ Could not fetch rank for "${name}#${tag}". The account may not have played ranked matches yet.`
-      );
-      return;
+    let mmr = await valorantAPI.getMMR(region, name, tag);
+    let valorantRank: string;
+    let valorantELO: number;
+    let isUnrated = false;
+    
+    // Check if player is unrated (no current rank or unrated status)
+    if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
+      // Player is unrated - get last ranked rank from MMR history
+      isUnrated = true;
+      try {
+        const mmrHistory = await valorantAPI.getMMRHistory(name, tag);
+        if (mmrHistory && mmrHistory.length > 0) {
+          // Find the most recent ranked match (not unrated)
+          // Sort by date (most recent first) and find first ranked entry
+          const sortedHistory = [...mmrHistory].sort((a, b) => b.date_raw - a.date_raw);
+          const lastRanked = sortedHistory.find(m => 
+            m.currenttierpatched && 
+            !m.currenttierpatched.toLowerCase().includes('unrated')
+          );
+          
+          if (lastRanked) {
+            valorantRank = lastRanked.currenttierpatched;
+            valorantELO = lastRanked.elo;
+          } else {
+            await interaction.editReply(
+              `❌ Could not find a ranked rank for "${name}#${tag}". Please complete your placement matches first.`
+            );
+            return;
+          }
+        } else {
+          await interaction.editReply(
+            `❌ Could not fetch rank history for "${name}#${tag}". The account may not have played ranked matches yet.`
+          );
+          return;
+        }
+      } catch (error) {
+        await interaction.editReply(
+          `❌ Could not fetch rank for "${name}#${tag}". The account may not have played ranked matches yet.`
+        );
+        return;
+      }
+    } else {
+      // Player has current rank
+      valorantRank = mmr.currenttierpatched;
+      valorantELO = mmr.elo;
     }
 
-    // Step 2: Map Valorant rank to custom Discord rank and MMR (capped at GRNDS V)
-    const valorantRank = mmr.currenttierpatched; // e.g., "Diamond 2"
-    
-    // Get lifetime stats for confidence boosting (optional)
+    // Step 2: Get lifetime stats for confidence boosting (optional)
     // Note: MMR history may be slow, so we'll make it optional/non-blocking
     let lifetimeStats;
     try {
@@ -80,10 +116,12 @@ export async function execute(
         // Calculate peak rank from history
         let peakRank = mmrHistory[0].currenttierpatched;
         for (const m of mmrHistory) {
-          const peakValue = customRankService.getValorantRankValue(peakRank);
-          const currentValue = customRankService.getValorantRankValue(m.currenttierpatched);
-          if (currentValue > peakValue) {
-            peakRank = m.currenttierpatched;
+          if (m.currenttierpatched && !m.currenttierpatched.toLowerCase().includes('unrated')) {
+            const peakValue = customRankService.getValorantRankValue(peakRank);
+            const currentValue = customRankService.getValorantRankValue(m.currenttierpatched);
+            if (currentValue > peakValue) {
+              peakRank = m.currenttierpatched;
+            }
           }
         }
 
@@ -105,7 +143,7 @@ export async function execute(
     // Step 3: Calculate initial MMR (capped at GRNDS V)
     const startingMMR = customRankService.calculateInitialMMR(
       valorantRank,
-      mmr.elo,
+      valorantELO,
       lifetimeStats
     );
 
@@ -156,7 +194,7 @@ export async function execute(
         },
         {
           name: 'Valorant Rank',
-          value: valorantRank,
+          value: isUnrated ? `${valorantRank} (from last ranked)` : valorantRank,
           inline: true,
         },
           {
@@ -171,7 +209,9 @@ export async function execute(
           }
         )
         .setDescription(
-          `You've been placed at **${discordRank}** (${startingMMR} MMR) based on your Valorant rank. Your Discord rank will now be updated based on server matches!`
+          isUnrated 
+            ? `You've been placed at **${discordRank}** (${startingMMR} MMR) based on your last ranked rank (you are currently unrated). Your Discord rank will now be updated based on server matches!`
+            : `You've been placed at **${discordRank}** (${startingMMR} MMR) based on your Valorant rank. Your Discord rank will now be updated based on server matches!`
         );
 
     await interaction.editReply({ embeds: [embed] });
