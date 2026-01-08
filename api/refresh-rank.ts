@@ -422,6 +422,8 @@ export default async function handler(
     const { error: updateError } = await supabase
       .from('players')
       .update({
+        riot_puuid: puuid, // Update PUUID for future v3 API calls
+        riot_region: accountRegion, // Update region in case it changed
         discord_rank: discordRank,
         discord_rank_value: discordRankValue,
         current_mmr: newMMR,
