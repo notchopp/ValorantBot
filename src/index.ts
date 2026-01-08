@@ -13,6 +13,7 @@ import { CustomRankService } from './services/CustomRankService';
 import { RoleUpdateService } from './services/RoleUpdateService';
 import { VoiceChannelService } from './services/VoiceChannelService';
 import { VercelAPIService } from './services/VercelAPIService';
+import { SkillGapAnalyzer } from './services/SkillGapAnalyzer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -64,6 +65,7 @@ const riotIDService = new RiotIDService(playerService, databaseService);
 const rankCalculationService = new RankCalculationService(databaseService, customRankService);
 const roleUpdateService = new RoleUpdateService(databaseService, appConfig);
 const voiceChannelService = new VoiceChannelService();
+const skillGapAnalyzer = new SkillGapAnalyzer(databaseService);
 // Initialize Vercel API Service
 const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
 
@@ -89,6 +91,7 @@ const services = {
   roleUpdateService,
   voiceChannelService,
   vercelAPI,
+  skillGapAnalyzer,
   config: appConfig,
 } as const;
 
