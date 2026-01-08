@@ -6,28 +6,10 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
 
-# Discord bots don't need HTTP services, but keeping for health checks
-[http_service]
-  internal_port = 3000
-  force_https = true
-  auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 1
-  processes = ["app"]
-
-[[services]]
-  protocol = "tcp"
-  internal_port = 3000
-  processes = ["app"]
-
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-    force_https = true
-
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
+# Discord bots don't need HTTP services - they connect to Discord's API
+# Keep machines running and don't require HTTP health checks
+[deploy]
+  strategy = "immediate"
 
 [processes]
   app = "npm start"
