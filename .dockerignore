@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+*.log
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+README.md
+fly.toml
