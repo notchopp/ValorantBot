@@ -100,16 +100,12 @@ const commandFiles = fs
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
   const command = require(filePath);
-  if ('data' in command && 'execute' in command) {
-    client.commands.set(command.data.name, command);
-    console.log(`✅ Loaded command: ${command.data.name}`);
-    
-    // Handle mmrData alias if exists
-    if ('mmrData' in command) {
-      client.commands.set('mmr', command);
-      console.log(`✅ Loaded command alias: mmr -> ${command.data.name}`);
-    }
-  } else {
+    if ('data' in command && 'execute' in command) {
+      client.commands.set(command.data.name, command);
+      console.log(`✅ Loaded command: ${command.data.name}`);
+      
+      // Note: mmrData alias is handled during command registration, not here
+    } else {
     console.warn(`⚠️  Command at ${filePath} is missing required "data" or "execute" property.`);
   }
 }
@@ -117,14 +113,24 @@ for (const file of commandFiles) {
 // Register slash commands
 async function registerCommands() {
   const commands: any[] = [];
+  const commandNames = new Set<string>(); // Track registered command names to avoid duplicates
   
   // Get all commands, including mmrData if it exists
   for (const [, cmd] of client.commands.entries()) {
-    commands.push(cmd.data.toJSON());
+    // Only add the main command data if we haven't seen this command name before
+    const commandName = cmd.data.name;
+    if (!commandNames.has(commandName)) {
+      commands.push(cmd.data.toJSON());
+      commandNames.add(commandName);
+    }
     
-    // If command has mmrData, add it as separate command
+    // If command has mmrData, add it as separate command (only if not already added)
     if ('mmrData' in cmd && cmd.mmrData) {
-      commands.push(cmd.mmrData.toJSON());
+      const mmrCommandName = cmd.mmrData.name;
+      if (!commandNames.has(mmrCommandName)) {
+        commands.push(cmd.mmrData.toJSON());
+        commandNames.add(mmrCommandName);
+      }
     }
   }
 
