@@ -24,10 +24,23 @@ export async function execute(
     customRankService: CustomRankService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   const userId = interaction.user.id;
   const username = interaction.user.username;
+
+  // Defer reply immediately to prevent timeout (3 second limit)
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+  } catch (error: any) {
+    // If defer fails (e.g., interaction expired), log and return
+    if (error?.code === 10062) {
+      console.warn(`Verify interaction timed out for user ${userId} - interaction may have expired`);
+      return;
+    }
+    // Re-throw other errors
+    throw error;
+  }
 
   try {
     const { valorantAPI, databaseService, playerService, customRankService } = services;
