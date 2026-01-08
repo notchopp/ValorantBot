@@ -14,7 +14,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName('link')
-      .setDescription('Link your Riot ID (name#tag)')
+      .setDescription('Link your Riot ID - stores your account info (use /verify after to get placed)')
       .addStringOption((option) =>
         option
           .setName('name')
@@ -98,20 +98,11 @@ async function handleLink(
     // Auto-detect region if not provided
     const detectedRegion = region || account.region || 'na';
     
+    // Link Riot ID to database (stores account info, no Discord rank assignment)
     await riotIDService.linkRiotID(userId, name, tag, detectedRegion, account.puuid);
-    
-    // Fetch and update rank immediately (force refresh from DB)
-    const player = await playerService.getPlayer(userId, true);
-    if (player) {
-      const mmr = await valorantAPI.getMMR(detectedRegion, name, tag);
-      if (mmr) {
-        player.rank = mmr.currenttierpatched;
-        player.rankValue = valorantAPI.getRankValueFromMMR(mmr);
-      }
-    }
 
     await interaction.editReply(
-      `✅ Successfully linked Riot ID: **${name}#${tag}** (Region: ${detectedRegion.toUpperCase()})`
+      `✅ Successfully linked Riot ID: **${name}#${tag}** (Region: ${detectedRegion.toUpperCase()})\n\nNow use \`/verify\` to get your initial Discord rank placement!`
     );
   } else {
     await riotIDService.linkRiotID(userId, name, tag, region);
