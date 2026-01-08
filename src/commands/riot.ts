@@ -158,6 +158,8 @@ async function handleUnlink(
     riotIDService: RiotIDService;
     playerService: PlayerService;
     valorantAPI?: ValorantAPIService;
+    roleUpdateService?: RoleUpdateService;
+    databaseService?: DatabaseService;
   }
 ) {
   const userId = interaction.user.id;
@@ -175,9 +177,25 @@ async function handleUnlink(
     throw error;
   }
 
-  const { riotIDService } = services;
+  const { riotIDService, roleUpdateService } = services;
 
-    const unlinked = await riotIDService.unlinkRiotID(userId);
+  const unlinked = await riotIDService.unlinkRiotID(userId);
+  
+  // Remove Discord rank role when unlinking
+  if (unlinked && interaction.guild && roleUpdateService) {
+    try {
+      console.log('🗑️ Removing rank roles after unlink', { userId });
+      await roleUpdateService.removeAllRankRoles(userId, interaction.guild);
+      console.log('✅ Removed rank roles after unlink', { userId });
+    } catch (error) {
+      console.warn('⚠️ Failed to remove rank roles after unlink', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Continue - role removal is non-critical
+    }
+  }
+  
   if (unlinked) {
     await interaction.editReply('✅ Successfully unlinked your Riot ID.');
   } else {
