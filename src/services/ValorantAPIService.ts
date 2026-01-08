@@ -153,6 +153,9 @@ export class ValorantAPIService {
   private api: AxiosInstance;
   private baseURL = 'https://api.henrikdev.xyz/valorant/v1';
   private apiKey?: string;
+  private readonly RATE_LIMIT = 30; // 30 requests per minute
+  private readonly RATE_WINDOW = 60000; // 1 minute in milliseconds
+  private requestTimestamps: number[] = [];
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey;
@@ -171,12 +174,61 @@ export class ValorantAPIService {
       timeout: 10000,
       headers,
     });
+
+    // Add response interceptor to handle rate limits
+    this.api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 429) {
+          // Rate limited - wait and retry
+          const retryAfter = error.response.headers['retry-after'] 
+            ? parseInt(error.response.headers['retry-after']) * 1000 
+            : 2000; // Default 2 seconds
+          console.warn(`Rate limited by API, waiting ${retryAfter}ms before retry`);
+          await this.delay(retryAfter);
+          return this.api.request(error.config);
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  /**
+   * Rate limiting: ensure we don't exceed 30 requests per minute
+   */
+  private async waitForRateLimit(): Promise<void> {
+    const now = Date.now();
+    
+    // Remove timestamps older than 1 minute
+    this.requestTimestamps = this.requestTimestamps.filter(
+      (timestamp) => now - timestamp < this.RATE_WINDOW
+    );
+
+    // If we're at the limit, wait until the oldest request expires
+    if (this.requestTimestamps.length >= this.RATE_LIMIT) {
+      const oldestTimestamp = this.requestTimestamps[0];
+      const waitTime = this.RATE_WINDOW - (now - oldestTimestamp) + 100; // Add 100ms buffer
+      if (waitTime > 0) {
+        console.warn(`Rate limit reached (${this.RATE_LIMIT}/min), waiting ${waitTime}ms`);
+        await this.delay(waitTime);
+        // Recursively check again after waiting
+        return this.waitForRateLimit();
+      }
+    }
+
+    // Record this request
+    this.requestTimestamps.push(now);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Get account information by Riot ID
    */
   async getAccount(name: string, tag: string): Promise<ValorantAccount | null> {
+    await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantAccount }>(
         `/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
@@ -195,6 +247,7 @@ export class ValorantAPIService {
    * Get current MMR/rank by region and Riot ID
    */
   async getMMR(region: string, name: string, tag: string): Promise<ValorantMMR | null> {
+    await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantMMR }>(
         `/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
@@ -213,6 +266,7 @@ export class ValorantAPIService {
    * Get MMR history for a player
    */
   async getMMRHistory(name: string, tag: string): Promise<ValorantMMRHistory[] | null> {
+    await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantMMRHistory[] }>(
         `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
@@ -231,6 +285,7 @@ export class ValorantAPIService {
    * Get match history for a player
    */
   async getMatches(region: string, name: string, tag: string, mode?: string): Promise<ValorantMatch[] | null> {
+    await this.waitForRateLimit();
     try {
       const url = mode
         ? `/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=${mode}`
@@ -251,6 +306,7 @@ export class ValorantAPIService {
    * Get match details by match ID
    */
   async getMatchByID(matchId: string): Promise<ValorantMatch | null> {
+    await this.waitForRateLimit();
     try {
       const response = await this.api.get<{ status: number; data: ValorantMatch }>(
         `/match/${matchId}`

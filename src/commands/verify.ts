@@ -6,7 +6,7 @@ import {
   Role,
   MessageFlags,
 } from 'discord.js';
-import { ValorantAPIService } from '../services/ValorantAPIService';
+import { ValorantAPIService, ValorantMMRHistory } from '../services/ValorantAPIService';
 import { DatabaseService } from '../services/DatabaseService';
 import { PlayerService } from '../services/PlayerService';
 import { CustomRankService } from '../services/CustomRankService';
@@ -77,17 +77,18 @@ export async function execute(
     let valorantRank: string;
     let valorantELO: number;
     let isUnrated = false;
+    let mmrHistory: ValorantMMRHistory[] | null = null; // Store for reuse to avoid duplicate API calls
     
     // Check if player is unrated (no current rank or unrated status)
     if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
       // Player is unrated - get last ranked rank from previous act/season
       isUnrated = true;
       try {
-        const mmrHistory = await valorantAPI.getMMRHistory(name, tag);
+        mmrHistory = await valorantAPI.getMMRHistory(name, tag);
         if (mmrHistory && mmrHistory.length > 0) {
           // Filter out all unrated entries and find the most recent ranked entry
           // This will be from a previous act/season (before current placements)
-          const rankedEntries = mmrHistory.filter(m => 
+          const rankedEntries = mmrHistory.filter((m: ValorantMMRHistory) => 
             m.currenttierpatched && 
             !m.currenttierpatched.toLowerCase().includes('unrated') &&
             m.currenttier > 0 // Ensure it's an actual rank tier
@@ -125,10 +126,13 @@ export async function execute(
     }
 
     // Step 2: Get lifetime stats for confidence boosting (optional)
-    // Note: MMR history may be slow, so we'll make it optional/non-blocking
+    // Reuse MMR history if we already fetched it, otherwise fetch it
     let lifetimeStats;
     try {
-      const mmrHistory = await valorantAPI.getMMRHistory(name, tag);
+      // Only fetch if we don't already have it (to avoid duplicate API calls)
+      if (!mmrHistory) {
+        mmrHistory = await valorantAPI.getMMRHistory(name, tag);
+      }
       if (mmrHistory && mmrHistory.length > 0) {
         // Calculate peak rank from history
         let peakRank = mmrHistory[0].currenttierpatched;
@@ -144,7 +148,7 @@ export async function execute(
 
         lifetimeStats = {
           gamesPlayed: mmrHistory.length,
-          wins: mmrHistory.filter(m => m.mmr_change_to_last_game > 0).length,
+          wins: mmrHistory.filter((m: ValorantMMRHistory) => m.mmr_change_to_last_game > 0).length,
           peakRank,
         };
       }
