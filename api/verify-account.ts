@@ -154,22 +154,49 @@ function calculateInitialMMR(valorantRank: string, valorantELO: number): number 
  * Get last ranked rank from MMR history (optimized - stops early)
  */
 async function getLastRankedRank(name: string, tag: string): Promise<{ rank: string; elo: number; date: string } | null> {
+  console.log('Fetching last ranked rank from MMR history', { name, tag });
+  
   try {
-    const response = await valorantAPI.get<{ status: number; data: ValorantMMRHistory[] }>(
-      `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
-    );
+    const url = `/mmr-history/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    console.log('Calling Valorant API:', { url });
+    
+    const response = await valorantAPI.get<{ status: number; data: ValorantMMRHistory[] }>(url);
+    
+    console.log('MMR history response received', {
+      name,
+      tag,
+      status: response.status,
+      dataLength: response.data.data?.length || 0,
+    });
     
     if (!response.data.data || response.data.data.length === 0) {
+      console.log('No MMR history data found', { name, tag });
       return null;
     }
 
     // Find first ranked entry (history is sorted by date, most recent first)
-    for (const entry of response.data.data) {
+    for (let i = 0; i < response.data.data.length; i++) {
+      const entry = response.data.data[i];
+      console.log(`Checking MMR history entry ${i}`, {
+        date: entry.date,
+        tier: entry.currenttier,
+        tierPatched: entry.currenttierpatched,
+        elo: entry.elo,
+      });
+      
       if (
         entry.currenttierpatched &&
         !entry.currenttierpatched.toLowerCase().includes('unrated') &&
         entry.currenttier > 0
       ) {
+        console.log('Found ranked entry in history', {
+          name,
+          tag,
+          rank: entry.currenttierpatched,
+          elo: entry.elo,
+          date: entry.date,
+        });
+        
         return {
           rank: entry.currenttierpatched,
           elo: entry.elo,
@@ -178,12 +205,27 @@ async function getLastRankedRank(name: string, tag: string): Promise<{ rank: str
       }
     }
 
+    console.log('No ranked entries found in MMR history', {
+      name,
+      tag,
+      totalEntries: response.data.data.length,
+    });
+    
     return null;
   } catch (error: any) {
+    console.error('Error fetching last ranked rank', {
+      name,
+      tag,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data,
+    });
+    
     if (error.response?.status === 404) {
+      console.log('MMR history not found (404)', { name, tag });
       return null;
     }
-    console.error(`Error fetching last ranked rank for ${name}#${tag}:`, error.message);
+    
     return null;
   }
 }
@@ -195,8 +237,18 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
+  // Log all incoming requests for debugging
+  console.log('=== VERIFY ACCOUNT API CALLED ===', {
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    contentType: req.headers['content-type'],
+    userAgent: req.headers['user-agent'],
+    bodyKeys: req.body ? Object.keys(req.body) : [],
+  });
+
   // Only allow POST
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     res.status(405).json({ success: false, error: 'Method not allowed' });
     return;
   }
@@ -259,15 +311,35 @@ export default async function handler(
     }
 
     // Step 1: Get current Valorant rank
+    console.log('Fetching current Valorant rank', { riotName, riotTag, region });
+    
     let mmr: ValorantMMR | null = null;
     try {
-      const mmrResponse = await valorantAPI.get<{ status: number; data: ValorantMMR }>(
-        `/mmr/${region}/${encodeURIComponent(riotName)}/${encodeURIComponent(riotTag)}`
-      );
+      const mmrUrl = `/mmr/${region}/${encodeURIComponent(riotName)}/${encodeURIComponent(riotTag)}`;
+      console.log('Calling Valorant MMR API', { url: mmrUrl });
+      
+      const mmrResponse = await valorantAPI.get<{ status: number; data: ValorantMMR }>(mmrUrl);
       mmr = mmrResponse.data.data;
+      
+      console.log('Valorant MMR response received', {
+        riotName,
+        riotTag,
+        currentTier: mmr?.currenttier,
+        currentTierPatched: mmr?.currenttierpatched,
+        elo: mmr?.elo,
+      });
     } catch (error: any) {
+      console.error('Error fetching current MMR', {
+        riotName,
+        riotTag,
+        region,
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data,
+      });
+      
       if (error.response?.status !== 404) {
-        console.error('Error fetching MMR', { riotName, riotTag, region, error: error.message });
+        console.error('Non-404 error during MMR fetch - continuing with history check');
       }
     }
 
@@ -275,28 +347,64 @@ export default async function handler(
     let valorantELO: number;
 
     // Check if unrated
-    if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
+    const isUnrated = !mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated');
+    console.log('Checking rank status', {
+      riotName,
+      riotTag,
+      isUnrated,
+      currentTierPatched: mmr?.currenttierpatched,
+    });
+    
+    if (isUnrated) {
+      console.log('User is currently unrated, checking ranked history', { riotName, riotTag });
       const lastRanked = await getLastRankedRank(riotName, riotTag);
       
       if (!lastRanked) {
+        console.error('No ranked history found for user', { riotName, riotTag });
         res.status(404).json({
           success: false,
-          error: 'Could not find a ranked rank from previous acts/seasons. Please complete your placement matches first.',
+          error: `Could not find a ranked rank from previous acts/seasons for "${riotName}#${riotTag}". Please complete your placement matches first, or ensure you have played ranked in a previous act.`,
         });
         return;
       }
 
+      console.log('Using ranked history for placement', {
+        riotName,
+        riotTag,
+        rank: lastRanked.rank,
+        elo: lastRanked.elo,
+        date: lastRanked.date,
+      });
+      
       valorantRank = lastRanked.rank;
       valorantELO = lastRanked.elo;
     } else {
+      console.log('Using current rank for placement', {
+        riotName,
+        riotTag,
+        rank: mmr.currenttierpatched,
+        elo: mmr.elo,
+      });
+      
       valorantRank = mmr.currenttierpatched;
       valorantELO = mmr.elo;
     }
 
     // Step 2: Calculate initial MMR (capped at GRNDS V)
+    console.log('Calculating initial MMR', { valorantRank, valorantELO });
     const startingMMR = calculateInitialMMR(valorantRank, valorantELO);
     const discordRank = getRankFromMMR(startingMMR);
     const discordRankValue = getRankValue(discordRank);
+    
+    console.log('Initial placement calculated', {
+      userId,
+      riotId: `${riotName}#${riotTag}`,
+      valorantRank,
+      valorantELO,
+      startingMMR,
+      discordRank,
+      discordRankValue,
+    });
 
     // Step 3: Create or update player in database
     const playerData = {
@@ -311,6 +419,8 @@ export default async function handler(
       peak_mmr: startingMMR,
       verified_at: new Date().toISOString(),
     };
+    
+    console.log('Upserting player to database', { userId, playerData });
 
     const { data: player, error: upsertError } = await supabase
       .from('players')
@@ -323,8 +433,16 @@ export default async function handler(
       res.status(500).json({ success: false, error: 'Failed to save player data' });
       return;
     }
+    
+    console.log('Player upserted successfully', { userId, playerId: player.id });
 
     // Step 4: Log rank history
+    console.log('Logging rank history', {
+      playerId: player.id,
+      oldRank: existingPlayer?.discord_rank || 'Unranked',
+      newRank: discordRank,
+    });
+    
     await supabase.from('rank_history').insert({
       player_id: player.id,
       old_rank: existingPlayer?.discord_rank || 'Unranked',
@@ -343,7 +461,7 @@ export default async function handler(
     });
 
     // Return success
-    res.status(200).json({
+    const successResponse = {
       success: true,
       discordRank,
       discordRankValue,
@@ -351,9 +469,17 @@ export default async function handler(
       valorantRank,
       valorantELO,
       message: `Placed at ${discordRank} (${startingMMR} MMR)`,
+    };
+    
+    console.log('=== VERIFY ACCOUNT API SUCCESS ===', {
+      timestamp: new Date().toISOString(),
+      response: successResponse,
     });
+    
+    res.status(200).json(successResponse);
   } catch (error) {
-    console.error('Verify account error', {
+    console.error('=== VERIFY ACCOUNT API ERROR ===', {
+      timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });

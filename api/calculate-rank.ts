@@ -129,7 +129,17 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
+  // Log all incoming requests for debugging
+  console.log('=== CALCULATE RANK API CALLED ===', {
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    contentType: req.headers['content-type'],
+    userAgent: req.headers['user-agent'],
+    bodyKeys: req.body ? Object.keys(req.body) : [],
+  });
+
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     res.status(405).json({ success: false, error: 'Method not allowed' });
     return;
   }
@@ -138,6 +148,7 @@ export default async function handler(
     const { matchId } = req.body as CalculateRankRequest;
 
     if (!matchId || typeof matchId !== 'string') {
+      console.log('Invalid request - missing matchId', { body: req.body });
       res.status(400).json({ success: false, error: 'Missing or invalid matchId' });
       return;
     }
@@ -262,12 +273,21 @@ export default async function handler(
 
     console.log('Rank calculation complete', { matchId, resultsCount: results.length });
 
-    res.status(200).json({
+    const successResponse = {
       success: true,
       results,
+    };
+    
+    console.log('=== CALCULATE RANK API SUCCESS ===', {
+      timestamp: new Date().toISOString(),
+      matchId,
+      resultsCount: results.length,
     });
+
+    res.status(200).json(successResponse);
   } catch (error) {
-    console.error('Calculate rank error', {
+    console.error('=== CALCULATE RANK API ERROR ===', {
+      timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
