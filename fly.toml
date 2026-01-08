@@ -1,5 +1,10 @@
-app = "valorantbot"
-primary_region = "iad"
+# fly.toml app configuration file generated for valorantbot on 2026-01-08T06:45:33Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'valorantbot'
+primary_region = 'iad'
 
 [build]
 
