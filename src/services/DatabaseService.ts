@@ -104,6 +104,25 @@ export class DatabaseService {
   }
 
   /**
+   * Unlink/clear Riot ID from a player in the database
+   */
+  async unlinkPlayerRiotID(discordUserId: string): Promise<boolean> {
+    const supabase = this.getSupabase();
+    const { error } = await supabase
+      .from('players')
+      .update({
+        riot_name: null,
+        riot_tag: null,
+        riot_puuid: null,
+        riot_region: null,
+        verified_at: null,
+      })
+      .eq('discord_user_id', discordUserId);
+
+    return !error;
+  }
+
+  /**
    * Update player's Discord rank and MMR
    */
   async updatePlayerRank(

@@ -83,7 +83,7 @@ async function handleLink(
   const region = interaction.options.getString('region') || undefined;
 
   // Get or create player first
-  playerService.getOrCreatePlayer(userId, username);
+  await playerService.getOrCreatePlayer(userId, username);
 
   // Verify account exists via API
   if (valorantAPI) {
@@ -98,7 +98,7 @@ async function handleLink(
     // Auto-detect region if not provided
     const detectedRegion = region || account.region || 'na';
     
-    await riotIDService.linkRiotID(userId, name, tag, detectedRegion);
+    await riotIDService.linkRiotID(userId, name, tag, detectedRegion, account.puuid);
     
     // Fetch and update rank immediately
     const player = await playerService.getPlayer(userId);

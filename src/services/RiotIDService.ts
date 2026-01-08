@@ -1,4 +1,5 @@
 import { PlayerService } from './PlayerService';
+import { DatabaseService } from './DatabaseService';
 
 /**
  * Service to manage Discord user -> Riot ID mappings
@@ -7,15 +8,18 @@ import { PlayerService } from './PlayerService';
 export class RiotIDService {
   private riotIdMap: Map<string, { name: string; tag: string; region?: string }> = new Map();
   private playerService: PlayerService;
+  private databaseService?: DatabaseService;
 
-  constructor(playerService: PlayerService) {
+  constructor(playerService: PlayerService, databaseService?: DatabaseService) {
     this.playerService = playerService;
+    this.databaseService = databaseService;
   }
 
   /**
    * Link a Discord user to a Riot ID
+   * Also updates the database if databaseService is available
    */
-  async linkRiotID(userId: string, name: string, tag: string, region?: string): Promise<boolean> {
+  async linkRiotID(userId: string, name: string, tag: string, region?: string, puuid?: string): Promise<boolean> {
     const player = await this.playerService.getPlayer(userId);
     if (!player) {
       return false;
@@ -24,6 +28,12 @@ export class RiotIDService {
     const riotId = { name, tag, region };
     this.riotIdMap.set(userId, riotId);
     player.riotId = riotId;
+    
+    // Also update database if available
+    if (this.databaseService && puuid && region) {
+      await this.databaseService.updatePlayerRiotID(userId, name, tag, puuid, region);
+    }
+    
     return true;
   }
 
@@ -36,6 +46,7 @@ export class RiotIDService {
 
   /**
    * Remove Riot ID link for a Discord user
+   * Also updates the database to clear Riot ID fields
    */
   async unlinkRiotID(userId: string): Promise<boolean> {
     const removed = this.riotIdMap.delete(userId);
@@ -43,6 +54,11 @@ export class RiotIDService {
       const player = await this.playerService.getPlayer(userId);
       if (player) {
         player.riotId = undefined;
+      }
+      
+      // Also clear from database
+      if (this.databaseService) {
+        await this.databaseService.unlinkPlayerRiotID(userId);
       }
     }
     return removed;
