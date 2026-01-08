@@ -109,6 +109,8 @@ async function handleReport(
   const thirdRow = new ActionRowBuilder<TextInputBuilder>().addComponents(teamAStatsInput);
   const fourthRow = new ActionRowBuilder<TextInputBuilder>().addComponents(teamBStatsInput);
 
+  // Discord modals support max 5 action rows with max 5 text inputs total
+  // We use 4 rows with 4 text inputs, which is within limits
   modal.addComponents(firstRow, secondRow, thirdRow, fourthRow);
 
   await interaction.showModal(modal);
@@ -227,7 +229,8 @@ function parseTeamStats(statsText: string, teamPlayers: Player[]): Map<string, P
   const lines = statsText.trim().split('\n');
   let mvpUsername: string | null = null;
 
-  // First pass: find MVP
+  // First pass: find MVP (takes the first MVP declaration found)
+  // If multiple MVPs are declared, only the first one is used
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -245,12 +248,18 @@ function parseTeamStats(statsText: string, teamPlayers: Player[]): Map<string, P
     if (!trimmed || trimmed.toLowerCase().startsWith('mvp:')) continue;
 
     // Match format: username:K/D/A or username: K/D/A
+    // Only accepts non-negative integers for stats
     const match = trimmed.match(/^(.+?):\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/);
     if (match) {
       const username = match[1].trim();
       const kills = parseInt(match[2], 10);
       const deaths = parseInt(match[3], 10);
       const assists = parseInt(match[4], 10);
+
+      // Validate non-negative stats (negative stats don't make sense)
+      if (kills < 0 || deaths < 0 || assists < 0) {
+        continue; // Skip invalid stats
+      }
 
       // Check if this username exists in team
       const playerExists = teamPlayers.some(p => 
@@ -549,7 +558,7 @@ export async function handleMatchReportModal(
       })
       .slice(0, 3);
 
-    if (topPerformers.length > 0 && topPerformers.some(p => p.kills > 0 || p.deaths > 0 || p.assists > 0)) {
+    if (topPerformers.length > 0) {
       const topPerformersText = topPerformers
         .map(p => {
           const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
