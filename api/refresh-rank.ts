@@ -52,7 +52,7 @@ const RANK_THRESHOLDS = [
   { rank: 'X', min: 3000, max: 99999 },
 ];
 
-const GRNDS_V_MAX_MMR = 900; // Cap at GRNDS V
+const GRNDS_V_MAX_MMR = 900; // Cap at GRNDS V for initial boost from Valorant rank
 
 /**
  * Get rank from MMR
@@ -75,7 +75,7 @@ function getRankValue(rank: string): number {
 }
 
 /**
- * Calculate MMR from Valorant rank and ELO (capped at GRNDS V)
+ * Calculate MMR from Valorant rank and ELO (capped at GRNDS V for initial boost)
  */
 function calculateMMRFromValorantRank(valorantRank: string, valorantELO: number): number {
   try {
@@ -471,7 +471,7 @@ export default async function handler(
       valorantRank,
       boosted,
       message: boosted
-        ? `Rank boosted to ${discordRank} (${newMMR} MMR) based on your Valorant rank (${valorantRank}). Your Discord rank can still go higher through customs!`
+        ? `Rank boosted to ${discordRank} (${newMMR} MMR) based on your Valorant rank (${valorantRank}). Note: Valorant rank boost is capped at GRNDS V. Play customs to rank up further!`
         : isUnrated
         ? `Still unrated in Valorant. Your Discord rank remains ${discordRank} (${newMMR} MMR).`
         : `Current Discord rank ${discordRank} (${newMMR} MMR) is higher than your Valorant rank (${valorantRank}). Keep playing customs to rank up!`,

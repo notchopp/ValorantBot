@@ -91,20 +91,32 @@ export async function execute(
     }
 
     // Update Discord role if verification succeeded
-    if (interaction.guild && verifyResult.discordRank) {
+    if (interaction.guild && verifyResult.discordRank && roleUpdateService) {
       try {
+        console.info('Assigning Discord role after verification', {
+          userId,
+          oldRank: existingPlayer.discord_rank || 'Unranked',
+          newRank: verifyResult.discordRank,
+        });
+
         await roleUpdateService.updatePlayerRole(
           userId,
           existingPlayer.discord_rank || 'Unranked',
           verifyResult.discordRank,
           interaction.guild
         );
-      } catch (error) {
-        console.warn('Failed to update Discord role after verification', {
+
+        console.info('✅ Discord role assigned successfully', {
           userId,
+          rank: verifyResult.discordRank,
+        });
+      } catch (error) {
+        console.error('Failed to assign Discord role after verification', {
+          userId,
+          rank: verifyResult.discordRank,
           error: error instanceof Error ? error.message : String(error),
         });
-        // Continue - role update is non-critical
+        // Continue - role update is non-critical for verification
       }
     }
 
@@ -127,25 +139,39 @@ export async function execute(
           inline: true,
         },
         {
-          name: 'Valorant Rank',
-          value: verifyResult.valorantRank || 'N/A',
+          // Empty field for Discord's 3-column embed layout spacing
+          // Unicode zero-width space (\u200B) creates a blank column
+          name: '\u200B',
+          value: '\u200B',
           inline: true,
         },
         {
-          name: 'Initial Discord Rank',
-          value: verifyResult.discordRank || 'Unranked',
+          name: 'Valorant Rank',
+          value: verifyResult.valorantRank || 'Unrated',
+          inline: true,
+        },
+        {
+          name: 'Discord Rank',
+          value: `**${verifyResult.discordRank}**`,
           inline: true,
         },
         {
           name: 'Starting MMR',
-          value: verifyResult.startingMMR?.toString() || '0',
+          value: `**${verifyResult.startingMMR}**`,
           inline: true,
         }
-      )
-      .setDescription(
-        verifyResult.message || 
-        `You've been placed at **${verifyResult.discordRank}** (${verifyResult.startingMMR} MMR). Your Discord rank will now be updated based on server matches!`
       );
+
+    // Add footer with context-appropriate message
+    if (verifyResult.valorantRank && verifyResult.valorantRank !== 'Unrated' && !verifyResult.valorantRank.includes('in placements')) {
+      embed.setFooter({
+        text: 'Your Discord rank is based on your Valorant rank. Play customs to adjust your rank!',
+      });
+    } else {
+      embed.setFooter({
+        text: 'Play customs to rank up! Use /riot refresh after getting ranked in Valorant.',
+      });
+    }
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {

@@ -96,7 +96,7 @@ const RANK_THRESHOLDS = [
   { rank: 'X', min: 3000, max: 99999 },
 ];
 
-const GRNDS_V_MAX_MMR = 900; // Cap for initial placement
+const GRNDS_V_MAX_MMR = 900; // Cap for initial placement at GRNDS V
 
 /**
  * Get rank from MMR
@@ -480,7 +480,26 @@ export default async function handler(
       startingMMR,
     });
 
-    // Return success
+    // Return success with clear messaging about initial placement cap
+    let message: string;
+    if (isUnrated || valorantRank === 'Unrated' || valorantRank.includes('in placements')) {
+      message = `✅ Rank Placement Complete!\n\n` +
+        `**Discord Rank:** ${discordRank}\n` +
+        `**Starting MMR:** ${startingMMR}\n\n` +
+        `You're currently unranked in Valorant. ` +
+        `Play customs to rank up! Once you get ranked in Valorant, ` +
+        `use \`/riot refresh\` to update your Discord rank.\n\n` +
+        `**Note:** The highest rank you can initially be placed at is GRNDS V.`;
+    } else {
+      message = `✅ Rank Placement Complete!\n\n` +
+        `**Valorant Rank:** ${valorantRank}\n` +
+        `**Discord Rank:** ${discordRank}\n` +
+        `**Starting MMR:** ${startingMMR}\n\n` +
+        `Your initial Discord rank is based on your Valorant rank. ` +
+        `Play customs to rank up further!\n\n` +
+        `**Note:** The highest rank you can initially be placed at is GRNDS V.`;
+    }
+    
     const successResponse = {
       success: true,
       discordRank,
@@ -488,9 +507,7 @@ export default async function handler(
       startingMMR,
       valorantRank,
       valorantELO,
-      message: isUnrated 
-        ? `Placed at ${discordRank} (${startingMMR} MMR). You're unranked in Valorant, so you start at GRNDS I. Play customs to rank up! Once you get ranked in Valorant, use \`/riot refresh\` to boost your Discord rank (max GRNDS V).`
-        : `Placed at ${discordRank} (${startingMMR} MMR). Your Discord rank is based on your Valorant rank, capped at GRNDS V. Play customs to rank up further!`,
+      message,
     };
     
     console.log('=== VERIFY ACCOUNT API SUCCESS ===', {
