@@ -289,8 +289,10 @@ export default async function handler(
       valorantRank = lastRanked.rank;
       valorantELO = lastRanked.elo;
     } else {
-      valorantRank = mmr.currenttierpatched;
-      valorantELO = mmr.elo;
+      // TypeScript knows mmr is not null here due to the condition above
+      const validMMR = mmr;
+      valorantRank = validMMR.currenttierpatched;
+      valorantELO = validMMR.elo;
     }
 
     // Step 2: Calculate initial MMR (capped at GRNDS V)
