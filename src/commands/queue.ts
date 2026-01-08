@@ -18,6 +18,11 @@ import { ValorantAPIService } from '../services/ValorantAPIService';
 import { SkillGapAnalyzer } from '../services/SkillGapAnalyzer';
 import { Config } from '../config/config';
 
+// Constants
+const DISCORD_ERROR_UNKNOWN_INTERACTION = 10062;
+const DISCORD_ERROR_INTERACTION_EXPIRED = 40060;
+const MIN_VALORANT_ACCOUNT_LEVEL = 20;
+
 export const data = new SlashCommandBuilder()
   .setName('queue')
   .setDescription('Queue management commands')
@@ -281,19 +286,19 @@ async function handleJoin(
         const account = await valorantAPI.getAccount(dbPlayer.riot_name, dbPlayer.riot_tag);
 
         // Check account level (minimum 20)
-        if (account && account.account_level < 20) {
+        if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
           await interaction.editReply({
             content:
-              '⚠️ Your Valorant account level is below 20.\n\n' +
+              `⚠️ Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
               `Current level: ${account.account_level}\n` +
-              'Play more Valorant to unlock queue access! (Minimum: Level 20)',
+              `Play more Valorant to unlock queue access! (Minimum: Level ${MIN_VALORANT_ACCOUNT_LEVEL})`,
           });
           return;
         }
 
         // Optional: Check recent match activity (past 30 days)
         const matches = await valorantAPI.getMatches(
-          dbPlayer.riot_region || 'na',
+          dbPlayer.riot_region || config.valorantAPI.defaultRegion,
           dbPlayer.riot_name,
           dbPlayer.riot_tag,
           'competitive'
@@ -741,7 +746,10 @@ export async function handleButtonInteraction(
       }
     } catch (replyError: any) {
       // Ignore if interaction already expired or acknowledged
-      if (replyError?.code !== 10062 && replyError?.code !== 40060) {
+      if (
+        replyError?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION &&
+        replyError?.code !== DISCORD_ERROR_INTERACTION_EXPIRED
+      ) {
         console.error('Error sending button error message', { userId, error: replyError });
       }
     }
@@ -776,7 +784,7 @@ async function handleJoinButton(
       await interaction.deferUpdate();
     }
   } catch (error: any) {
-    if (error?.code === 10062) {
+    if (error?.code === DISCORD_ERROR_UNKNOWN_INTERACTION) {
       console.warn(`Join button interaction timed out for user ${userId} - interaction may have expired`);
       return;
     }
@@ -806,7 +814,7 @@ async function handleJoinButton(
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
-        if (error?.code !== 10062 && error?.code !== 40060) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending follow-up message', { userId, error: error.message });
         }
       }
@@ -823,7 +831,7 @@ async function handleJoinButton(
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
-        if (error?.code !== 10062 && error?.code !== 40060) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending follow-up message', { userId, error: error.message });
         }
       }
@@ -836,17 +844,20 @@ async function handleJoinButton(
         const account = await valorantAPI.getAccount(dbPlayer.riot_name, dbPlayer.riot_tag);
 
         // Check account level (minimum 20)
-        if (account && account.account_level < 20) {
+        if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
           try {
             await interaction.followUp({
               content:
-                '⚠️ Your Valorant account level is below 20.\n\n' +
+                `⚠️ Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
                 `Current level: ${account.account_level}\n` +
-                'Play more Valorant to unlock queue access! (Minimum: Level 20)',
+                `Play more Valorant to unlock queue access! (Minimum: Level ${MIN_VALORANT_ACCOUNT_LEVEL})`,
               flags: MessageFlags.Ephemeral,
             });
           } catch (error: any) {
-            if (error?.code !== 10062 && error?.code !== 40060) {
+            if (
+              error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION &&
+              error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED
+            ) {
               console.error('Error sending follow-up message', { userId, error: error.message });
             }
           }
@@ -855,7 +866,7 @@ async function handleJoinButton(
 
         // Optional: Check recent match activity (past 30 days)
         const matches = await valorantAPI.getMatches(
-          dbPlayer.riot_region || 'na',
+          dbPlayer.riot_region || config.valorantAPI.defaultRegion,
           dbPlayer.riot_name,
           dbPlayer.riot_tag,
           'competitive'
@@ -869,7 +880,7 @@ async function handleJoinButton(
               flags: MessageFlags.Ephemeral,
             });
           } catch (error: any) {
-            if (error?.code !== 10062 && error?.code !== 40060) {
+            if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
               console.error('Error sending follow-up message', { userId, error: error.message });
             }
           }
@@ -905,7 +916,7 @@ async function handleJoinButton(
       try {
         await interaction.followUp({ content: result.message, flags: MessageFlags.Ephemeral });
       } catch (error: any) {
-        if (error?.code !== 10062 && error?.code !== 40060) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending follow-up message', { userId, error: error.message });
         }
       }
@@ -1177,7 +1188,7 @@ async function handleJoinButton(
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
-        if (error?.code !== 10062 && error?.code !== 40060) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending join confirmation', { userId, error: error.message });
         }
       }
@@ -1222,7 +1233,7 @@ async function handleLeaveButton(
       await interaction.deferUpdate();
     }
   } catch (error: any) {
-    if (error?.code === 10062) {
+    if (error?.code === DISCORD_ERROR_UNKNOWN_INTERACTION) {
       console.warn(`Leave button interaction timed out for user ${userId} - interaction may have expired`);
       return;
     }
@@ -1325,7 +1336,7 @@ async function handleLeaveButton(
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
-        if (error?.code !== 10062 && error?.code !== 40060) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending leave confirmation', { userId, error: error.message });
         }
       }
@@ -1346,7 +1357,7 @@ async function handleLeaveButton(
       }
     } catch (followUpError) {
       // Ignore follow-up errors if interaction expired
-      if (followUpError instanceof Error && (followUpError as any).code !== 10062) {
+      if (followUpError instanceof Error && (followUpError as any).code !== DISCORD_ERROR_UNKNOWN_INTERACTION) {
         console.error('Error sending leave error message', { userId, error: followUpError });
       }
     }
