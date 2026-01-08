@@ -12,6 +12,7 @@ import { RankCalculationService } from './services/RankCalculationService';
 import { CustomRankService } from './services/CustomRankService';
 import { RoleUpdateService } from './services/RoleUpdateService';
 import { VoiceChannelService } from './services/VoiceChannelService';
+import { VercelAPIService } from './services/VercelAPIService';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -63,6 +64,7 @@ const riotIDService = new RiotIDService(playerService, databaseService);
 const rankCalculationService = new RankCalculationService(databaseService, customRankService);
 const roleUpdateService = new RoleUpdateService(databaseService, appConfig);
 const voiceChannelService = new VoiceChannelService();
+const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
 
 // Services object to pass to commands
 const services = {
@@ -77,6 +79,7 @@ const services = {
   customRankService,
   roleUpdateService,
   voiceChannelService,
+  vercelAPI,
   config: appConfig,
 } as const;
 

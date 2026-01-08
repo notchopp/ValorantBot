@@ -2,14 +2,11 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
-  GuildMember,
-  Role,
   MessageFlags,
 } from 'discord.js';
-import { ValorantAPIService, ValorantMMRHistory } from '../services/ValorantAPIService';
 import { DatabaseService } from '../services/DatabaseService';
 import { PlayerService } from '../services/PlayerService';
-import { CustomRankService } from '../services/CustomRankService';
+import { VercelAPIService } from '../services/VercelAPIService';
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -18,10 +15,10 @@ export const data = new SlashCommandBuilder()
 export async function execute(
   interaction: ChatInputCommandInteraction,
   services: {
-    valorantAPI?: ValorantAPIService;
     databaseService: DatabaseService;
     playerService: PlayerService;
-    customRankService: CustomRankService;
+    vercelAPI: VercelAPIService;
+    roleUpdateService: any; // RoleUpdateService
   }
 ) {
   const userId = interaction.user.id;
@@ -43,23 +40,10 @@ export async function execute(
   }
 
   try {
-    const { valorantAPI, databaseService, playerService, customRankService } = services;
-
-    if (!valorantAPI) {
-      await interaction.editReply('❌ Valorant API is not available. Please contact an administrator.');
-      return;
-    }
-
-    // Check if already placed (has Discord rank assigned)
-    const existingPlayer = await databaseService.getPlayer(userId);
-    if (existingPlayer && existingPlayer.discord_rank && existingPlayer.discord_rank !== 'Unranked' && existingPlayer.current_mmr > 0) {
-      await interaction.editReply(
-        `❌ You are already placed at **${existingPlayer.discord_rank}** (${existingPlayer.current_mmr} MMR). Use \`/riot unlink\` and \`/riot link\` to change your account.`
-      );
-      return;
-    }
+    const { databaseService, vercelAPI, roleUpdateService } = services;
 
     // Check if Riot ID is linked (via /riot link) - check database directly
+    const existingPlayer = await databaseService.getPlayer(userId);
     if (!existingPlayer?.riot_name || !existingPlayer?.riot_tag || !existingPlayer?.riot_region) {
       await interaction.editReply(
         `❌ Please link your Riot ID first using \`/riot link\` before getting placed.\n\n**Steps:**\n1. Use \`/riot link name:<your_riot_name> tag:<your_riot_tag> region:<your_region>\`\n2. Then use \`/verify\` to get your initial Discord rank placement.`
@@ -67,155 +51,86 @@ export async function execute(
       return;
     }
 
-    // Use the linked Riot ID from database
-    const name = existingPlayer.riot_name;
-    const tag = existingPlayer.riot_tag;
-    const region = existingPlayer.riot_region;
+    // Check if already placed (has Discord rank assigned)
+    if (existingPlayer.discord_rank && existingPlayer.discord_rank !== 'Unranked' && existingPlayer.current_mmr > 0) {
+      await interaction.editReply(
+        `❌ You are already placed at **${existingPlayer.discord_rank}** (${existingPlayer.current_mmr} MMR). Use \`/riot unlink\` and \`/riot link\` to change your account.`
+      );
+      return;
+    }
 
-    // Step 1: Get current Valorant rank (refresh from API)
-    let mmr = await valorantAPI.getMMR(region, name, tag);
-    let valorantRank: string;
-    let valorantELO: number;
-    let isUnrated = false;
-    let mmrHistory: ValorantMMRHistory[] | null = null; // Store for reuse to avoid duplicate API calls
-    
-    // Check if player is unrated (no current rank or unrated status)
-    if (!mmr || !mmr.currenttierpatched || mmr.currenttierpatched.toLowerCase().includes('unrated')) {
-      // Player is unrated - get last ranked rank from previous act/season (optimized method)
-      isUnrated = true;
+    // Call Vercel Cloud Agent to handle verification
+    const verifyResult = await vercelAPI.verifyAccount({
+      userId,
+      username,
+      riotName: existingPlayer.riot_name,
+      riotTag: existingPlayer.riot_tag,
+      region: existingPlayer.riot_region,
+    });
+
+    if (!verifyResult.success) {
+      await interaction.editReply(
+        `❌ ${verifyResult.error || 'Failed to verify account. Please try again later.'}`
+      );
+      return;
+    }
+
+    // Update Discord role if verification succeeded
+    if (interaction.guild && verifyResult.discordRank) {
       try {
-        const lastRanked = await valorantAPI.getLastRankedRank(name, tag);
-        
-        if (lastRanked) {
-          valorantRank = lastRanked.rank;
-          valorantELO = lastRanked.elo;
-        } else {
-          await interaction.editReply(
-            `❌ Could not find a ranked rank from previous acts/seasons for "${name}#${tag}". Please complete your placement matches first, or ensure you have played ranked in a previous act.`
-          );
-          return;
-        }
-      } catch (error) {
-        await interaction.editReply(
-          `❌ Could not fetch rank for "${name}#${tag}". The account may not have played ranked matches yet.`
+        await roleUpdateService.updatePlayerRole(
+          userId,
+          existingPlayer.discord_rank || 'Unranked',
+          verifyResult.discordRank,
+          interaction.guild
         );
-        return;
+      } catch (error) {
+        console.warn('Failed to update Discord role after verification', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue - role update is non-critical
       }
-    } else {
-      // Player has current rank
-      valorantRank = mmr.currenttierpatched;
-      valorantELO = mmr.elo;
-    }
-
-    // Step 2: Get lifetime stats for confidence boosting (optional)
-    // Reuse MMR history if we already fetched it, otherwise fetch it
-    let lifetimeStats;
-    try {
-      // Only fetch if we don't already have it (to avoid duplicate API calls)
-      if (!mmrHistory) {
-        mmrHistory = await valorantAPI.getMMRHistory(name, tag);
-      }
-      if (mmrHistory && mmrHistory.length > 0) {
-        // Calculate peak rank from history
-        let peakRank = mmrHistory[0].currenttierpatched;
-        for (const m of mmrHistory) {
-          if (m.currenttierpatched && !m.currenttierpatched.toLowerCase().includes('unrated')) {
-            const peakValue = customRankService.getValorantRankValue(peakRank);
-            const currentValue = customRankService.getValorantRankValue(m.currenttierpatched);
-            if (currentValue > peakValue) {
-              peakRank = m.currenttierpatched;
-            }
-          }
-        }
-
-        lifetimeStats = {
-          gamesPlayed: mmrHistory.length,
-          wins: mmrHistory.filter((m: ValorantMMRHistory) => m.mmr_change_to_last_game > 0).length,
-          peakRank,
-        };
-      }
-    } catch (error) {
-      // Non-critical - continue without lifetime stats
-      console.warn('Could not fetch MMR history for confidence boosting', {
-        name,
-        tag,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    // Step 3: Calculate initial MMR (capped at GRNDS V)
-    const startingMMR = customRankService.calculateInitialMMR(
-      valorantRank,
-      valorantELO,
-      lifetimeStats
-    );
-
-    // Get custom rank from MMR
-    const discordRank = await customRankService.getRankFromMMR(startingMMR);
-    const rankValue = customRankService.getRankValue(discordRank);
-
-    // Step 4: Update database with Discord rank placement
-    await playerService.getOrCreatePlayer(userId, username);
-    await databaseService.updatePlayerRank(userId, discordRank, rankValue, startingMMR);
-
-    // Step 5: Assign Discord role
-    if (interaction.guild && interaction.member) {
-      const member = await interaction.guild.members.fetch(userId);
-      await assignRankRole(member, discordRank, interaction.guild);
     }
 
     // Invalidate cache
-    playerService.invalidateCache(userId);
+    services.playerService.invalidateCache(userId);
 
-    // Step 6: Log rank history (initial placement)
-    const dbPlayer = await databaseService.getPlayer(userId);
-    if (dbPlayer) {
-      await databaseService.logRankChange(
-        dbPlayer.id,
-        'Unranked',
-        discordRank,
-        0,
-        startingMMR,
-        'verification'
-      );
-    }
-
-    // Create success embed
+    // Create success embed with results from Vercel
     const embed = new EmbedBuilder()
       .setTitle('✅ Rank Placement Complete!')
       .setColor(0x00ff00)
       .addFields(
         {
           name: 'Riot ID',
-          value: `${name}#${tag}`,
+          value: `${existingPlayer.riot_name}#${existingPlayer.riot_tag}`,
           inline: true,
         },
         {
           name: 'Region',
-          value: region.toUpperCase(),
+          value: existingPlayer.riot_region.toUpperCase(),
           inline: true,
         },
         {
           name: 'Valorant Rank',
-          value: isUnrated ? `${valorantRank} (from last ranked)` : valorantRank,
+          value: verifyResult.valorantRank || 'N/A',
           inline: true,
         },
-          {
-            name: 'Initial Discord Rank',
-            value: discordRank,
-            inline: true,
-          },
-          {
-            name: 'Starting MMR',
-            value: startingMMR.toString(),
-            inline: true,
-          }
-        )
-        .setDescription(
-          isUnrated 
-            ? `You've been placed at **${discordRank}** (${startingMMR} MMR) based on your last ranked rank (you are currently unrated). Your Discord rank will now be updated based on server matches!`
-            : `You've been placed at **${discordRank}** (${startingMMR} MMR) based on your Valorant rank. Your Discord rank will now be updated based on server matches!`
-        );
+        {
+          name: 'Initial Discord Rank',
+          value: verifyResult.discordRank || 'Unranked',
+          inline: true,
+        },
+        {
+          name: 'Starting MMR',
+          value: verifyResult.startingMMR?.toString() || '0',
+          inline: true,
+        }
+      )
+      .setDescription(
+        verifyResult.message || 
+        `You've been placed at **${verifyResult.discordRank}** (${verifyResult.startingMMR} MMR). Your Discord rank will now be updated based on server matches!`
+      );
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
@@ -231,68 +146,3 @@ export async function execute(
   }
 }
 
-// Old functions removed - now handled by CustomRankService
-
-/**
- * Assign Discord rank role to member
- * Follows guardrails: error handling, logging
- */
-async function assignRankRole(member: GuildMember, rank: string, guild: any): Promise<void> {
-  try {
-    // Remove existing custom rank roles
-    const customRankNames = [
-      'grnds', 'breakpoint', 'challenger', 'x'
-    ];
-    
-    const rankRoles = member.roles.cache.filter((role) => {
-      const roleName = role.name.toLowerCase();
-      return customRankNames.some(rn => roleName.includes(rn));
-    });
-
-    for (const role of rankRoles.values()) {
-      try {
-        await member.roles.remove(role, 'Rank updated via /verify');
-      } catch (error) {
-        console.error('Error removing rank role', {
-          roleId: role.id,
-          roleName: role.name,
-          userId: member.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    // Find and assign new rank role
-    const rankRole = guild.roles.cache.find((role: Role | any) => {
-      if (!role || !role.name) return false;
-      const roleName = role.name.toLowerCase();
-      const rankLower = rank.toLowerCase();
-      // Match exact rank (e.g., "GRNDS V" matches role "GRNDS V")
-      return roleName === rankLower || roleName.includes(rankLower.split(' ')[0]);
-    });
-
-    if (rankRole) {
-      await member.roles.add(rankRole, 'Initial rank placement via /verify');
-      console.log('Rank role assigned', {
-        userId: member.id,
-        username: member.user.username,
-        rank,
-        roleId: rankRole.id,
-      });
-    } else {
-      console.warn('Rank role not found', {
-        rank,
-        guildId: guild.id,
-        availableRoles: guild.roles.cache.map((r: Role) => r.name).slice(0, 10),
-      });
-    }
-  } catch (error) {
-    console.error('Error assigning rank role', {
-      userId: member.id,
-      username: member.user.username,
-      rank,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // Don't throw - role assignment failure shouldn't break verification
-  }
-}

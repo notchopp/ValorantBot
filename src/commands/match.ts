@@ -12,7 +12,6 @@ import {
 import { MatchService } from '../services/MatchService';
 import { PlayerService } from '../services/PlayerService';
 import { DatabaseService } from '../services/DatabaseService';
-import { RankCalculationService } from '../services/RankCalculationService';
 import { CustomRankService } from '../services/CustomRankService';
 import { RoleUpdateService } from '../services/RoleUpdateService';
 import { Config } from '../config/config';
@@ -33,9 +32,9 @@ export async function execute(
     matchService: MatchService;
     playerService: PlayerService;
     databaseService: DatabaseService;
-    rankCalculationService: RankCalculationService;
-    customRankService: CustomRankService;
+    vercelAPI: any; // VercelAPIService
     roleUpdateService: RoleUpdateService;
+    customRankService: CustomRankService;
     config: Config;
   }
 ) {
@@ -53,6 +52,9 @@ async function handleReport(
   services: {
     matchService: MatchService;
     playerService: PlayerService;
+    vercelAPI: any; // VercelAPIService
+    roleUpdateService: RoleUpdateService;
+    customRankService: CustomRankService;
     config: Config;
   }
 ) {
@@ -100,9 +102,8 @@ async function handleInfo(
     matchService: MatchService;
     playerService: PlayerService;
     databaseService: DatabaseService;
-    rankCalculationService: RankCalculationService;
-    customRankService: CustomRankService;
     roleUpdateService: RoleUpdateService;
+    customRankService: CustomRankService;
     config: Config;
   }
 ) {
@@ -186,9 +187,9 @@ export async function handleMatchReportModal(
     matchService: MatchService;
     playerService: PlayerService;
     databaseService: DatabaseService;
-    rankCalculationService: RankCalculationService;
-    customRankService: CustomRankService;
+    vercelAPI: any; // VercelAPIService
     roleUpdateService: RoleUpdateService;
+    customRankService: CustomRankService;
     config: Config;
   }
 ) {
@@ -198,7 +199,7 @@ export async function handleMatchReportModal(
   const username = interaction.user.username;
 
   try {
-    const { matchService, playerService, databaseService, rankCalculationService, customRankService, roleUpdateService } = services;
+    const { matchService, playerService, databaseService, roleUpdateService, customRankService } = services;
     
     // Validate guild exists
     if (!interaction.guild) {
@@ -303,7 +304,7 @@ export async function handleMatchReportModal(
     // Update in-memory match
     matchService.reportMatch(currentMatch.matchId, winner as 'A' | 'B', score);
 
-    // Step 4: Trigger rank calculation
+    // Step 4: Trigger rank calculation via Vercel Cloud Agent
     let rankResults: Array<{
       playerId: string;
       oldMMR: number;
@@ -314,9 +315,42 @@ export async function handleMatchReportModal(
       pointsEarned: number;
     }> = [];
     try {
-      rankResults = await rankCalculationService.calculateMatchRankChanges(currentMatch.matchId);
+      const { vercelAPI } = services;
+      const calculateResult = await vercelAPI.calculateRank({
+        matchId: currentMatch.matchId,
+      });
+      
+      if (calculateResult.success && calculateResult.results) {
+        rankResults = calculateResult.results;
+        
+        // Update Discord roles for players who ranked up/down
+        if (interaction.guild) {
+          for (const result of rankResults) {
+            if (result.rankChanged) {
+              try {
+                await roleUpdateService.updatePlayerRole(
+                  result.playerId,
+                  result.oldRank,
+                  result.newRank,
+                  interaction.guild
+                );
+              } catch (error) {
+                console.warn('Failed to update role after rank change', {
+                  playerId: result.playerId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        }
+      } else {
+        console.error('Rank calculation failed', {
+          matchId: currentMatch.matchId,
+          error: calculateResult.error,
+        });
+      }
     } catch (error) {
-      console.error('Error calculating rank changes', {
+      console.error('Error calling calculate-rank API', {
         matchId: currentMatch.matchId,
         error: error instanceof Error ? error.message : String(error),
       });

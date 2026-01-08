@@ -3,6 +3,7 @@ import { Player } from './Player';
 export interface Team {
   players: Player[];
   teamId: 'A' | 'B';
+  voiceChannelId?: string; // Voice channel ID for the team
 }
 
 export interface Match {

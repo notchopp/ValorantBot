@@ -13,6 +13,7 @@ import { RankService } from '../services/RankService';
 import { MatchService } from '../services/MatchService';
 import { DatabaseService } from '../services/DatabaseService';
 import { VoiceChannelService } from '../services/VoiceChannelService';
+import { VercelAPIService } from '../services/VercelAPIService';
 import { Config } from '../config/config';
 
 export const data = new SlashCommandBuilder()
@@ -43,6 +44,7 @@ export async function execute(
     matchService: MatchService;
     databaseService: DatabaseService;
     voiceChannelService: VoiceChannelService;
+    vercelAPI: VercelAPIService;
     config: Config;
   }
 ) {
@@ -220,6 +222,7 @@ async function handleJoin(
     matchService: MatchService;
     databaseService: DatabaseService;
     voiceChannelService: VoiceChannelService;
+    vercelAPI: VercelAPIService;
     config: Config;
   }
 ) {
@@ -262,39 +265,89 @@ async function handleJoin(
 
     // Check if queue is full (async)
     if (await queueService.isFull()) {
-    // Create match (async - get players from queue)
-    const queuePlayers = await queueService.getPlayers();
-    const match = matchService.createMatch(
-      queuePlayers,
-      config.teamBalancing.defaultMode
-    );
+      // Validate guild exists for voice channels
+      if (!interaction.guild) {
+        await interaction.editReply('❌ Cannot create match: guild not found.');
+        return;
+      }
 
-    // Validate guild exists for voice channels
-    if (!interaction.guild) {
-      await interaction.editReply('❌ Cannot create match: guild not found.');
-      return;
-    }
+      // Lock queue to prevent further joins
+      queueService.lock();
 
-    // Create voice channels and assign team roles
-    const { voiceChannelService } = services;
-    const { teamAChannel, teamBChannel } = await voiceChannelService.setupTeamVoiceChannels(
-      interaction.guild,
-      match
-    );
+      // Call Vercel Cloud Agent to process queue and create match
+      const { vercelAPI } = services;
+      const processResult = await vercelAPI.processQueue({
+        balancingMode: config.teamBalancing.defaultMode,
+      });
 
-    // Store voice channel IDs in match
-    if (teamAChannel) match.teamAChannelId = teamAChannel.id;
-    if (teamBChannel) match.teamBChannelId = teamBChannel.id;
+      if (!processResult.success || !processResult.match) {
+        queueService.unlock();
+        await interaction.editReply(
+          `❌ Failed to create match: ${processResult.error || 'Unknown error'}`
+        );
+        return;
+      }
 
-    // Save match to Supabase (Phase 4)
-    try {
-      const teamAUserIds = match.teams.teamA.players.map(p => p.userId);
-      const teamBUserIds = match.teams.teamB.players.map(p => p.userId);
-      
-      const dbMatch = await databaseService.createMatch({
-        matchId: match.matchId,
-        map: match.map,
-        hostUserId: match.host.userId,
+      // Get player objects for match creation (for voice channels and display)
+      const teamAPlayers = (await Promise.all(
+        processResult.match.teamA.map(async (userId: string) => {
+          const player = await playerService.getPlayer(userId);
+          if (!player) {
+            const dbPlayer = await databaseService.getPlayer(userId);
+            if (dbPlayer) {
+              return databaseService.databasePlayerToModel(dbPlayer);
+            }
+          }
+          return player;
+        })
+      )).filter((p): p is NonNullable<typeof p> => p !== undefined);
+      const teamBPlayers = (await Promise.all(
+        processResult.match.teamB.map(async (userId: string) => {
+          const player = await playerService.getPlayer(userId);
+          if (!player) {
+            const dbPlayer = await databaseService.getPlayer(userId);
+            if (dbPlayer) {
+              return databaseService.databasePlayerToModel(dbPlayer);
+            }
+          }
+          return player;
+        })
+      )).filter((p): p is NonNullable<typeof p> => p !== undefined);
+
+      // Create in-memory match object for voice channels
+      const match = matchService.createMatch(
+        [...teamAPlayers, ...teamBPlayers],
+        config.teamBalancing.defaultMode,
+        processResult.match.map
+      );
+
+      // Override match ID and teams with Vercel result
+      match.matchId = processResult.match.matchId;
+      match.map = processResult.match.map;
+      match.teams.teamA.players = teamAPlayers;
+      match.teams.teamB.players = teamBPlayers;
+      match.host = teamAPlayers.find((p: any) => p?.userId === processResult.match?.hostUserId) || teamAPlayers[0];
+
+      // Create voice channels and assign team roles
+      const { voiceChannelService } = services;
+      const { teamAChannel, teamBChannel } = await voiceChannelService.setupTeamVoiceChannels(
+        interaction.guild,
+        match
+      );
+
+      // Store voice channel IDs in match
+      if (teamAChannel) match.teams.teamA.voiceChannelId = teamAChannel.id;
+      if (teamBChannel) match.teams.teamB.voiceChannelId = teamBChannel.id;
+
+      // Save match to Supabase (already done by Vercel, but ensure voice channels are stored)
+      try {
+        const teamAUserIds = match.teams.teamA.players.map(p => p.userId);
+        const teamBUserIds = match.teams.teamB.players.map(p => p.userId);
+        
+        const dbMatch = await databaseService.createMatch({
+          matchId: match.matchId,
+          map: match.map,
+          hostUserId: match.host.userId,
         teamA: teamAUserIds,
         teamB: teamBUserIds,
         matchType: 'custom',
@@ -501,6 +554,7 @@ export async function handleButtonInteraction(
     matchService: MatchService;
     databaseService: DatabaseService;
     voiceChannelService: VoiceChannelService;
+    vercelAPI: VercelAPIService;
     config: Config;
   }
 ) {
@@ -559,6 +613,7 @@ async function handleJoinButton(
     matchService: MatchService;
     databaseService: DatabaseService;
     voiceChannelService: VoiceChannelService;
+    vercelAPI: VercelAPIService;
     config: Config;
   }
 ) {
@@ -629,18 +684,68 @@ async function handleJoinButton(
 
     // Check if queue is full (async)
     if (await queueService.isFull()) {
-      // Create match (async - get players from queue)
-      const queuePlayers = await queueService.getPlayers();
-      const match = matchService.createMatch(
-        queuePlayers,
-        config.teamBalancing.defaultMode
-      );
-
       // Validate guild exists for voice channels
       if (!interaction.guild) {
         await interaction.editReply('❌ Cannot create match: guild not found.');
         return;
       }
+
+      // Lock queue to prevent further joins
+      queueService.lock();
+
+      // Call Vercel Cloud Agent to process queue and create match
+      const { vercelAPI } = services;
+      const processResult = await vercelAPI.processQueue({
+        balancingMode: config.teamBalancing.defaultMode,
+      });
+
+      if (!processResult.success || !processResult.match) {
+        queueService.unlock();
+        await interaction.editReply(
+          `❌ Failed to create match: ${processResult.error || 'Unknown error'}`
+        );
+        return;
+      }
+
+      // Get player objects for match creation (for voice channels and display)
+      const teamAPlayers = (await Promise.all(
+        processResult.match.teamA.map(async (userId: string) => {
+          const player = await playerService.getPlayer(userId);
+          if (!player) {
+            const dbPlayer = await databaseService.getPlayer(userId);
+            if (dbPlayer) {
+              return databaseService.databasePlayerToModel(dbPlayer);
+            }
+          }
+          return player;
+        })
+      )).filter((p): p is NonNullable<typeof p> => p !== undefined);
+      const teamBPlayers = (await Promise.all(
+        processResult.match.teamB.map(async (userId: string) => {
+          const player = await playerService.getPlayer(userId);
+          if (!player) {
+            const dbPlayer = await databaseService.getPlayer(userId);
+            if (dbPlayer) {
+              return databaseService.databasePlayerToModel(dbPlayer);
+            }
+          }
+          return player;
+        })
+      )).filter((p): p is NonNullable<typeof p> => p !== undefined);
+
+      // Create in-memory match object for voice channels
+      const match = matchService.createMatch(
+        [...teamAPlayers, ...teamBPlayers],
+        config.teamBalancing.defaultMode,
+        processResult.match.map
+      );
+
+      // Override match ID and teams with Vercel result
+      match.matchId = processResult.match.matchId;
+      match.map = processResult.match.map;
+      match.teams.teamA.players = teamAPlayers;
+      match.teams.teamB.players = teamBPlayers;
+      match.host = teamAPlayers.find((p: any) => p?.userId === processResult.match?.hostUserId) || teamAPlayers[0];
 
       // Create voice channels and assign team roles
       const { teamAChannel, teamBChannel } = await voiceChannelService.setupTeamVoiceChannels(
@@ -649,36 +754,8 @@ async function handleJoinButton(
       );
 
       // Store voice channel IDs in match
-      if (teamAChannel) match.teamAChannelId = teamAChannel.id;
-      if (teamBChannel) match.teamBChannelId = teamBChannel.id;
-
-      // Save match to Supabase
-      try {
-        const teamAUserIds = match.teams.teamA.players.map(p => p.userId);
-        const teamBUserIds = match.teams.teamB.players.map(p => p.userId);
-        
-        const dbMatch = await databaseService.createMatch({
-          matchId: match.matchId,
-          map: match.map,
-          hostUserId: match.host.userId,
-          teamA: teamAUserIds,
-          teamB: teamBUserIds,
-          matchType: 'custom',
-        });
-
-        if (!dbMatch) {
-          console.error('Failed to save match to database', {
-            matchId: match.matchId,
-          });
-        }
-      } catch (error) {
-        console.error('Error saving match to database', {
-          matchId: match.matchId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      queueService.lock();
+      if (teamAChannel) match.teams.teamA.voiceChannelId = teamAChannel.id;
+      if (teamBChannel) match.teams.teamB.voiceChannelId = teamBChannel.id;
 
       // Send match announcement with voice channel info
       const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel);
@@ -771,6 +848,7 @@ async function handleLeaveButton(
     matchService: MatchService;
     databaseService: DatabaseService;
     voiceChannelService: VoiceChannelService;
+    vercelAPI: VercelAPIService;
     config: Config;
   }
 ) {
