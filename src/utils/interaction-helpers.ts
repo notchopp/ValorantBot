@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, MessageFlags, InteractionResponse } from 'discord.js';
+import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 
 /**
  * Safely defer an interaction reply
