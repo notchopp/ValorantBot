@@ -46,7 +46,7 @@ export async function execute(
     .setTitle('🏆 Leaderboard')
     .setDescription(leaderboardText)
     .setColor(0xffd700)
-    .setFooter({ text: 'Ranked by total points • See full leaderboard at grnds.xyz/leaderboard' });
+    .setFooter({ text: 'Ranked by total points • See full leaderboard at https://grnds.xyz/leaderboard' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
