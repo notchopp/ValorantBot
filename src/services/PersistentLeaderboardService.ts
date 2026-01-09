@@ -148,7 +148,8 @@ export class PersistentLeaderboardService {
     });
 
     // Split into chunks if needed (Discord embed field value limit is 1024 characters)
-    const leaderboardText = leaderboardEntries.join('\n');
+    // Add spacing between rows for better readability
+    const leaderboardText = leaderboardEntries.join('\n\n');
     
     if (leaderboardText.length <= 1024) {
       embed.addFields({
@@ -159,8 +160,8 @@ export class PersistentLeaderboardService {
     } else {
       // Split into multiple fields if too long
       const chunkSize = Math.ceil(leaderboardEntries.length / 2);
-      const firstChunk = leaderboardEntries.slice(0, chunkSize).join('\n');
-      const secondChunk = leaderboardEntries.slice(chunkSize).join('\n');
+      const firstChunk = leaderboardEntries.slice(0, chunkSize).join('\n\n');
+      const secondChunk = leaderboardEntries.slice(chunkSize).join('\n\n');
 
       embed.addFields(
         {
