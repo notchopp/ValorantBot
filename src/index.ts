@@ -17,6 +17,7 @@ import { SkillGapAnalyzer } from './services/SkillGapAnalyzer';
 import { HostTimeoutService } from './services/HostTimeoutService';
 import { AutoMatchDetectionService } from './services/AutoMatchDetectionService';
 import { DiscordLogger } from './services/DiscordLogger';
+import { PersistentQueueService } from './services/PersistentQueueService';
 import { initializeLogger } from './utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -82,8 +83,8 @@ if (process.env.VERCEL_API_URL) {
   console.warn('Set it with: fly secrets set VERCEL_API_URL=https://your-app.vercel.app');
 }
 
-// Services object to pass to commands
-const services = {
+// Services object to pass to commands (persistentQueueService added after initialization)
+let services: any = {
   queueService,
   playerService,
   matchService,
@@ -98,12 +99,13 @@ const services = {
   vercelAPI,
   skillGapAnalyzer,
   config: appConfig,
-} as const;
+};
 
 // Background services (initialized after client is ready)
 let hostTimeoutService: HostTimeoutService | null = null;
 let autoMatchDetectionService: AutoMatchDetectionService | null = null;
 let discordLogger: DiscordLogger | null = null;
+let persistentQueueService: PersistentQueueService | null = null;
 
 // Create Discord client
 const client = new Client({
@@ -314,7 +316,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 });
 
 // Bot ready
-client.once('clientReady', async () => {
+client.once('ready', async () => {
   console.log(`✅ Bot logged in as ${client.user?.tag}`);
   console.log(`📊 Valorant API: ${valorantAPI ? 'Enabled' : 'Disabled'}`);
   
@@ -398,10 +400,21 @@ client.once('clientReady', async () => {
       playerService,
       client
     );
-    autoMatchDetectionService.start();
-    console.log('✅ Auto-match detection service started');
+      autoMatchDetectionService.start();
+      console.log('✅ Auto-match detection service started');
   } catch (error) {
     console.error('Failed to start auto-match detection service', { error });
+  }
+
+  // Initialize persistent queue service
+  try {
+    persistentQueueService = new PersistentQueueService(client, queueService, appConfig);
+    await persistentQueueService.initializePersistentQueue('lobby');
+    // Add to services object after initialization
+    services.persistentQueueService = persistentQueueService;
+    console.log('✅ Persistent queue service initialized');
+  } catch (error) {
+    console.error('Failed to initialize persistent queue service', { error });
   }
   
   registerCommands();

@@ -74,6 +74,15 @@ export class RoleUpdateService {
       if (newRank && newRank !== 'Unranked') {
         console.log('➕ Assigning new rank role', { newRank });
         await this.assignRankRole(member, newRank, guild);
+        
+        // Also assign ranked #GRNDS role if CHALLENGER I or higher
+        const rankValue = this.getRankValue(newRank);
+        if (rankValue >= 11) { // CHALLENGER I starts at 11
+          await this.assignRankedGrndsRole(member, guild);
+        } else {
+          // Remove ranked #GRNDS role if below CHALLENGER
+          await this.removeRankedGrndsRole(member, guild);
+        }
       }
 
       console.log('✅ Role update completed successfully', {
@@ -236,6 +245,62 @@ export class RoleUpdateService {
         stack: error instanceof Error ? error.stack : undefined,
       });
       // Don't throw - this is a non-critical operation
+    }
+  }
+
+  /**
+   * Assign ranked #GRNDS role to players who are CHALLENGER I or higher
+   */
+  private async assignRankedGrndsRole(member: GuildMember, guild: Guild): Promise<void> {
+    try {
+      const rankedGrndsRole = guild.roles.cache.find(
+        (role) => role.name === '#GRNDS' || role.name === 'ranked #GRNDS' || role.name.toLowerCase().includes('ranked grnds')
+      );
+
+      if (!rankedGrndsRole) {
+        console.warn('⚠️ Ranked #GRNDS role not found in guild', { guildId: guild.id, guildName: guild.name });
+        return;
+      }
+
+      if (member.roles.cache.has(rankedGrndsRole.id)) {
+        console.log('ℹ️ Member already has ranked #GRNDS role', { userId: member.id });
+        return;
+      }
+
+      await member.roles.add(rankedGrndsRole, 'Reached CHALLENGER I or higher');
+      console.log('✅ Assigned ranked #GRNDS role', { userId: member.id, username: member.user.username });
+    } catch (error) {
+      console.error('❌ Error assigning ranked #GRNDS role', {
+        userId: member.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Remove ranked #GRNDS role from players below CHALLENGER I
+   */
+  private async removeRankedGrndsRole(member: GuildMember, guild: Guild): Promise<void> {
+    try {
+      const rankedGrndsRole = guild.roles.cache.find(
+        (role) => role.name === '#GRNDS' || role.name === 'ranked #GRNDS' || role.name.toLowerCase().includes('ranked grnds')
+      );
+
+      if (!rankedGrndsRole) {
+        return; // Role doesn't exist, nothing to remove
+      }
+
+      if (!member.roles.cache.has(rankedGrndsRole.id)) {
+        return; // Member doesn't have the role
+      }
+
+      await member.roles.remove(rankedGrndsRole, 'Ranked below CHALLENGER I');
+      console.log('✅ Removed ranked #GRNDS role', { userId: member.id, username: member.user.username });
+    } catch (error) {
+      console.error('❌ Error removing ranked #GRNDS role', {
+        userId: member.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

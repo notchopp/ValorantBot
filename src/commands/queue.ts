@@ -55,6 +55,7 @@ export async function execute(
     vercelAPI: VercelAPIService;
     valorantAPI?: ValorantAPIService;
     skillGapAnalyzer: SkillGapAnalyzer;
+    persistentQueueService?: any; // PersistentQueueService
     config: Config;
   }
 ) {
@@ -96,18 +97,33 @@ async function handleStart(
   try {
     // Validate guild exists
     if (!interaction.guild) {
-      await interaction.editReply('❌ This command can only be used in a server.');
+      await interaction.editReply('This command can only be used in a server.');
       return;
     }
 
-    // Check for #GRNDS MAKER role
+    // Check for queue management roles: #GRNDSMAKER, #GRNDSKEEPER, or chopp
     const member = await interaction.guild.members.fetch(userId);
     const grndsMakerRole = interaction.guild.roles.cache.find(
-      (role) => role.name === '#GRNDS MAKER'
+      (role) => role.name === '#GRNDSMAKER'
+    );
+    const grndsKeeperRole = interaction.guild.roles.cache.find(
+      (role) => role.name === '#GRNDSKEEPER' || role.name === '#GRNDS KEEPER'
+    );
+    const choppRole = interaction.guild.roles.cache.find(
+      (role) => role.name.toLowerCase().includes('chopp') || role.name.toLowerCase() === 'chopp'
     );
     
-    if (grndsMakerRole && !member.roles.cache.has(grndsMakerRole.id)) {
-      await interaction.editReply('❌ Only users with the **#GRNDS MAKER** role can start queues.');
+    const hasPermission = 
+      (grndsMakerRole && member.roles.cache.has(grndsMakerRole.id)) ||
+      (grndsKeeperRole && member.roles.cache.has(grndsKeeperRole.id)) ||
+      (choppRole && member.roles.cache.has(choppRole.id));
+    
+    if (!hasPermission) {
+      await interaction.editReply(
+        'Only users with **#GRNDSMAKER**, **#GRNDSKEEPER**, or **chopp** role can start new queues.\n\n' +
+        '**Anyone can join the queue!** Use `/queue join` or click the button in the lobby channel.\n' +
+        'Need a queue started? Ping <@&' + (grndsMakerRole?.id || '') + '> or any mod!'
+      );
       return;
     }
 
@@ -116,14 +132,14 @@ async function handleStart(
     // Check if queue is already active
     const queue = await queueService.getStatus();
     if (queue.players.length > 0) {
-      await interaction.editReply('❌ A queue is already active. Use `/queue stop` to end it first.');
+      await interaction.editReply('A queue is already active. Use `/queue stop` to end it first.');
       return;
     }
 
     // Check if there's an active match
     const currentMatch = matchService.getCurrentMatch();
     if (currentMatch && currentMatch.status === 'in-progress') {
-      await interaction.editReply('❌ There is already a match in progress. Please wait for it to complete.');
+      await interaction.editReply(' There is already a match in progress. Please wait for it to complete.');
       return;
     }
 
@@ -143,7 +159,7 @@ async function handleStart(
 
     // Create embed with join button
     const embed = new EmbedBuilder()
-      .setTitle('🎮 Queue Started!')
+      .setTitle('Queue Started!')
       .setDescription('Click the button below to join the queue!')
       .setColor(0x00ff00)
       .addFields({
@@ -153,14 +169,14 @@ async function handleStart(
       })
       .addFields({
         name: 'Status',
-        value: '✅ Open',
+        value: 'Open',
         inline: true,
       });
 
     // Add queue lobby info if created
     if (queueLobbyChannel) {
       embed.addFields({
-        name: '🎮 Queue Lobby',
+        name: 'Queue Lobby',
         value: `<#${queueLobbyChannel.id}>\n*Join this voice channel while waiting!*`,
         inline: false,
       });
@@ -170,14 +186,12 @@ async function handleStart(
     const joinButton = new ButtonBuilder()
       .setCustomId('queue_join_button')
       .setLabel('Join Queue')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('➕');
+      .setStyle(ButtonStyle.Primary);
 
     const leaveButton = new ButtonBuilder()
       .setCustomId('queue_leave_button')
       .setLabel('Leave Queue')
-      .setStyle(ButtonStyle.Danger)
-      .setEmoji('➖');
+      .setStyle(ButtonStyle.Danger);
 
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(joinButton, leaveButton);
@@ -205,7 +219,7 @@ async function handleStart(
     });
 
     await interaction.editReply({
-      content: '❌ An error occurred while starting the queue. Please try again.',
+      content: 'An error occurred while starting the queue. Please try again.',
     });
   }
 }
@@ -232,18 +246,29 @@ async function handleStop(
   try {
     // Validate guild exists
     if (!interaction.guild) {
-      await interaction.editReply('❌ This command can only be used in a server.');
+      await interaction.editReply('This command can only be used in a server.');
       return;
     }
 
-    // Check for #GRNDS MAKER role
+    // Check for queue management roles: #GRNDSMAKER, #GRNDSKEEPER, or chopp
     const member = await interaction.guild.members.fetch(userId);
     const grndsMakerRole = interaction.guild.roles.cache.find(
-      (role) => role.name === '#GRNDS MAKER' || role.name === 'grndsmaker'
+      (role) => role.name === '#GRNDSMAKER'
+    );
+    const grndsKeeperRole = interaction.guild.roles.cache.find(
+      (role) => role.name === '#GRNDSKEEPER' || role.name === '#GRNDS KEEPER'
+    );
+    const choppRole = interaction.guild.roles.cache.find(
+      (role) => role.name.toLowerCase().includes('chopp') || role.name.toLowerCase() === 'chopp'
     );
     
-    if (grndsMakerRole && !member.roles.cache.has(grndsMakerRole.id)) {
-      await interaction.editReply('❌ Only users with the **#GRNDS MAKER** role can stop queues.');
+    const hasPermission = 
+      (grndsMakerRole && member.roles.cache.has(grndsMakerRole.id)) ||
+      (grndsKeeperRole && member.roles.cache.has(grndsKeeperRole.id)) ||
+      (choppRole && member.roles.cache.has(choppRole.id));
+    
+    if (!hasPermission) {
+      await interaction.editReply('Only users with **#GRNDSMAKER**, **#GRNDSKEEPER**, or **chopp** role can stop queues.');
       return;
     }
 
@@ -277,8 +302,8 @@ async function handleStop(
 
     // Include queue ID in response if multiple queues might exist
     const responseText = queueId 
-      ? `✅ Queue stopped and cleared. (Queue ID: ${queueId})`
-      : '✅ Queue stopped and cleared.';
+      ? `Queue stopped and cleared. (Queue ID: ${queueId})`
+      : 'Queue stopped and cleared.';
     
     await interaction.editReply(responseText);
   } catch (error) {
@@ -289,7 +314,7 @@ async function handleStop(
     });
 
     await interaction.editReply({
-      content: '❌ An error occurred while stopping the queue. Please try again.',
+      content: 'An error occurred while stopping the queue. Please try again.',
     });
   }
 }
@@ -306,6 +331,7 @@ async function handleJoin(
     vercelAPI: VercelAPIService;
     valorantAPI?: ValorantAPIService;
     skillGapAnalyzer: SkillGapAnalyzer;
+    persistentQueueService?: any; // PersistentQueueService
     config: Config;
   }
 ) {
@@ -331,7 +357,7 @@ async function handleJoin(
     if (!dbPlayer?.riot_name || !dbPlayer?.riot_tag || !dbPlayer?.riot_puuid) {
       await interaction.editReply({
         content:
-          '❌ You must link your Riot ID before joining queue.\n\n' +
+          ' You must link your Riot ID before joining queue.\n\n' +
           'Use `/riot link` to link your account, then `/verify` to get placed.',
       });
       return;
@@ -341,7 +367,7 @@ async function handleJoin(
     if (!dbPlayer.discord_rank || dbPlayer.discord_rank === 'Unranked') {
       await interaction.editReply({
         content:
-          '❌ You must complete verification before joining queue.\n\n' +
+          ' You must complete verification before joining queue.\n\n' +
           'Use `/verify` to get your initial Discord rank placement.',
       });
       return;
@@ -356,7 +382,7 @@ async function handleJoin(
         if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
           await interaction.editReply({
             content:
-              `⚠️ Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
+              ` Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
               `Current level: ${account.account_level}\n` +
               `Play more Valorant to unlock queue access! (Minimum: Level ${MIN_VALORANT_ACCOUNT_LEVEL})`,
           });
@@ -374,7 +400,7 @@ async function handleJoin(
         if (matches && matches.length === 0) {
           // Warning but allow join
           await interaction.followUp({
-            content: '⚠️ No recent competitive matches found. Consider playing some Valorant!',
+            content: ' No recent competitive matches found. Consider playing some Valorant!',
             flags: MessageFlags.Ephemeral,
           });
         }
@@ -413,11 +439,17 @@ async function handleJoin(
   const queue = await queueService.getStatus();
   const queueSize = queue.players.length;
 
+  // Update persistent queue message if it exists
+  const { persistentQueueService } = services;
+  if (persistentQueueService) {
+    await persistentQueueService.updatePersistentQueueMessage();
+  }
+
   // Check if queue is full (async)
   if (await queueService.isFull()) {
       // Validate guild exists for voice channels
       if (!interaction.guild) {
-        await interaction.editReply('❌ Cannot create match: guild not found.');
+        await interaction.editReply('Cannot create match: guild not found.');
         return;
       }
 
@@ -450,7 +482,7 @@ async function handleJoin(
       if (!vercelAPI) {
         console.error('vercelAPI is not available in services for queue processing (handleJoin command)');
         queueService.unlock();
-        await interaction.editReply('❌ Vercel API service is not available. Please configure VERCEL_API_URL.');
+        await interaction.editReply('Vercel API service is not available. Please configure VERCEL_API_URL.');
         return;
       }
 
@@ -467,7 +499,7 @@ async function handleJoin(
       if (!processResult.success || !processResult.match) {
         queueService.unlock();
         await interaction.editReply(
-          `❌ Failed to create match: ${processResult.error || 'Unknown error'}`
+          ` Failed to create match: ${processResult.error || 'Unknown error'}`
         );
         return;
       }
@@ -563,7 +595,7 @@ async function handleJoin(
     await queueService.clear();
     queueService.unlock();
 
-    await interaction.editReply('✅ Queue is full! Match created. Check your team voice channels!');
+    await interaction.editReply(' Queue is full! Match created. Check your team voice channels!');
     } else {
       await interaction.editReply(result.message);
     }
@@ -575,7 +607,7 @@ async function handleJoin(
     });
     
     await interaction.editReply({
-      content: '❌ An error occurred while joining the queue. Please try again.',
+      content: ' An error occurred while joining the queue. Please try again.',
     });
   }
 }
@@ -590,6 +622,7 @@ async function handleLeave(
     databaseService: DatabaseService;
     valorantAPI?: ValorantAPIService;
     skillGapAnalyzer: SkillGapAnalyzer;
+    persistentQueueService?: any; // PersistentQueueService
     config: Config;
   }
 ) {
@@ -598,8 +631,14 @@ async function handleLeave(
   const userId = interaction.user.id;
 
   try {
-    const { queueService } = services;
+    const { queueService, persistentQueueService } = services;
     const result = await queueService.leave(userId);
+    
+    // Update persistent queue message if it exists
+    if (persistentQueueService) {
+      await persistentQueueService.updatePersistentQueueMessage();
+    }
+    
     await interaction.editReply(result.message);
   } catch (error) {
     console.error('Queue leave error', {
@@ -608,7 +647,7 @@ async function handleLeave(
     });
     
     await interaction.editReply({
-      content: '❌ An error occurred while leaving the queue. Please try again.',
+      content: ' An error occurred while leaving the queue. Please try again.',
     });
   }
 }
@@ -642,7 +681,7 @@ async function handleStatus(
     })
     .addFields({
       name: 'Status',
-      value: queue.isLocked ? '🔒 Locked' : '✅ Open',
+      value: queue.isLocked ? ' Locked' : ' Open',
       inline: true,
     });
 
@@ -678,7 +717,7 @@ async function handleStatus(
     });
     
     await interaction.editReply({
-      content: '❌ An error occurred while fetching queue status. Please try again.',
+      content: ' An error occurred while fetching queue status. Please try again.',
     });
   }
 }
@@ -690,7 +729,7 @@ function createMatchEmbed(
   teamBChannel?: any
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setTitle('🎮 Match Created!')
+    .setTitle(' Match Created!')
     .setColor(match.hostConfirmed ? 0x00ff00 : 0xff9900)
     .addFields({
       name: 'Map',
@@ -711,7 +750,7 @@ function createMatchEmbed(
   // Add host status
   if (match.hostConfirmed && match.hostInviteCode) {
     embed.addFields({
-      name: '✅ Host Confirmed',
+      name: ' Host Confirmed',
       value: `Invite Code: \`${match.hostInviteCode}\``,
       inline: false,
     });
@@ -740,13 +779,13 @@ function createMatchEmbed(
     .join('\n');
 
   embed
-    .addFields({ name: '🔵 Team A', value: teamAList || 'None', inline: true })
-    .addFields({ name: '🔴 Team B', value: teamBList || 'None', inline: true });
+    .addFields({ name: ' Team A', value: teamAList || 'None', inline: true })
+    .addFields({ name: ' Team B', value: teamBList || 'None', inline: true });
 
   // Add voice channel info if available
   if (teamAChannel) {
     embed.addFields({
-      name: '🔵 Team A Voice',
+      name: ' Team A Voice',
       value: `<#${teamAChannel.id}>`,
       inline: true,
     });
@@ -754,7 +793,7 @@ function createMatchEmbed(
 
   if (teamBChannel) {
     embed.addFields({
-      name: '🔴 Team B Voice',
+      name: ' Team B Voice',
       value: `<#${teamBChannel.id}>`,
       inline: true,
     });
@@ -790,7 +829,7 @@ export async function handleButtonInteraction(
     // Validate guild exists
     if (!interaction.guild) {
       await interaction.reply({
-        content: '❌ This can only be used in a server.',
+        content: ' This can only be used in a server.',
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -802,7 +841,7 @@ export async function handleButtonInteraction(
       await handleLeaveButton(interaction, services);
     } else {
       await interaction.reply({
-        content: '❌ Unknown button interaction.',
+        content: ' Unknown button interaction.',
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -819,12 +858,12 @@ export async function handleButtonInteraction(
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
-          content: '❌ An error occurred. Please try again.',
+          content: ' An error occurred. Please try again.',
           flags: MessageFlags.Ephemeral,
         });
       } else if (interaction.deferred) {
         await interaction.followUp({
-          content: '❌ An error occurred. Please try again.',
+          content: ' An error occurred. Please try again.',
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -856,6 +895,7 @@ async function handleJoinButton(
     vercelAPI: VercelAPIService;
     valorantAPI?: ValorantAPIService;
     skillGapAnalyzer: SkillGapAnalyzer;
+    persistentQueueService?: any; // PersistentQueueService
     config: Config;
   }
 ) {
@@ -881,7 +921,7 @@ async function handleJoinButton(
     // Check if there's an active match
     const currentMatch = matchService.getCurrentMatch();
     if (currentMatch && currentMatch.status === 'in-progress') {
-      await interaction.editReply('❌ There is already a match in progress. Please wait for it to complete.');
+      await interaction.editReply(' There is already a match in progress. Please wait for it to complete.');
       return;
     }
 
@@ -893,7 +933,7 @@ async function handleJoinButton(
       try {
         await interaction.followUp({
           content:
-            '❌ You must link your Riot ID before joining queue.\n\n' +
+            ' You must link your Riot ID before joining queue.\n\n' +
             'Use `/riot link` to link your account, then `/verify` to get placed.',
           flags: MessageFlags.Ephemeral,
         });
@@ -910,7 +950,7 @@ async function handleJoinButton(
       try {
         await interaction.followUp({
           content:
-            '❌ You must complete verification before joining queue.\n\n' +
+            ' You must complete verification before joining queue.\n\n' +
             'Use `/verify` to get your initial Discord rank placement.',
           flags: MessageFlags.Ephemeral,
         });
@@ -932,7 +972,7 @@ async function handleJoinButton(
           try {
             await interaction.followUp({
               content:
-                `⚠️ Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
+                ` Your Valorant account level is below ${MIN_VALORANT_ACCOUNT_LEVEL}.\n\n` +
                 `Current level: ${account.account_level}\n` +
                 `Play more Valorant to unlock queue access! (Minimum: Level ${MIN_VALORANT_ACCOUNT_LEVEL})`,
               flags: MessageFlags.Ephemeral,
@@ -960,7 +1000,7 @@ async function handleJoinButton(
           // Warning but allow join
           try {
             await interaction.followUp({
-              content: '⚠️ No recent competitive matches found. Consider playing some Valorant!',
+              content: ' No recent competitive matches found. Consider playing some Valorant!',
               flags: MessageFlags.Ephemeral,
             });
           } catch (error: any) {
@@ -1011,7 +1051,7 @@ async function handleJoinButton(
     if (interaction.guild) {
       // Find queue lobby channel
       const queueLobbyChannel = interaction.guild.channels.cache.find(
-        (ch: any) => ch.type === 2 && ch.name === '🎮 Queue Lobby' // ChannelType.GuildVoice = 2
+        (ch: any) => ch.type === 2 && ch.name === ' Queue Lobby' // ChannelType.GuildVoice = 2
       ) as any;
       
       if (queueLobbyChannel && interaction.member?.voice.channel) {
@@ -1041,7 +1081,7 @@ async function handleJoinButton(
       if (!interaction.guild) {
         try {
           await interaction.followUp({
-            content: '❌ Cannot create match: guild not found.',
+            content: ' Cannot create match: guild not found.',
             flags: MessageFlags.Ephemeral,
           });
         } catch (error) {
@@ -1085,7 +1125,7 @@ async function handleJoinButton(
         queueService.unlock();
         try {
           await interaction.followUp({
-            content: '❌ Vercel API service is not available. Please configure VERCEL_API_URL.',
+            content: ' Vercel API service is not available. Please configure VERCEL_API_URL.',
             flags: MessageFlags.Ephemeral,
           });
         } catch (error) {
@@ -1107,7 +1147,7 @@ async function handleJoinButton(
       if (!processResult.success || !processResult.match) {
         queueService.unlock();
         await interaction.editReply(
-          `❌ Failed to create match: ${processResult.error || 'Unknown error'}`
+          ` Failed to create match: ${processResult.error || 'Unknown error'}`
         );
         return;
       }
@@ -1182,7 +1222,7 @@ async function handleJoinButton(
         try {
           const hostMember = await interaction.guild.members.fetch(match.host.userId);
           await hostMember.send(
-            `🎮 You've been selected as the **host** for the match!\n\n` +
+            ` You've been selected as the **host** for the match!\n\n` +
             `**Match ID:** ${match.matchId}\n` +
             `**Map:** ${match.map}\n\n` +
             `**Steps to host:**\n` +
@@ -1208,7 +1248,7 @@ async function handleJoinButton(
       if (interaction.message && interaction.message.editable) {
         try {
           await interaction.message.edit({
-            content: '✅ Queue is full! Match created. Check your team voice channels!',
+            content: ' Queue is full! Match created. Check your team voice channels!',
             embeds: [],
             components: [],
           });
@@ -1231,7 +1271,7 @@ async function handleJoinButton(
 
       // Update the queue message with new player count
       const updatedEmbed = new EmbedBuilder()
-        .setTitle('🎮 Queue Started!')
+        .setTitle(' Queue Started!')
         .setDescription('Click the button below to join the queue!')
         .setColor(0x00ff00)
         .addFields({
@@ -1241,7 +1281,7 @@ async function handleJoinButton(
         })
         .addFields({
           name: 'Status',
-          value: queue.isLocked ? '🔒 Locked' : '✅ Open',
+          value: queue.isLocked ? ' Locked' : ' Open',
           inline: true,
         });
 
@@ -1266,14 +1306,12 @@ async function handleJoinButton(
       const joinButton = new ButtonBuilder()
         .setCustomId('queue_join_button')
         .setLabel('Join Queue')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('➕');
+        .setStyle(ButtonStyle.Primary);
 
       const leaveButton = new ButtonBuilder()
         .setCustomId('queue_leave_button')
         .setLabel('Leave Queue')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('➖');
+        .setStyle(ButtonStyle.Danger);
 
       const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(joinButton, leaveButton);
@@ -1290,7 +1328,7 @@ async function handleJoinButton(
           // Send ephemeral error
           try {
             await interaction.followUp({
-              content: '❌ Failed to update queue message. Please try again.',
+              content: ' Failed to update queue message. Please try again.',
               flags: MessageFlags.Ephemeral,
             });
           } catch (followUpError) {
@@ -1302,13 +1340,18 @@ async function handleJoinButton(
       // Send ephemeral confirmation message
       try {
         await interaction.followUp({
-          content: `✅ ${result.message}`,
+          content: ` ${result.message}`,
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
         if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
           console.error('Error sending join confirmation', { userId, error: error.message });
         }
+      }
+
+      // Also update persistent queue message if it exists
+      if (services.persistentQueueService) {
+        await services.persistentQueueService.updatePersistentQueueMessage();
       }
     }
   } catch (error) {
@@ -1319,7 +1362,7 @@ async function handleJoinButton(
     });
     
     await interaction.editReply({
-      content: '❌ An error occurred while joining the queue. Please try again.',
+      content: ' An error occurred while joining the queue. Please try again.',
     });
   }
 }
@@ -1368,7 +1411,7 @@ async function handleLeaveButton(
       const queueSize = queue.players.length;
 
       const updatedEmbed = new EmbedBuilder()
-        .setTitle('🎮 Queue Started!')
+        .setTitle(' Queue Started!')
         .setDescription('Click the button below to join the queue!')
         .setColor(0x00ff00)
         .addFields({
@@ -1378,7 +1421,7 @@ async function handleLeaveButton(
         })
         .addFields({
           name: 'Status',
-          value: '✅ Open',
+          value: ' Open',
           inline: true,
         });
 
@@ -1415,14 +1458,12 @@ async function handleLeaveButton(
       const joinButton = new ButtonBuilder()
         .setCustomId('queue_join_button')
         .setLabel('Join Queue')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('➕');
+        .setStyle(ButtonStyle.Primary);
 
       const leaveButton = new ButtonBuilder()
         .setCustomId('queue_leave_button')
         .setLabel('Leave Queue')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('➖');
+        .setStyle(ButtonStyle.Danger);
 
       const row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(joinButton, leaveButton);
@@ -1437,7 +1478,7 @@ async function handleLeaveButton(
         // Send ephemeral error
         try {
           await interaction.followUp({
-            content: '❌ Failed to update queue message. Please try again.',
+            content: ' Failed to update queue message. Please try again.',
             flags: MessageFlags.Ephemeral,
           });
         } catch (followUpError) {
@@ -1469,7 +1510,7 @@ async function handleLeaveButton(
     try {
       if (!interaction.replied) {
         await interaction.followUp({
-          content: '❌ An error occurred while leaving the queue. Please try again.',
+          content: ' An error occurred while leaving the queue. Please try again.',
           flags: MessageFlags.Ephemeral,
         });
       }
