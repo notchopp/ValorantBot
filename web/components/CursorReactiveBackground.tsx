@@ -22,7 +22,7 @@ export function CursorReactiveBackground() {
 
   const radialMask = useTransform(
     [spotlightX, spotlightY],
-    ([x, y]) => `radial-gradient(800px circle at ${x}px ${y}px, black 0%, transparent 80%)`
+    ([x, y]) => `radial-gradient(500px circle at ${x}px ${y}px, black 0%, transparent 70%)`
   )
 
   return (
@@ -67,9 +67,9 @@ export function CursorReactiveBackground() {
             left: spotlightX,
             top: spotlightY,
             transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.08) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.06) 40%, transparent 70%)',
           }}
-          className="absolute w-[800px] h-[800px] rounded-full blur-[150px]"
+          className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
         />
       </motion.div>
 
