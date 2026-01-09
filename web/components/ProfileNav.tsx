@@ -1,17 +1,16 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 interface ProfileData {
   discord_username: string | null
   display_name: string | null
+  discord_user_id: string
 }
 
 export function ProfileNav() {
-  const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,6 +57,7 @@ export function ProfileNav() {
       setProfile({
         discord_username: player.discord_username,
         display_name: userProfile?.display_name || null,
+        discord_user_id: player.discord_user_id,
       })
       setLoading(false)
     }
@@ -77,7 +77,7 @@ export function ProfileNav() {
 
   return (
     <Link
-      href={`/profile/${profile.discord_username ? 'me' : 'profile'}/edit`}
+      href={`/profile/${profile.discord_user_id}/edit`}
       className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.05] transition-all group"
     >
       <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
