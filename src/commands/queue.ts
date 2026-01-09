@@ -6,6 +6,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  Message,
 } from 'discord.js';
 import { QueueService } from '../services/QueueService';
 import { PlayerService } from '../services/PlayerService';
@@ -181,10 +182,21 @@ async function handleStart(
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(joinButton, leaveButton);
 
-    await interaction.editReply({
+    // Generate queue ID before creating message
+    const queueId = `queue-${Date.now()}`;
+    
+    // Add queue ID to embed footer for identification
+    embed.setFooter({ text: `Queue ID: ${queueId}` });
+
+    const reply = await interaction.editReply({
       embeds: [embed],
       components: [row],
     });
+
+    // Store queue start message info for later deletion
+    if (reply instanceof Message) {
+      queueService.setQueueStartMessage(reply.id, reply.channel.id, queueId);
+    }
   } catch (error) {
     console.error('Queue start error', {
       userId,
@@ -218,13 +230,57 @@ async function handleStop(
   const username = interaction.user.username;
 
   try {
+    // Validate guild exists
+    if (!interaction.guild) {
+      await interaction.editReply('❌ This command can only be used in a server.');
+      return;
+    }
+
+    // Check for #GRNDS MAKER role
+    const member = await interaction.guild.members.fetch(userId);
+    const grndsMakerRole = interaction.guild.roles.cache.find(
+      (role) => role.name === '#GRNDS MAKER' || role.name === 'grndsmaker'
+    );
+    
+    if (grndsMakerRole && !member.roles.cache.has(grndsMakerRole.id)) {
+      await interaction.editReply('❌ Only users with the **#GRNDS MAKER** role can stop queues.');
+      return;
+    }
+
     const { queueService } = services;
+
+    // Get queue start message info before clearing
+    const { messageId, channelId, queueId } = queueService.getQueueStartMessage();
+
+    // Delete queue start message if it exists
+    if (messageId && channelId && interaction.guild) {
+      try {
+        const channel = await interaction.guild.channels.fetch(channelId);
+        if (channel && channel.isTextBased()) {
+          const message = await channel.messages.fetch(messageId);
+          await message.delete();
+          console.log('Deleted queue start message', { messageId, queueId });
+        }
+      } catch (error) {
+        // Message might already be deleted or not found - that's okay
+        console.warn('Could not delete queue start message', {
+          messageId,
+          channelId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     // Clear queue
     await queueService.clear();
     queueService.unlock();
 
-    await interaction.editReply('✅ Queue stopped and cleared.');
+    // Include queue ID in response if multiple queues might exist
+    const responseText = queueId 
+      ? `✅ Queue stopped and cleared. (Queue ID: ${queueId})`
+      : '✅ Queue stopped and cleared.';
+    
+    await interaction.editReply(responseText);
   } catch (error) {
     console.error('Queue stop error', {
       userId,

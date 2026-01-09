@@ -14,6 +14,9 @@ export class QueueService {
   private dbService: DatabaseService;
   private playerService: PlayerService;
   private isLockedFlag: boolean = false; // Track lock state separately
+  private queueStartMessageId: string | null = null; // Track queue start message for deletion
+  private queueStartChannelId: string | null = null; // Track channel where queue started
+  private queueId: string | null = null; // Unique identifier for this queue session
 
   constructor(config: Config, dbService: DatabaseService, playerService: PlayerService) {
     this.config = config;
@@ -169,6 +172,9 @@ export class QueueService {
       if (cleared) {
         this.queue = createQueue();
         this.isLockedFlag = false;
+        this.queueStartMessageId = null;
+        this.queueStartChannelId = null;
+        this.queueId = null;
       }
       return cleared;
     } catch (error) {
@@ -177,6 +183,35 @@ export class QueueService {
       });
       return false;
     }
+  }
+
+  /**
+   * Set queue start message info for later deletion
+   */
+  setQueueStartMessage(messageId: string, channelId: string, queueId: string): void {
+    this.queueStartMessageId = messageId;
+    this.queueStartChannelId = channelId;
+    this.queueId = queueId;
+  }
+
+  /**
+   * Get queue start message info
+   */
+  getQueueStartMessage(): { messageId: string | null; channelId: string | null; queueId: string | null } {
+    return {
+      messageId: this.queueStartMessageId,
+      channelId: this.queueStartChannelId,
+      queueId: this.queueId,
+    };
+  }
+
+  /**
+   * Clear queue start message info
+   */
+  clearQueueStartMessage(): void {
+    this.queueStartMessageId = null;
+    this.queueStartChannelId = null;
+    this.queueId = null;
   }
 
   /**

@@ -111,6 +111,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // Needed for message content access
   ],
 }) as BotClient;
 
@@ -330,6 +331,35 @@ client.once('clientReady', async () => {
     console.warn('⚠️  DISCORD_LOG_CHANNEL_ID not set - Discord logging disabled');
     console.warn('Set it with: fly secrets set DISCORD_LOG_CHANNEL_ID=your-channel-id');
   }
+
+  // Handle new member joins - send welcome DM
+  client.on('guildMemberAdd', async (member) => {
+    try {
+      // Only send DM if member is not a bot
+      if (member.user.bot) {
+        return;
+      }
+
+      // Send welcome DM - GRNDS themed, natural language
+      const welcomeMessage = `Hey ${member.user.username}! 👋\n\nYou're in #GRNDS now. Welcome!\n\nHead over to the welcome page to get started: https://grnds.xyz/welcome\n\nWe're always looking for feedback, so feel free to share your thoughts anytime. Have fun and rank up! 🎮`;
+
+      try {
+        await member.send(welcomeMessage);
+        console.log('Sent welcome DM to new member', { userId: member.user.id, username: member.user.username });
+      } catch (error) {
+        // User might have DMs disabled - that's okay, just log it
+        console.warn('Could not send welcome DM to new member', {
+          userId: member.user.id,
+          username: member.user.username,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } catch (error) {
+      console.error('Error handling new member join', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
   
   // Load queue state from database on startup
   try {
