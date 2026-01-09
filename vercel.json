@@ -13,7 +13,27 @@
       "destination": "/api/welcome"
     },
     {
+      "source": "/Welcome",
+      "destination": "/api/welcome"
+    },
+    {
+      "source": "/WELCOME",
+      "destination": "/api/welcome"
+    },
+    {
       "source": "/welcome.html",
+      "destination": "/api/welcome"
+    },
+    {
+      "source": "/Welcome.html",
+      "destination": "/api/welcome"
+    },
+    {
+      "source": "/WELCOME.html",
+      "destination": "/api/welcome"
+    },
+    {
+      "source": "/welcome.HTML",
       "destination": "/api/welcome"
     }
   ],
