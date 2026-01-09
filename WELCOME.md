@@ -63,7 +63,7 @@ Track the X rank leaderboard, the top 10 players with 3000+ MMR. Shows 24 hour M
 Use AI to get insights into your performance and identify areas for improvement.
 
 **`/why`**
-Get an AI powered breakdown of why you might be losing or stuck at your current rank. Analyzes your recent match performance, identifies patterns, and provides specific insights based on your stats. Perfect for when you're tilted and need to understand what's going wrong.
+Get an AI powered breakdown of why you might be losing or stuck at your current rank. Analyzes your recent match performance, identifies patterns, and provides specific insights based on your stats. Perfect for when you're tilted and need to understand what's going wrong. Limited to 3 uses per day to ensure quality analysis, we plan to increase this limit in the future based on demand.
 
 ### 🎮 Account & Stats Commands
 
@@ -117,10 +117,13 @@ Cancel an ongoing match if needed.
 **Respect the commands.** Don't spam them. We encourage use but be reasonable. These commands hit the database and some do complex calculations, so give them a second to breathe between uses.
 
 **Daily limits apply to certain commands:**
-- **`/agent`** - Limited to once per day (when implemented). This is an AI powered analysis command that's resource intensive.
+- **`/why`** - Limited to 3 uses per day. This is an AI powered analysis command that requires deep data processing. We plan to increase this limit in the future based on server capacity and demand.
+
+**Command visibility:**
+Some commands are visible only to you (like `/progress`, `/streak`, `/history`, `/session`, `/why`) to keep your personal stats private and create a healthier competitive culture. Others like `/compare`, `/hot`, and `/xwatch` are public to encourage social interaction and friendly competition.
 
 **Most commands are instant:**
-All the progression and social commands are available anytime you want. Check your streak 100 times a day if that's your thing, we don't judge.
+All the progression and social commands are available anytime you want (within rate limits). Check your streak 100 times a day if that's your thing, we don't judge.
 
 **Queue up and play:**
 The more games you play, the more accurate your MMR becomes and the more interesting your stats get. This system thrives on active players grinding games.

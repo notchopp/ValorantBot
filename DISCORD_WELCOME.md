@@ -23,7 +23,11 @@ Check out **WELCOME.md** for the full comprehensive guide covering all commands,
 
 Commands are there to be used, not spammed, but we encourage checking your stats and progression as much as you want. Most commands are instant, just be reasonable.
 
+**Rate limits:** `/why` is limited to 3 uses per day for quality AI analysis. We plan to increase this based on demand and server capacity.
+
 **Future updates coming:** AI powered features like `/agent` (daily analysis sessions) and `/predict` (win probability) are in development. Right now you can use `/why` to get AI insights on your performance.
+
+**Command visibility:** Personal stats commands are private (only you see them) while social commands like `/compare`, `/hot`, and `/xwatch` are public to encourage healthy competition.
 
 Let's make ranked competitive again. Grind hard, climb fast, and don't let losses keep you down. Every X rank player started at GRNDS I.
 

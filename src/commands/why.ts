@@ -19,6 +19,36 @@ interface PerformanceAnalysis {
   trendDirection: 'improving' | 'declining' | 'stable';
 }
 
+// Rate limiting: 3 uses per day per user
+const usageTracker = new Map<string, { count: number; resetTime: number }>();
+const DAILY_LIMIT = 3;
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const userUsage = usageTracker.get(userId);
+
+  // Reset if it's a new day (24 hours since last reset)
+  if (!userUsage || now >= userUsage.resetTime) {
+    const resetTime = now + 24 * 60 * 60 * 1000; // 24 hours from now
+    usageTracker.set(userId, { count: 0, resetTime });
+    return { allowed: true, remaining: DAILY_LIMIT, resetTime };
+  }
+
+  // Check if user has exceeded limit
+  if (userUsage.count >= DAILY_LIMIT) {
+    return { allowed: false, remaining: 0, resetTime: userUsage.resetTime };
+  }
+
+  return { allowed: true, remaining: DAILY_LIMIT - userUsage.count, resetTime: userUsage.resetTime };
+}
+
+function incrementUsage(userId: string): void {
+  const userUsage = usageTracker.get(userId);
+  if (userUsage) {
+    userUsage.count++;
+  }
+}
+
 export async function execute(
   interaction: ChatInputCommandInteraction,
   services: {
@@ -32,6 +62,18 @@ export async function execute(
 
   try {
     const { databaseService } = services;
+
+    // Check rate limit
+    const rateLimit = checkRateLimit(userId);
+    if (!rateLimit.allowed) {
+      const hoursUntilReset = Math.ceil((rateLimit.resetTime - Date.now()) / (1000 * 60 * 60));
+      await interaction.editReply(
+        `⏰ You've used your daily limit of ${DAILY_LIMIT} analyses. ` +
+        `This limit resets in approximately ${hoursUntilReset} hour${hoursUntilReset !== 1 ? 's' : ''}. ` +
+        `We plan to increase usage limits in the future based on demand!`
+      );
+      return;
+    }
 
     // Get player data
     const player = await databaseService.getPlayer(userId);
@@ -115,8 +157,13 @@ export async function execute(
       });
     }
 
+    // Increment usage counter after successful analysis
+    incrementUsage(userId);
+
+    // Add usage info to footer
+    const remainingUses = rateLimit.remaining - 1;
     embed.setFooter({
-      text: `Analysis based on ${analysis.matchesAnalyzed} recent matches | Use /progress to track improvement`,
+      text: `Analysis based on ${analysis.matchesAnalyzed} recent matches | ${remainingUses} use${remainingUses !== 1 ? 's' : ''} remaining today`,
     });
 
     await interaction.editReply({ embeds: [embed] });
@@ -139,7 +186,7 @@ export async function execute(
 async function analyzePerformance(
   databaseService: DatabaseService,
   playerId: string,
-  userId: string
+  _userId: string
 ): Promise<PerformanceAnalysis | null> {
   try {
     const supabase = databaseService.supabase;
@@ -232,7 +279,7 @@ async function analyzePerformance(
  */
 function generateInsights(
   analysis: PerformanceAnalysis,
-  player: any
+  _player: any
 ): {
   summary: string;
   primaryIssue: string | null;
