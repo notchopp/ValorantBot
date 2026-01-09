@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, REST, Routes, Interaction, MessageFlags } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, REST, Routes, Interaction, MessageFlags, EmbedBuilder } from 'discord.js';
 import { config } from 'dotenv';
 import { defaultConfig, Config } from './config/config';
 import { PlayerService } from './services/PlayerService';
@@ -342,11 +342,28 @@ client.once('ready', async () => {
         return;
       }
 
-      // Send welcome DM - GRNDS themed, natural language
-      const welcomeMessage = `Hey ${member.user.username}! 👋\n\nYou're in #GRNDS now. Welcome!\n\nHead over to the welcome page to get started: https://grnds.xyz/welcome\n\nWe're always looking for feedback, so feel free to share your thoughts anytime. Have fun and rank up! 🎮`;
+      // Send welcome DM with embed
+      const welcomeEmbed = new EmbedBuilder()
+        .setTitle('Welcome to #GRNDS')
+        .setDescription(`Hey ${member.user.username}! You're in #GRNDS now. Welcome!`)
+        .setColor(0xff8c00) // GRNDS orange color
+        .addFields(
+          {
+            name: 'Get Started',
+            value: 'Head over to the welcome page to get started:\n[grnds.xyz/welcome](https://grnds.xyz/welcome)',
+            inline: false,
+          },
+          {
+            name: 'Quick Start',
+            value: '1. Link your Riot ID: `/riot link`\n2. Get verified: `/verify`\n3. Join the queue: `/queue join`',
+            inline: false,
+          }
+        )
+        .setFooter({ text: 'We\'re always looking for feedback. Have fun and rank up!' })
+        .setTimestamp();
 
       try {
-        await member.send(welcomeMessage);
+        await member.send({ embeds: [welcomeEmbed] });
         console.log('Sent welcome DM to new member', { userId: member.user.id, username: member.user.username });
       } catch (error) {
         // User might have DMs disabled - that's okay, just log it
