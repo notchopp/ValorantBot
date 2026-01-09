@@ -292,9 +292,30 @@ export default async function handler(
       
       // Provide more specific error messages
       if (error.response?.status === 404) {
+        // Extract API error message if available
+        let apiErrorMessage = '';
+        if (error.response?.data?.errors) {
+          if (Array.isArray(error.response.data.errors)) {
+            apiErrorMessage = error.response.data.errors
+              .map((e: any) => e.message || e.msg || JSON.stringify(e))
+              .join('; ');
+          } else if (typeof error.response.data.errors === 'object') {
+            apiErrorMessage = JSON.stringify(error.response.data.errors);
+          }
+        }
+        
+        console.error('API 404 error details:', { 
+          apiErrorMessage,
+          fullResponseData: error.response?.data 
+        });
+        
+        const errorMsg = apiErrorMessage 
+          ? `Could not find Riot account "${normalizedName}#${normalizedTag}". API Error: ${apiErrorMessage}`
+          : `Could not find Riot account "${normalizedName}#${normalizedTag}". Please verify your current Riot ID in-game.`;
+        
         res.status(404).json({
           success: false,
-          error: `Could not find Riot account "${normalizedName}#${normalizedTag}". Please check your username and tag.`,
+          error: errorMsg,
         });
         return;
       }

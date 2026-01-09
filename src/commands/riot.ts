@@ -113,8 +113,19 @@ async function handleLink(
     console.log('Verifying Riot account via API', { name, tag, tagType: typeof tag });
     const account = await valorantAPI.getAccount(name, tag);
     if (!account) {
+      // Provide helpful error message about name changes
       await interaction.editReply(
-        `❌ Could not find Riot account "${name}#${tag}". Please check your username and tag.`
+        `❌ Could not find Riot account "${name}#${tag}".\n\n` +
+        `**Possible reasons:**\n` +
+        `• The Riot ID may have changed (check your current in-game name)\n` +
+        `• Make sure you're using your **current** Riot ID, not a past name\n` +
+        `• Verify the tag is correct (tags can be numbers like "1017" or letters)\n` +
+        `• Try checking your Riot ID in the Valorant game client\n\n` +
+        `**To find your current Riot ID:**\n` +
+        `1. Open Valorant\n` +
+        `2. Check the top-left corner of the main menu\n` +
+        `3. Your current Riot ID will be displayed there\n\n` +
+        `Once you have your current Riot ID, try again with \`/riot link\`.`
       );
       return;
     }

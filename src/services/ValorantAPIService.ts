@@ -277,15 +277,37 @@ export class ValorantAPIService {
       return null;
     } catch (error: any) {
       // Log detailed error information
-      console.error(`Error fetching account for ${name}#${tag}:`, {
+      const errorDetails: any = {
         status: error.response?.status,
         statusText: error.response?.statusText,
         message: error.message,
         responseData: error.response?.data,
         url: error.config?.url,
-      });
+      };
+      
+      // Extract API error messages if available
+      if (error.response?.data?.errors) {
+        errorDetails.apiErrors = error.response.data.errors;
+        if (Array.isArray(error.response.data.errors)) {
+          errorDetails.apiErrorMessage = error.response.data.errors
+            .map((e: any) => e.message || e.msg || JSON.stringify(e))
+            .join('; ');
+        } else if (typeof error.response.data.errors === 'object') {
+          errorDetails.apiErrorMessage = JSON.stringify(error.response.data.errors);
+        }
+      }
+      
+      console.error(`Error fetching account for ${name}#${tag}:`, errorDetails);
       
       if (error.response?.status === 404) {
+        // Log the actual API error message for debugging
+        if (errorDetails.apiErrorMessage) {
+          console.error(`API 404 error details: ${errorDetails.apiErrorMessage}`);
+        }
+        // Log full error structure to understand what the API returns
+        if (error.response?.data) {
+          console.error(`Full API 404 response:`, JSON.stringify(error.response.data, null, 2));
+        }
         return null;
       }
       
