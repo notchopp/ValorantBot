@@ -1,4 +1,5 @@
 -- Add host-related fields to matches table
+-- Migration: 002_add_host_fields
 ALTER TABLE matches 
 ADD COLUMN IF NOT EXISTS host_user_id TEXT,
 ADD COLUMN IF NOT EXISTS host_invite_code TEXT,
