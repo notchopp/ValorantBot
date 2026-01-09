@@ -232,39 +232,13 @@ async function handleInfo(
 ) {
   const userId = interaction.user.id;
   
-  // Defer reply immediately to prevent timeout (3 second limit)
-  try {
-    if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn(`Riot info interaction timed out for user ${userId} - interaction may have expired`);
-      return;
-    }
-    throw error;
-  }
+  // Defer reply immediately using safe helper
+  await safeDefer(interaction, true);
 
   const { riotIDService, playerService, databaseService } = services;
 
-  // Try to get Riot ID from memory first, then from database
-  let riotId = riotIDService.getRiotID(userId);
-  
-  // If not in memory, try database
-  if (!riotId && databaseService) {
-    const dbPlayer = await databaseService.getPlayer(userId);
-    if (dbPlayer?.riot_name && dbPlayer?.riot_tag) {
-      // Load into memory for future use
-      await riotIDService.linkRiotID(
-        userId,
-        dbPlayer.riot_name,
-        dbPlayer.riot_tag,
-        dbPlayer.riot_region || undefined,
-        dbPlayer.riot_puuid || undefined
-      );
-      riotId = riotIDService.getRiotID(userId);
-    }
-  }
+  // Try to get Riot ID (checks memory and database automatically)
+  const riotId = await riotIDService.getRiotID(userId);
 
   if (!riotId) {
     await interaction.editReply('❌ You do not have a Riot ID linked. Use `/riot link` to link your account.');
@@ -359,23 +333,13 @@ async function handleRefresh(
   const userId = interaction.user.id;
   const username = interaction.user.username;
   
-  // Defer reply immediately to prevent timeout (3 second limit)
-  try {
-    if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn(`Riot refresh interaction timed out for user ${userId} - interaction may have expired`);
-      return;
-    }
-    throw error;
-  }
+  // Defer reply immediately using safe helper
+  await safeDefer(interaction, true);
 
   const { riotIDService, vercelAPI, roleUpdateService, databaseService } = services;
 
-  // Check if Riot ID is linked
-  const riotId = riotIDService.getRiotID(userId);
+  // Check if Riot ID is linked (checks memory and database automatically)
+  const riotId = await riotIDService.getRiotID(userId);
   if (!riotId) {
     await interaction.editReply('❌ No Riot ID linked. Use `/riot link` to link your account first.');
     return;

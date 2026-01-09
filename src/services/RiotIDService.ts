@@ -39,9 +39,38 @@ export class RiotIDService {
 
   /**
    * Get Riot ID for a Discord user
+   * Checks both in-memory cache and database
    */
-  getRiotID(userId: string): { name: string; tag: string; region?: string } | null {
-    return this.riotIdMap.get(userId) || null;
+  async getRiotID(userId: string): Promise<{ name: string; tag: string; region?: string } | null> {
+    // Check memory first
+    const memoryRiotId = this.riotIdMap.get(userId);
+    if (memoryRiotId) {
+      return memoryRiotId;
+    }
+    
+    // If not in memory, check database
+    if (this.databaseService) {
+      const dbPlayer = await this.databaseService.getPlayer(userId);
+      if (dbPlayer?.riot_name && dbPlayer?.riot_tag) {
+        // Load into memory for future use
+        const riotId = {
+          name: dbPlayer.riot_name,
+          tag: dbPlayer.riot_tag,
+          region: dbPlayer.riot_region || undefined,
+        };
+        this.riotIdMap.set(userId, riotId);
+        
+        // Also update player object
+        const player = await this.playerService.getPlayer(userId);
+        if (player) {
+          player.riotId = riotId;
+        }
+        
+        return riotId;
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -96,9 +125,21 @@ export class RiotIDService {
 
   /**
    * Check if a user has a linked Riot ID
+   * Checks both in-memory cache and database
    */
-  hasRiotID(userId: string): boolean {
-    return this.riotIdMap.has(userId);
+  async hasRiotID(userId: string): Promise<boolean> {
+    // Check memory first
+    if (this.riotIdMap.has(userId)) {
+      return true;
+    }
+    
+    // If not in memory, check database
+    if (this.databaseService) {
+      const dbPlayer = await this.databaseService.getPlayer(userId);
+      return !!(dbPlayer?.riot_name && dbPlayer?.riot_tag);
+    }
+    
+    return false;
   }
 
   // For future persistence
