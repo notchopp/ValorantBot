@@ -7,6 +7,8 @@ app = 'valorantbot'
 primary_region = 'ewr'
 
 [build]
+  # Use Dockerfile in root directory
+  dockerfile = "Dockerfile"
 
 [env]
   NODE_ENV = "production"
