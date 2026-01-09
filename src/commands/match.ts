@@ -291,6 +291,7 @@ export async function handleMatchReportModal(
     vercelAPI: any; // VercelAPIService
     roleUpdateService: RoleUpdateService;
     customRankService: CustomRankService;
+    persistentLeaderboardService?: any; // PersistentLeaderboardService
     config: Config;
   }
 ) {
@@ -690,6 +691,19 @@ export async function handleMatchReportModal(
     }
 
     await interaction.editReply({ embeds: [embed] });
+
+    // Update persistent leaderboard after match report
+    const { persistentLeaderboardService } = services;
+    if (persistentLeaderboardService) {
+      try {
+        await persistentLeaderboardService.updatePersistentLeaderboardMessage();
+      } catch (error) {
+        console.error('Error updating persistent leaderboard after match report', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't fail match reporting if leaderboard update fails
+      }
+    }
   } catch (error) {
     console.error('Match report modal error', {
       userId,

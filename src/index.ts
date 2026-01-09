@@ -18,6 +18,7 @@ import { HostTimeoutService } from './services/HostTimeoutService';
 import { AutoMatchDetectionService } from './services/AutoMatchDetectionService';
 import { DiscordLogger } from './services/DiscordLogger';
 import { PersistentQueueService } from './services/PersistentQueueService';
+import { PersistentLeaderboardService } from './services/PersistentLeaderboardService';
 import { initializeLogger } from './utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -106,6 +107,7 @@ let hostTimeoutService: HostTimeoutService | null = null;
 let autoMatchDetectionService: AutoMatchDetectionService | null = null;
 let discordLogger: DiscordLogger | null = null;
 let persistentQueueService: PersistentQueueService | null = null;
+let persistentLeaderboardService: PersistentLeaderboardService | null = null;
 
 // Create Discord client
 const client = new Client({
@@ -432,6 +434,17 @@ client.once('ready', async () => {
     console.log('✅ Persistent queue service initialized');
   } catch (error) {
     console.error('Failed to initialize persistent queue service', { error });
+  }
+
+  // Initialize persistent leaderboard service
+  try {
+    persistentLeaderboardService = new PersistentLeaderboardService(client, playerService);
+    await persistentLeaderboardService.initializePersistentLeaderboard('leaderboard');
+    // Add to services object after initialization
+    services.persistentLeaderboardService = persistentLeaderboardService;
+    console.log('✅ Persistent leaderboard service initialized');
+  } catch (error) {
+    console.error('Failed to initialize persistent leaderboard service', { error });
   }
   
   registerCommands();
