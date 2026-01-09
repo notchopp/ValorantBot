@@ -47,29 +47,25 @@ export async function POST(request: Request) {
       )
     }
     
-    // Get Discord user ID from OAuth - check identities array first
-    const identities = user.identities || []
-    interface Identity {
-      provider: string
-      identity_data?: {
-        id?: string
-      }
-      user_id?: string
-    }
-    const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
-    const discordUserId = discordIdentity?.identity_data?.id || 
-                          discordIdentity?.user_id ||
-                          user.user_metadata?.provider_user_id ||
-                          user.user_metadata?.provider_id || 
-                          user.user_metadata?.sub || 
-                          user.user_metadata?.discord_id ||
-                          user.id
+    // Step 1: Check users table for auth_id -> discord_user_id mapping
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('discord_user_id')
+      .eq('auth_id', user.id)
+      .maybeSingle()
     
-    // Get player by discord_user_id (actual Discord ID, not Supabase UUID)
+    if (!userRecord || !userRecord.discord_user_id) {
+      return Response.json(
+        { error: 'User not linked to Discord account. Please link your account via the Discord bot.' },
+        { status: 404 }
+      )
+    }
+    
+    // Step 2: Get player by discord_user_id from users table
     const { data: player, error: playerError } = await supabase
       .from('players')
       .select('id')
-      .eq('discord_user_id', discordUserId)
+      .eq('discord_user_id', userRecord.discord_user_id)
       .maybeSingle()
     
     if (playerError || !player) {

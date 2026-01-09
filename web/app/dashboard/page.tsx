@@ -6,10 +6,6 @@ import { ActivityFeed as ActivityFeedType } from '@/lib/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
-// Force dynamic rendering to ensure fresh data
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 interface PlayerData {
   id: string
   discord_user_id: string
@@ -21,6 +17,10 @@ interface PlayerData {
   discord_rank: string | null
 }
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   
@@ -31,84 +31,138 @@ export default async function DashboardPage() {
     redirect('/auth/login')
   }
   
-  // Get Discord user ID from OAuth - Discord OAuth stores it in identities
-  // First check identities array (Supabase stores provider user ID here)
-  // Then check metadata, then fallback to user.id
-  const identities = user.identities || []
-  interface Identity {
-    provider: string
-    identity_data?: {
-      id?: string
-      preferred_username?: string
-      username?: string
-    }
-    user_id?: string
-  }
-  const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
-  const discordUserId = discordIdentity?.identity_data?.id || 
-                        discordIdentity?.user_id ||
-                        user.user_metadata?.provider_user_id ||
-                        user.user_metadata?.provider_id || 
-                        user.user_metadata?.sub || 
-                        user.user_metadata?.discord_id ||
-                        user.id // Last resort fallback
-  
-  // Get Discord username from OAuth metadata
-  const discordUsername = discordIdentity?.identity_data?.preferred_username ||
-                          discordIdentity?.identity_data?.username ||
-                          user.user_metadata?.preferred_username || 
-                          user.user_metadata?.global_name ||
-                          user.user_metadata?.full_name || 
-                          user.user_metadata?.name || 
-                          user.user_metadata?.username ||
-                          user.email?.split('@')[0] || 
-                          'Player'
-  
-  // Get or create player data - query by actual Discord user ID
-  let { data: playerData } = await supabase
-    .from('players')
-    .select('*')
-    .eq('discord_user_id', discordUserId)
+  // Step 1: Check users table for auth_id -> discord_user_id mapping
+  let { data: userRecord } = await supabase
+    .from('users')
+    .select('discord_user_id')
+    .eq('auth_id', user.id)
     .maybeSingle()
   
-  // If no player exists, create one
-  if (!playerData) {
-    const { data: newPlayer } = await supabase
-      .from('players')
-      .insert({
-        discord_user_id: discordUserId,
-        discord_username: discordUsername,
-        current_mmr: 0,
-        peak_mmr: 0,
-        discord_rank: 'GRNDS I',
-      })
-      .select()
-      .single()
-    
-    if (newPlayer) {
-      playerData = newPlayer as PlayerData
+  // If no user record exists, try to auto-link from OAuth metadata
+  if (!userRecord) {
+    // Get Discord user ID from OAuth - check identities array first
+    const identities = user.identities || []
+    interface Identity {
+      provider: string
+      identity_data?: {
+        id?: string
+        preferred_username?: string
+        username?: string
+      }
+      user_id?: string
     }
+    const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
+    const discordUserIdFromAuth = discordIdentity?.identity_data?.id || 
+                                  discordIdentity?.user_id ||
+                                  user.user_metadata?.provider_user_id ||
+                                  user.user_metadata?.provider_id || 
+                                  user.user_metadata?.sub || 
+                                  user.user_metadata?.discord_id ||
+                                  null
+    
+    // If we found a Discord ID from OAuth, check if player exists and auto-link
+    if (discordUserIdFromAuth) {
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('discord_user_id')
+        .eq('discord_user_id', discordUserIdFromAuth)
+        .maybeSingle()
+      
+      // If player exists, create user record linking auth to player (auto-link)
+      if (existingPlayer) {
+        const { data: newUserRecord } = await supabase
+          .from('users')
+          .insert({
+            auth_id: user.id,
+            discord_user_id: discordUserIdFromAuth,
+            email: user.email || null,
+          })
+          .select('discord_user_id')
+          .single()
+        
+        if (newUserRecord) {
+          userRecord = newUserRecord
+        }
+      }
+    }
+  }
+  
+  // If still no user record exists, user needs to link Discord account via bot
+  if (!userRecord || !userRecord.discord_user_id) {
+    // Show dashboard with 0s and message to link Discord
+    const discordUsername = user.user_metadata?.preferred_username || 
+                            user.user_metadata?.global_name ||
+                            user.user_metadata?.full_name || 
+                            user.user_metadata?.name || 
+                            user.user_metadata?.username ||
+                            user.email?.split('@')[0] || 
+                            'Player'
+    
+    const playerDataToUse: PlayerData = {
+      id: user.id,
+      discord_user_id: user.id, // Temporary
+      discord_username: discordUsername,
+      riot_name: null,
+      riot_tag: null,
+      current_mmr: 0,
+      peak_mmr: 0,
+      discord_rank: 'GRNDS I',
+    }
+    
+    return (
+      <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">
+        <div className="max-w-[1600px] mx-auto">
+          {/* Link Discord Message */}
+          <div className="glass rounded-2xl p-8 border border-yellow-500/30 mb-8 bg-yellow-500/5">
+            <h2 className="text-xl font-black text-white mb-4 uppercase tracking-tight">Link Your Discord Account</h2>
+            <p className="text-white/60 mb-4">
+              To view your stats, you need to link your Discord account. Use the Discord bot to link your account:
+            </p>
+            <div className="space-y-2 text-sm text-white/40 font-mono">
+              <div>1. Join the Discord server</div>
+              <div>2. Run <code className="bg-black/50 px-2 py-1 rounded text-yellow-500">/riot link</code> and <code className="bg-black/50 px-2 py-1 rounded text-yellow-500">/verify</code> in Discord</div>
+              <div>3. Return here to see your stats</div>
+            </div>
+          </div>
+          
+          {/* Show empty dashboard */}
+          <DashboardContent playerDataToUse={playerDataToUse} totalMatches={0} wins={0} losses={0} winRate={0} netMMR={0} leaderboardPosition={0} activityFeed={[]} season={null} />
+        </div>
+      </div>
+    )
+  }
+  
+  // Step 2: Get player data using discord_user_id from users table
+  const { data: playerData } = await supabase
+    .from('players')
+    .select('*')
+    .eq('discord_user_id', userRecord.discord_user_id)
+    .maybeSingle()
+  
+  // If player doesn't exist, show message
+  if (!playerData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 relative z-10">
+        <div className="text-center max-w-md glass rounded-2xl p-8 border border-white/5">
+          <h1 className="text-4xl font-black text-white mb-4 tracking-tighter uppercase">Player Not Found</h1>
+          <p className="text-base text-white/60 font-light">
+            Your Discord account is linked, but no player data was found. Make sure you&apos;ve used <code className="bg-black/50 px-2 py-1 rounded text-yellow-500">/verify</code> in Discord.
+          </p>
+        </div>
+      </div>
+    )
   }
   
   // Ensure all fields have values (handle nulls from DB)
-  const playerDataToUse: PlayerData = playerData ? {
+  const playerDataToUse: PlayerData = {
     id: playerData.id,
     discord_user_id: playerData.discord_user_id,
-    discord_username: playerData.discord_username ?? discordUsername,
+    discord_username: playerData.discord_username ?? 'Player',
     riot_name: playerData.riot_name ?? null,
     riot_tag: playerData.riot_tag ?? null,
     current_mmr: (playerData.current_mmr ?? 0) as number,
     peak_mmr: (playerData.peak_mmr ?? 0) as number,
     discord_rank: playerData.discord_rank ?? 'GRNDS I',
-  } : {
-    id: discordUserId,
-    discord_user_id: discordUserId,
-    discord_username: discordUsername,
-    riot_name: null,
-    riot_tag: null,
-    current_mmr: 0,
-    peak_mmr: 0,
-    discord_rank: 'GRNDS I',
   }
   
   // Get player's match stats
@@ -166,6 +220,43 @@ export default async function DashboardPage() {
     .eq('is_active', true)
     .maybeSingle()
   
+  return (
+    <DashboardContent 
+      playerDataToUse={playerDataToUse}
+      totalMatches={totalMatches}
+      wins={wins}
+      losses={losses}
+      winRate={winRate}
+      netMMR={netMMR}
+      leaderboardPosition={leaderboardPosition}
+      activityFeed={activityFeed}
+      season={season}
+    />
+  )
+}
+
+// Dashboard content component to reuse logic
+function DashboardContent({
+  playerDataToUse,
+  totalMatches,
+  wins,
+  losses,
+  winRate,
+  netMMR,
+  leaderboardPosition,
+  activityFeed,
+  season,
+}: {
+  playerDataToUse: PlayerData
+  totalMatches: number
+  wins: number
+  losses: number
+  winRate: number
+  netMMR: number
+  leaderboardPosition: number
+  activityFeed: ActivityFeedType[]
+  season: { id: string; name: string } | null
+}) {
   return (
     <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">
       <div className="max-w-[1600px] mx-auto">
