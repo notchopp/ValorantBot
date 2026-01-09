@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { ActivityFeed } from '@/components/ActivityFeed'
@@ -7,15 +7,16 @@ import { Player, ActivityFeed as ActivityFeedType, Comment, RankHistory } from '
 import { notFound } from 'next/navigation'
 
 export default async function ProfilePage({ params }: { params: { userId: string } }) {
-  const supabase = await createClient()
+  // Use admin client for data fetching
+  const supabaseAdmin = getSupabaseAdminClient()
   const { userId } = params
   
   // Get player by discord_user_id
-  const { data: player } = await supabase
+  const { data: player } = await supabaseAdmin
     .from('players')
     .select('*')
     .eq('discord_user_id', userId)
-    .single()
+    .maybeSingle() as { data: Player | null }
   
   if (!player) {
     notFound()
@@ -24,7 +25,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
   const playerData = player as Player
   
   // Get player's match stats
-  const { data: matchStats } = await supabase
+  const { data: matchStats } = await supabaseAdmin
     .from('match_player_stats')
     .select('*, match:matches(*)')
     .eq('player_id', playerData.id)
@@ -61,27 +62,27 @@ export default async function ProfilePage({ params }: { params: { userId: string
   const mvpCount = stats.filter(s => s.mvp).length
   
   // Get activity feed
-  const { data: activities } = await supabase
+  const { data: activities } = await supabaseAdmin
     .from('activity_feed')
     .select('*, player:players(*)')
     .eq('player_id', playerData.id)
     .order('created_at', { ascending: false })
     .limit(20)
   
-  const activityFeed = activities as ActivityFeedType[] || []
+  const activityFeed = (activities as ActivityFeedType[]) || []
   
   // Get rank history
-  const { data: rankHistory } = await supabase
+  const { data: rankHistory } = await supabaseAdmin
     .from('rank_history')
     .select('*')
     .eq('player_id', playerData.id)
     .order('created_at', { ascending: false })
     .limit(10)
   
-  const history = rankHistory as RankHistory[] || []
+  const history = (rankHistory as RankHistory[]) || []
   
   // Get comments for profile
-  const { data: comments } = await supabase
+  const { data: comments } = await supabaseAdmin
     .from('comments')
     .select('*, author:players(*)')
     .eq('target_type', 'profile')
@@ -89,15 +90,24 @@ export default async function ProfilePage({ params }: { params: { userId: string
     .order('created_at', { ascending: false })
     .limit(50)
   
-  const profileComments = comments as Comment[] || []
+  const profileComments = (comments as Comment[]) || []
   
   // Get leaderboard position
-  const { count: position } = await supabase
+  const { count: position } = await supabaseAdmin
     .from('players')
     .select('*', { count: 'exact', head: true })
     .gt('current_mmr', playerData.current_mmr)
   
   const leaderboardPosition = (position || 0) + 1
+  
+  // Get user profile for display name
+  const { data: userProfile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('display_name')
+    .eq('discord_user_id', playerData.discord_user_id)
+    .maybeSingle() as { data: { display_name: string | null } | null }
+  
+  const displayName = userProfile?.display_name || playerData.discord_username || 'Player'
   
   return (
     <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10">
@@ -107,7 +117,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
             <div>
               <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white mb-2 md:mb-4 tracking-tighter leading-[0.9]">
-                {playerData.discord_username}
+                {displayName}
               </h1>
               <p className="text-lg md:text-xl text-white/60 font-light">
                 {playerData.riot_name && playerData.riot_tag 

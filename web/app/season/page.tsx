@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
 import { SeasonCountdown } from '@/components/SeasonCountdown'
 import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
@@ -10,10 +10,11 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function SeasonPage() {
-  const supabase = await createClient()
+  // Use admin client to ensure data access
+  const supabaseAdmin = getSupabaseAdminClient()
   
   // Get active season or upcoming season
-  const { data: activeSeason } = await supabase
+  const { data: activeSeason } = await supabaseAdmin
     .from('seasons')
     .select('*')
     .eq('is_active', true)
@@ -23,7 +24,7 @@ export default async function SeasonPage() {
   let seasonStartsSoon = false
   
   if (!currentSeason) {
-    const { data: upcomingSeason } = await supabase
+    const { data: upcomingSeason } = await supabaseAdmin
       .from('seasons')
       .select('*')
       .gte('start_date', new Date().toISOString())
@@ -49,7 +50,7 @@ export default async function SeasonPage() {
   }
   
   // Get leaderboard (top 50) with real stats from match_player_stats
-  const { data: leaderboard } = await supabase
+  const { data: leaderboard } = await supabaseAdmin
     .from('players')
     .select('*')
     .order('current_mmr', { ascending: false })
@@ -68,7 +69,7 @@ export default async function SeasonPage() {
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
       // Get match stats for this player this season
-      const { data: matchStats } = await supabase
+      const { data: matchStats } = await supabaseAdmin
         .from('match_player_stats')
         .select('*, match:matches(match_date, winner)')
         .eq('player_id', player.id)
@@ -101,8 +102,8 @@ export default async function SeasonPage() {
   const top10 = playersWithStats.slice(0, 10)
   const xWatch = playersWithStats.slice(10, 20)
   
-  // Get comments for season
-  const { data: comments } = await supabase
+  // Get comments for season (use admin client for read access)
+  const { data: comments } = await supabaseAdmin
     .from('comments')
     .select('*, author:players(*)')
     .eq('target_type', 'season')

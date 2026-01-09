@@ -54,6 +54,8 @@
    fly secrets set DISCORD_GUILD_ID=your_guild_id
    fly secrets set VALORANT_API_ENABLED=true
    fly secrets set VALORANT_DEFAULT_REGION=na
+   fly secrets set SUPABASE_URL=https://your-project.supabase.co
+   fly secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
    ```
 
 4. **Deploy**
@@ -103,6 +105,8 @@ The bot will automatically rebuild and restart.
 | `DISCORD_GUILD_ID` | Discord server ID (optional, for guild commands) | No |
 | `VALORANT_API_ENABLED` | Enable/disable Valorant API integration | No (default: true) |
 | `VALORANT_DEFAULT_REGION` | Default region for API calls | No (default: na) |
+| `SUPABASE_URL` | Supabase project URL | Yes (for database features) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS) | Yes (for bot operations) |
 
 ## Troubleshooting
 

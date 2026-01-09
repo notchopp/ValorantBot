@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
 import { Player } from '@/lib/types'
 import Link from 'next/link'
@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function LeaderboardPage() {
-  const supabase = await createClient()
+  // Use admin client to ensure data access
+  const supabaseAdmin = getSupabaseAdminClient()
   
   // Get all players ordered by MMR with real stats
-  const { data: leaderboard } = await supabase
+  const { data: leaderboard } = await supabaseAdmin
     .from('players')
     .select('*')
     .order('current_mmr', { ascending: false })
@@ -31,7 +32,7 @@ export default async function LeaderboardPage() {
   
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
-      const { data: matchStats } = await supabase
+      const { data: matchStats } = await supabaseAdmin
         .from('match_player_stats')
         .select('*, match:matches(winner)')
         .eq('player_id', player.id)

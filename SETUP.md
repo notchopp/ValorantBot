@@ -55,8 +55,12 @@ VALORANT_API_ENABLED=true
 VALORANT_DEFAULT_REGION=na
 
 # Supabase Configuration
+# Note: The bot requires SUPABASE_SERVICE_ROLE_KEY to bypass RLS policies
+# The service role key provides full database access needed for bot operations
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+# Fallback to anon key if service role key is not available (not recommended for production)
+# SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
 ## Installation

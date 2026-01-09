@@ -46,22 +46,52 @@ export class RiotIDService {
 
   /**
    * Remove Riot ID link for a Discord user
+   * Checks both in-memory cache and database
    * Also updates the database to clear Riot ID fields
    */
   async unlinkRiotID(userId: string): Promise<boolean> {
-    const removed = this.riotIdMap.delete(userId);
-    if (removed) {
+    // Check if exists in memory
+    const existsInMemory = this.riotIdMap.has(userId);
+    
+    // Check database if not in memory
+    let existsInDatabase = false;
+    if (this.databaseService && !existsInMemory) {
+      const dbPlayer = await this.databaseService.getPlayer(userId);
+      existsInDatabase = !!(dbPlayer?.riot_name && dbPlayer?.riot_tag);
+      
+      // If found in database but not in memory, load it first so we can clean it up
+      if (existsInDatabase && dbPlayer.riot_name && dbPlayer.riot_tag) {
+        this.riotIdMap.set(userId, {
+          name: dbPlayer.riot_name,
+          tag: dbPlayer.riot_tag,
+          region: dbPlayer.riot_region || undefined,
+        });
+      }
+    }
+    
+    // If exists in either memory or database, proceed with unlink
+    if (existsInMemory || existsInDatabase) {
+      // Remove from memory
+      this.riotIdMap.delete(userId);
+      
+      // Update player object
       const player = await this.playerService.getPlayer(userId);
       if (player) {
         player.riotId = undefined;
       }
       
-      // Also clear from database
+      // Always clear from database if database service is available
       if (this.databaseService) {
-        await this.databaseService.unlinkPlayerRiotID(userId);
+        const dbSuccess = await this.databaseService.unlinkPlayerRiotID(userId);
+        if (!dbSuccess) {
+          console.warn('Failed to unlink Riot ID from database', { userId });
+        }
       }
+      
+      return true;
     }
-    return removed;
+    
+    return false;
   }
 
   /**

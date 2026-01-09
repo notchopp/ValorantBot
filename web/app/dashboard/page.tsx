@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { ActivityFeed } from '@/components/ActivityFeed'
@@ -55,12 +56,15 @@ export default async function DashboardPage() {
     redirect('/auth/login')
   }
   
-  // Step 1: Check users table for auth_id -> discord_user_id mapping
-  let { data: userRecord } = await supabase
+  // Use admin client for data fetching (bypasses RLS)
+  const supabaseAdmin = getSupabaseAdminClient()
+  
+  // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
+  let { data: userRecord } = await supabaseAdmin
     .from('users')
     .select('discord_user_id')
     .eq('auth_id', user.id)
-    .maybeSingle()
+    .maybeSingle() as { data: { discord_user_id: string } | null }
   
   // If no user record exists, try to auto-link from OAuth metadata
   if (!userRecord) {
@@ -84,25 +88,30 @@ export default async function DashboardPage() {
                                   null
     
     if (discordUserIdFromAuth) {
-      const { data: existingPlayer } = await supabase
+      // Check if player exists with this Discord ID
+      const { data: existingPlayer } = await supabaseAdmin
         .from('players')
         .select('discord_user_id')
         .eq('discord_user_id', discordUserIdFromAuth)
-        .maybeSingle()
+        .maybeSingle() as { data: { discord_user_id: string } | null }
       
+      // If player exists, create/update users table entry using admin client
       if (existingPlayer) {
-        const { data: newUserRecord } = await supabase
-          .from('users')
-          .insert({
+        const { data: newUserRecord } = await (supabaseAdmin
+          .from('users') as any)
+          .upsert({
             auth_id: user.id,
             discord_user_id: discordUserIdFromAuth,
             email: user.email || null,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'auth_id'
           })
           .select('discord_user_id')
           .single()
         
         if (newUserRecord) {
-          userRecord = newUserRecord
+          userRecord = newUserRecord as { discord_user_id: string }
         }
       }
     }
@@ -135,12 +144,12 @@ export default async function DashboardPage() {
           <div className="glass rounded-2xl p-8 border border-red-500/30 mb-8 bg-red-500/5">
             <h2 className="text-xl font-black text-white mb-4 uppercase tracking-tight">Link Your Discord Account</h2>
             <p className="text-white/60 mb-4">
-              To view your stats, you need to link your Discord account. Use the Discord bot to link your account:
+              To view your stats, you need to link your Discord account. You&apos;ve signed in with Discord, but you need to:
             </p>
             <div className="space-y-2 text-sm text-white/40 font-mono">
               <div>1. Join the Discord server</div>
               <div>2. Run <code className="bg-black/50 px-2 py-1 rounded text-red-500">/riot link</code> and <code className="bg-black/50 px-2 py-1 rounded text-red-500">/verify</code> in Discord</div>
-              <div>3. Return here to see your stats</div>
+              <div>3. Refresh this page to see your stats</div>
             </div>
           </div>
           
@@ -163,12 +172,12 @@ export default async function DashboardPage() {
     )
   }
   
-  // Step 2: Get player data using discord_user_id from users table
-  const { data: playerData } = await supabase
+  // Step 2: Get player data using discord_user_id from users table (use admin client)
+  const { data: playerData } = await supabaseAdmin
     .from('players')
     .select('*')
     .eq('discord_user_id', userRecord.discord_user_id)
-    .maybeSingle()
+    .maybeSingle() as { data: PlayerData | null }
   
   if (!playerData) {
     return (
@@ -194,8 +203,8 @@ export default async function DashboardPage() {
     discord_rank: playerData.discord_rank ?? 'GRNDS I',
   }
   
-  // Get player's match stats and history
-  const { data: matchStats } = await supabase
+  // Get player's match stats and history (use admin client)
+  const { data: matchStats } = await supabaseAdmin
     .from('match_player_stats')
     .select('*, match:matches(match_date, map, winner)')
     .eq('player_id', playerDataToUse.id)
@@ -250,8 +259,8 @@ export default async function DashboardPage() {
   const recentMatches = stats.slice(0, 10)
   const netMMR = recentMatches.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
   
-  // Get rank progression (rank_history)
-  const { data: rankHistory } = await supabase
+  // Get rank progression (rank_history) - use admin client
+  const { data: rankHistory } = await supabaseAdmin
     .from('rank_history')
     .select('*')
     .eq('player_id', playerDataToUse.id)
@@ -260,8 +269,8 @@ export default async function DashboardPage() {
   
   const rankProgression: RankProgressionEntry[] = (rankHistory as RankProgressionEntry[]) || []
   
-  // Get activity feed
-  const { data: activities } = await supabase
+  // Get activity feed - use admin client
+  const { data: activities } = await supabaseAdmin
     .from('activity_feed')
     .select('*, player:players(*)')
     .eq('player_id', playerDataToUse.id)
@@ -270,27 +279,27 @@ export default async function DashboardPage() {
   
   const activityFeed = (activities as ActivityFeedType[]) || []
   
-  // Get leaderboard position
-  const { count: position } = await supabase
+  // Get leaderboard position - use admin client
+  const { count: position } = await supabaseAdmin
     .from('players')
     .select('*', { count: 'exact', head: true })
     .gt('current_mmr', playerDataToUse.current_mmr)
   
   const leaderboardPosition = (position || 0) + 1
   
-  // Get current season
-  const { data: season } = await supabase
+  // Get current season - use admin client
+  const { data: season } = await supabaseAdmin
     .from('seasons')
     .select('*')
     .eq('is_active', true)
     .maybeSingle()
   
-  // Get user profile for customization
-  const { data: userProfile } = await supabase
+  // Get user profile for customization - use admin client
+  const { data: userProfile } = await supabaseAdmin
     .from('user_profiles')
     .select('*')
     .eq('discord_user_id', playerDataToUse.discord_user_id)
-    .maybeSingle()
+    .maybeSingle() as { data: { display_name?: string | null; bio?: string | null } | null }
   
   return (
     <DashboardContent 

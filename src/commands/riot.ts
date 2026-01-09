@@ -10,6 +10,7 @@ import { ValorantAPIService } from '../services/ValorantAPIService';
 import { VercelAPIService } from '../services/VercelAPIService';
 import { RoleUpdateService } from '../services/RoleUpdateService';
 import { DatabaseService } from '../services/DatabaseService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('riot')
@@ -180,20 +181,18 @@ async function handleUnlink(
 ) {
   const userId = interaction.user.id;
   
-  // Defer reply immediately to prevent timeout (3 second limit)
-  try {
-    if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    }
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn(`Riot unlink interaction timed out for user ${userId} - interaction may have expired`);
-      return;
-    }
-    throw error;
-  }
+  // Defer reply immediately using safe helper
+  await safeDefer(interaction, { ephemeral: true });
 
-  const { riotIDService, roleUpdateService } = services;
+  const { riotIDService, roleUpdateService, databaseService } = services;
+
+  // Check database first to see if there's a Riot ID linked
+  let hasRiotID = false;
+  if (databaseService) {
+    const dbPlayer = await databaseService.getPlayer(userId);
+    hasRiotID = !!(dbPlayer?.riot_name && dbPlayer?.riot_tag);
+    console.log('Unlink check', { userId, hasRiotID, riotName: dbPlayer?.riot_name, riotTag: dbPlayer?.riot_tag });
+  }
 
   const unlinked = await riotIDService.unlinkRiotID(userId);
   
@@ -213,9 +212,9 @@ async function handleUnlink(
   }
   
   if (unlinked) {
-    await interaction.editReply('✅ Successfully unlinked your Riot ID.');
+    await safeEditReply(interaction, '✅ Successfully unlinked your Riot ID.');
   } else {
-    await interaction.editReply('❌ You do not have a Riot ID linked.');
+    await safeEditReply(interaction, '❌ You do not have a Riot ID linked.');
   }
 }
 

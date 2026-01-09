@@ -9,7 +9,7 @@ export class DatabaseService {
 
   private getSupabase() {
     if (!supabaseClient) {
-      throw new Error('Supabase not initialized. Check SUPABASE_URL and SUPABASE_ANON_KEY environment variables.');
+      throw new Error('Supabase not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) environment variables.');
     }
     return supabaseClient;
   }

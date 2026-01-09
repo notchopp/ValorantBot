@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { discord_user_id, display_name, bio, favorite_agent, favorite_map } = body
     
-    // Validate input
+    // Validate input with security limits
     if (!discord_user_id) {
       return NextResponse.json(
         { error: 'discord_user_id is required' },
@@ -27,12 +28,43 @@ export async function POST(request: Request) {
       )
     }
     
-    // Verify user owns this profile
-    const { data: userRecord } = await supabase
+    // Validate length limits (security)
+    if (display_name && display_name.length > 32) {
+      return NextResponse.json(
+        { error: 'Display name must be 32 characters or less' },
+        { status: 400 }
+      )
+    }
+    
+    if (bio && bio.length > 200) {
+      return NextResponse.json(
+        { error: 'Bio must be 200 characters or less' },
+        { status: 400 }
+      )
+    }
+    
+    if (favorite_agent && favorite_agent.length > 20) {
+      return NextResponse.json(
+        { error: 'Favorite agent must be 20 characters or less' },
+        { status: 400 }
+      )
+    }
+    
+    if (favorite_map && favorite_map.length > 20) {
+      return NextResponse.json(
+        { error: 'Favorite map must be 20 characters or less' },
+        { status: 400 }
+      )
+    }
+    
+    // Verify user owns this profile (use admin client for this check)
+    const supabaseAdmin = getSupabaseAdminClient()
+    
+    const { data: userRecord } = await supabaseAdmin
       .from('users')
       .select('discord_user_id')
       .eq('auth_id', user.id)
-      .maybeSingle()
+      .maybeSingle() as { data: { discord_user_id: string } | null }
     
     if (!userRecord || userRecord.discord_user_id !== discord_user_id) {
       return NextResponse.json(
@@ -41,9 +73,9 @@ export async function POST(request: Request) {
       )
     }
     
-    // Update or insert profile
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
+    // Update or insert profile (use admin client)
+    const { data: profile, error: profileError } = await (supabaseAdmin
+      .from('user_profiles') as any)
       .upsert({
         discord_user_id,
         display_name: display_name?.trim() || null,
@@ -51,6 +83,8 @@ export async function POST(request: Request) {
         favorite_agent: favorite_agent?.trim() || null,
         favorite_map: favorite_map?.trim() || null,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'discord_user_id'
       })
       .select()
       .single()

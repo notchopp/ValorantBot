@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   try {
@@ -47,12 +48,15 @@ export async function POST(request: Request) {
       )
     }
     
+    // Use admin client to check users table (bypasses RLS)
+    const supabaseAdmin = getSupabaseAdminClient()
+    
     // Step 1: Check users table for auth_id -> discord_user_id mapping
-    const { data: userRecord } = await supabase
+    const { data: userRecord } = await supabaseAdmin
       .from('users')
       .select('discord_user_id')
       .eq('auth_id', user.id)
-      .maybeSingle()
+      .maybeSingle() as { data: { discord_user_id: string } | null }
     
     if (!userRecord || !userRecord.discord_user_id) {
       return Response.json(
@@ -61,23 +65,23 @@ export async function POST(request: Request) {
       )
     }
     
-    // Step 2: Get player by discord_user_id from users table
-    const { data: player, error: playerError } = await supabase
+    // Step 2: Get player by discord_user_id from users table (use admin client)
+    const { data: player, error: playerError } = await supabaseAdmin
       .from('players')
       .select('id')
       .eq('discord_user_id', userRecord.discord_user_id)
-      .maybeSingle()
+      .maybeSingle() as { data: { id: string } | null; error: any }
     
-    if (playerError || !player) {
+    if (playerError || !player || !player.id) {
       return Response.json(
         { error: 'Player not found. Please link your Discord account.' },
         { status: 404 }
       )
     }
     
-    // Insert comment (censoring is handled by database trigger)
-    const { data: comment, error: insertError } = await supabase
-      .from('comments')
+    // Insert comment (use admin client to bypass RLS)
+    const { data: comment, error: insertError } = await (supabaseAdmin
+      .from('comments') as any)
       .insert({
         author_id: player.id,
         target_type,
@@ -88,7 +92,7 @@ export async function POST(request: Request) {
       .select('*, author:players(*)')
       .single()
     
-    if (insertError) {
+    if (insertError || !comment) {
       console.error('Error inserting comment:', insertError)
       return Response.json(
         { error: 'Failed to post comment. Please try again.' },
