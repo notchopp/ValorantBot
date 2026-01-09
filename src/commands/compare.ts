@@ -166,6 +166,11 @@ export async function execute(
 
     await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
+    // Handle already acknowledged errors - don't try to reply again
+    if (error?.code === 40060) {
+      return;
+    }
+
     // Only log if it's not a timeout error (timeout errors are handled silently)
     if (error?.code !== 10062) {
       console.error('Compare command error', {
@@ -175,9 +180,12 @@ export async function execute(
       });
     }
     
-    await safeEditReply(interaction, {
-      content: '❌ An error occurred while comparing players. Please try again later.',
-    });
+    // Only try to send error reply if interaction hasn't been handled yet
+    if (!interaction.replied) {
+      await safeEditReply(interaction, {
+        content: '❌ An error occurred while comparing players. Please try again later.',
+      });
+    }
   }
 }
 
