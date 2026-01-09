@@ -97,6 +97,7 @@ export default async function DashboardPage() {
       
       // If player exists, create/update users table entry using admin client
       if (existingPlayer) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: newUserRecord } = await (supabaseAdmin
           .from('users') as any)
           .upsert({

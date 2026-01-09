@@ -51,6 +51,7 @@ export async function GET(request: Request) {
           // This ensures we only link authenticated web users who have used the bot
           if (existingPlayer) {
             // Upsert users table entry (create if doesn't exist, update if exists)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (supabaseAdmin
               .from('users') as any)
               .upsert({
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
               })
             
             // Also ensure user_profile exists (for customization)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (supabaseAdmin
               .from('user_profiles') as any)
               .upsert({

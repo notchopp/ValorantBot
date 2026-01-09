@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       .from('players')
       .select('id')
       .eq('discord_user_id', userRecord.discord_user_id)
-      .maybeSingle() as { data: { id: string } | null; error: any }
+      .maybeSingle() as { data: { id: string } | null; error: unknown }
     
     if (playerError || !player || !player.id) {
       return Response.json(
@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     }
     
     // Insert comment (use admin client to bypass RLS)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: comment, error: insertError } = await (supabaseAdmin
       .from('comments') as any)
       .insert({

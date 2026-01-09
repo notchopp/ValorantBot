@@ -74,6 +74,7 @@ export async function POST(request: Request) {
     }
     
     // Update or insert profile (use admin client)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: profile, error: profileError } = await (supabaseAdmin
       .from('user_profiles') as any)
       .upsert({
