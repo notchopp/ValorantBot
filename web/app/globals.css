@@ -16,7 +16,7 @@
   --text-muted: #888888;
   --border-color: rgba(255, 255, 255, 0.05);
   /* Rank colors - exact GRNDS system */
-  --rank-grnds: #ff8c00;
+  --rank-grnds: #ffd700;
   --rank-breakpoint: #000000;
   --rank-challenger: #ff0000;
   --rank-x: #ffffff;
@@ -65,7 +65,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ff8c00;
+  background: #ffd700;
 }
 
 * {
@@ -92,9 +92,9 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Ensure selection color matches brand - GRNDS orange */
+/* Ensure selection color matches brand - GRNDS yellow */
 ::selection {
-  background: #ff8c00;
+  background: #ffd700;
   color: #000;
 }
 

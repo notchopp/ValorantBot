@@ -11,14 +11,16 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
-      // Redirect to the requested page or dashboard
-      const redirectUrl = new URL(next, requestUrl.origin)
+      // Redirect to production domain, not localhost
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hub.grnds.xyz'
+      const redirectUrl = new URL(next, baseUrl)
       return NextResponse.redirect(redirectUrl)
     }
   }
 
-  // If there's an error, redirect back to login
-  const loginUrl = new URL('/auth/login', requestUrl.origin)
+  // If there's an error, redirect back to login on production domain
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hub.grnds.xyz'
+  const loginUrl = new URL('/auth/login', baseUrl)
   loginUrl.searchParams.set('error', 'oauth_error')
   return NextResponse.redirect(loginUrl)
 }

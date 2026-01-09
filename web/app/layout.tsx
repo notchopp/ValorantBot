@@ -20,37 +20,37 @@ export default function RootLayout({
         <nav className="fixed top-0 left-0 right-0 z-[100] border-b border-white/5 bg-black/80 backdrop-blur-2xl transition-all duration-700 py-4 md:py-6">
           <div className="max-w-[1400px] mx-auto px-4 md:px-8 flex items-center justify-between">
             <div className="flex items-center gap-4 md:gap-6">
-              <Link href="/" className="text-xl md:text-2xl font-black text-[#ff8c00] tracking-tighter">
+              <Link href="/" className="text-xl md:text-2xl font-black text-[#ffd700] tracking-tighter">
                 GRNDS
               </Link>
               <div className="hidden md:flex items-center gap-8">
                 <Link 
                   href="/dashboard" 
-                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ff8c00] transition-colors relative group"
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
                 >
                   Dashboard
-                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ff8c00] transition-all group-hover:w-full" />
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
                 </Link>
                 <Link 
                   href="/season" 
-                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ff8c00] transition-colors relative group"
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
                 >
                   Season
-                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ff8c00] transition-all group-hover:w-full" />
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
                 </Link>
                 <Link 
                   href="/leaderboard" 
-                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ff8c00] transition-colors relative group"
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
                 >
                   Leaderboard
-                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ff8c00] transition-all group-hover:w-full" />
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
                 </Link>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <Link 
                 href="/auth/login"
-                className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-[#ff8c00] text-black rounded-xl hover:bg-[#ff9500] transition-all shadow-xl"
+                className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-[#ffd700] text-black rounded-xl hover:bg-[#ffed4e] transition-all shadow-xl"
               >
                 Sign In
               </Link>

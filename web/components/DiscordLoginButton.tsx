@@ -11,8 +11,8 @@ export function DiscordLoginButton() {
     try {
       setLoading(true)
       
-      // Get the current URL for redirect
-      const redirectUrl = `${window.location.origin}/auth/callback`
+      // Always use production URL for OAuth redirect (must match Supabase/Discord config)
+      const redirectUrl = 'https://hub.grnds.xyz/auth/callback'
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
