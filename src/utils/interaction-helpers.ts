@@ -41,10 +41,15 @@ export async function safeEditReply(
       await interaction.editReply(options);
     } else {
       // Fallback: if somehow not deferred, try to reply
-      await interaction.reply({
-        ...options,
+      const replyOptions: any = {
         ephemeral: true,
-      });
+      };
+      if (typeof options === 'string') {
+        replyOptions.content = options;
+      } else if (options && typeof options === 'object') {
+        Object.assign(replyOptions, options);
+      }
+      await interaction.reply(replyOptions);
     }
   } catch (error: any) {
     // If interaction expired (10062), silently ignore - nothing we can do
