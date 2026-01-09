@@ -31,6 +31,8 @@ That's it. Once you're verified, all the commands below unlock for you.
 
 These are your bread and butter for tracking improvement. Use these to see where you're at and where you're going.
 
+**Coming Soon:** AI powered commands like `/agent` (daily AI analysis sessions) and `/predict` (pre-match win probability) are in development and will be released in future updates.
+
 **`/progress`**
 Shows your detailed rank progression with a visual MMR bar, your current rank, how much MMR you need for the next rank, and even estimates how many wins you need. This is your main dashboard.
 
@@ -55,6 +57,13 @@ See the top 10 players with the biggest MMR gains in the last 7 days. Shows who'
 
 **`/xwatch`**
 Track the X rank leaderboard, the top 10 players with 3000+ MMR. Shows 24 hour MMR trends so you can see who's moving up or down. Crown emoji for the #1 player. This is where legends are made.
+
+### 🧠 AI Analysis Commands
+
+Use AI to get insights into your performance and identify areas for improvement.
+
+**`/why`**
+Get an AI powered breakdown of why you might be losing or stuck at your current rank. Analyzes your recent match performance, identifies patterns, and provides specific insights based on your stats. Perfect for when you're tilted and need to understand what's going wrong.
 
 ### 🎮 Account & Stats Commands
 

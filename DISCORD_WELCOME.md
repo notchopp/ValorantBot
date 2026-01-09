@@ -21,7 +21,9 @@ Use `/xwatch` to see the top 10 players and where you need to be. Only the best 
 
 Check out **WELCOME.md** for the full comprehensive guide covering all commands, usage limits, rank tiers, and how the system works. Everything you need to know is in there.
 
-Commands are there to be used, not spammed, but we encourage checking your stats and progression as much as you want. Most commands are instant, just be reasonable. `/agent` is daily limited when it drops since it's AI powered.
+Commands are there to be used, not spammed, but we encourage checking your stats and progression as much as you want. Most commands are instant, just be reasonable.
+
+**Future updates coming:** AI powered features like `/agent` (daily analysis sessions) and `/predict` (win probability) are in development. Right now you can use `/why` to get AI insights on your performance.
 
 Let's make ranked competitive again. Grind hard, climb fast, and don't let losses keep you down. Every X rank player started at GRNDS I.
 
