@@ -129,7 +129,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
             <div className="mb-6 md:mb-8">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Current MMR</span>
-                <span className="text-5xl md:text-7xl font-black text-[#ffd700] tracking-tighter">
+                <span className="text-5xl md:text-7xl font-black text-red-500 tracking-tighter">
                   {playerData.current_mmr}
                 </span>
               </div>
@@ -137,7 +137,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
             <MMRProgressBar currentMMR={playerData.current_mmr} />
             <div className="mt-6 flex items-center justify-between text-sm md:text-base">
               <span className="text-white/40 font-light">
-                Peak: <span className="text-[#ffd700] font-black">{playerData.peak_mmr} MMR</span>
+                Peak: <span className="text-red-500 font-black">{playerData.peak_mmr} MMR</span>
               </span>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
             </div>
             <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">MVP Count</div>
-              <div className="text-3xl md:text-4xl font-black text-[#ffd700] tracking-tighter">{mvpCount}</div>
+              <div className="text-3xl md:text-4xl font-black text-red-500 tracking-tighter">{mvpCount}</div>
             </div>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
                 {history.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-[#ffd700]/20 transition-all group"
+                    className="flex items-center justify-between p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all group"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-2 tracking-tight">

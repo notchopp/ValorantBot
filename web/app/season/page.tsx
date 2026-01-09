@@ -19,8 +19,7 @@ export default async function SeasonPage() {
     .eq('is_active', true)
     .maybeSingle()
   
-  // If no active season, check for upcoming season (starts soon)
-  let currentSeason = activeSeason as Season | null
+  let currentSeason = (activeSeason as Season) || null
   let seasonStartsSoon = false
   
   if (!currentSeason) {
@@ -49,7 +48,7 @@ export default async function SeasonPage() {
     )
   }
   
-  // Get leaderboard (top 50)
+  // Get leaderboard (top 50) with real stats from match_player_stats
   const { data: leaderboard } = await supabase
     .from('players')
     .select('*')
@@ -58,9 +57,42 @@ export default async function SeasonPage() {
   
   const players = (leaderboard as Player[]) || []
   
+  // Calculate season stats for each player (matches, win rate, etc.)
+  const playersWithStats = await Promise.all(
+    players.map(async (player) => {
+      // Get match stats for this player this season
+      const { data: matchStats } = await supabase
+        .from('match_player_stats')
+        .select('*, match:matches(match_date, winner)')
+        .eq('player_id', player.id)
+        .gte('created_at', currentSeason.start_date)
+        .lte('created_at', currentSeason.end_date)
+      
+      const stats = matchStats || []
+      const wins = stats.filter((s: any) => {
+        if (s.match) {
+          return s.match.winner === s.team
+        }
+        return s.mmr_after > s.mmr_before
+      }).length
+      
+      const totalMatches = stats.length
+      const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
+      const netMMR = stats.reduce((sum: number, s: any) => sum + (s.mmr_after - s.mmr_before), 0)
+      
+      return {
+        ...player,
+        seasonMatches: totalMatches,
+        seasonWins: wins,
+        seasonWinRate: winRate,
+        seasonNetMMR: netMMR,
+      }
+    })
+  )
+  
   // Get top 10 for X rank
-  const top10 = players.slice(0, 10)
-  const xWatch = players.slice(10, 20)
+  const top10 = playersWithStats.slice(0, 10)
+  const xWatch = playersWithStats.slice(10, 20)
   
   // Get comments for season
   const { data: comments } = await supabase
@@ -73,14 +105,20 @@ export default async function SeasonPage() {
   
   const seasonComments = (comments as Comment[]) || []
   
+  // Calculate season-wide stats
+  const totalSeasonMatches = playersWithStats.reduce((sum, p) => sum + (p.seasonMatches || 0), 0)
+  const averageMMR = players.length > 0 
+    ? Math.round(players.reduce((sum, p) => sum + p.current_mmr, 0) / players.length)
+    : 0
+  
   return (
     <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">
       <div className="max-w-[1600px] mx-auto">
-        {/* Season Header - Compact */}
+        {/* Season Header */}
         <div className="mb-8 md:mb-12">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-yellow-500 mb-2 tracking-tighter leading-none">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-red-500 mb-2 tracking-tighter leading-none">
                 {currentSeason.name}
               </h1>
               {currentSeason.description && (
@@ -97,7 +135,7 @@ export default async function SeasonPage() {
             </div>
           </div>
           
-          {/* Countdown - Compact */}
+          {/* Countdown & Stats */}
           <div className="glass rounded-2xl p-6 border border-white/5 mb-8">
             {seasonStartsSoon ? (
               <>
@@ -110,16 +148,30 @@ export default async function SeasonPage() {
                 <SeasonCountdown endDate={currentSeason.end_date} />
               </>
             )}
+            <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-white/5">
+              <div>
+                <div className="text-xs text-white/40 mb-1">Total Matches</div>
+                <div className="text-2xl font-black text-red-500">{totalSeasonMatches}</div>
+              </div>
+              <div>
+                <div className="text-xs text-white/40 mb-1">Active Players</div>
+                <div className="text-2xl font-black text-white">{players.length}</div>
+              </div>
+              <div>
+                <div className="text-xs text-white/40 mb-1">Average MMR</div>
+                <div className="text-2xl font-black text-white">{averageMMR}</div>
+              </div>
+            </div>
             <div className="text-xs text-white/40 mt-3 font-light">
               {new Date(currentSeason.start_date).toLocaleDateString()} - {new Date(currentSeason.end_date).toLocaleDateString()}
             </div>
           </div>
         </div>
         
-        {/* Top 10 & X Watch Grid - Dashboard Style */}
+        {/* Top 10 & X Watch Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
           {/* Top 10 (X Rank) */}
-          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-yellow-500/20 transition-all">
+          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-black text-white uppercase tracking-tight">Top 10 (X Rank)</h2>
               <div className="text-xs text-white/40">{top10.length} players</div>
@@ -130,15 +182,17 @@ export default async function SeasonPage() {
                   <Link
                     key={player.id}
                     href={`/profile/${player.discord_user_id}`}
-                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-yellow-500/30 transition-all group"
+                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
                   >
-                    <div className="text-xl font-black text-yellow-500 w-8">#{index + 1}</div>
+                    <div className="text-xl font-black text-red-500 w-8">#{index + 1}</div>
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
-                      <div className="text-xs text-white/40">{player.current_mmr} MMR</div>
+                      <div className="text-xs text-white/40">
+                        {player.current_mmr} MMR • {player.seasonMatches || 0} matches • {player.seasonWinRate || 0}% WR
+                      </div>
                     </div>
                     <RankBadge mmr={player.current_mmr} size="sm" />
-                    <svg className="w-4 h-4 text-white/20 group-hover:text-yellow-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
@@ -150,7 +204,7 @@ export default async function SeasonPage() {
           </div>
           
           {/* X Watch */}
-          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-yellow-500/20 transition-all">
+          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-black text-white uppercase tracking-tight mb-1">X Watch</h2>
@@ -164,7 +218,7 @@ export default async function SeasonPage() {
                   <Link
                     key={player.id}
                     href={`/profile/${player.discord_user_id}`}
-                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-yellow-500/30 transition-all group"
+                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
                   >
                     <div className="text-base font-black text-white/40 w-8">#{index + 11}</div>
                     <div className="flex-1 min-w-0">
@@ -179,7 +233,7 @@ export default async function SeasonPage() {
                       </div>
                     </div>
                     <RankBadge mmr={player.current_mmr} size="sm" />
-                    <svg className="w-4 h-4 text-white/20 group-hover:text-yellow-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
@@ -195,14 +249,14 @@ export default async function SeasonPage() {
         <div className="text-center mb-8 md:mb-12">
           <Link
             href="/leaderboard"
-            className="inline-block px-8 py-4 bg-yellow-500 text-black font-black uppercase tracking-wider text-xs rounded-xl hover:bg-yellow-400 transition-all shadow-xl"
+            className="inline-block px-8 py-4 bg-red-500 text-white font-black uppercase tracking-wider text-xs rounded-xl hover:bg-red-600 transition-all shadow-xl"
           >
             View Full Leaderboard
           </Link>
         </div>
         
         {/* Season Comments */}
-        <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-yellow-500/20 transition-all">
+        <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
           <h2 className="text-lg font-black text-white uppercase tracking-tight mb-6">Season Discussion</h2>
           <CommentSectionWrapper
             targetType="season"

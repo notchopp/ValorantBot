@@ -24,8 +24,7 @@ export function AuthButton() {
     })
 
     return () => subscription.unsubscribe()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [supabase])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -45,7 +44,7 @@ export function AuthButton() {
     return (
       <button
         onClick={handleSignOut}
-        className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all"
+        className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all border border-white/5"
       >
         Sign Out
       </button>
@@ -55,7 +54,7 @@ export function AuthButton() {
   return (
     <a
       href="/auth/login"
-      className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-[#ffd700] text-black rounded-xl hover:bg-[#ffed4e] transition-all shadow-xl"
+      className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all shadow-xl border border-red-500/20"
     >
       Sign In
     </a>

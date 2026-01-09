@@ -12,12 +12,12 @@ export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarPr
     return (
       <div className="w-full">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-400">MAX RANK</span>
-          <span className="text-lg font-black text-[#ffd700]">{currentMMR} MMR</span>
+          <span className="text-sm font-medium text-white/40">MAX RANK</span>
+          <span className="text-lg font-black text-red-500">{currentMMR} MMR</span>
         </div>
         <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-[#ffd700] to-[#ffed4e]"
+            className="h-full bg-gradient-to-r from-red-600 to-red-400"
             style={{ width: '100%' }}
           />
         </div>
@@ -47,17 +47,17 @@ export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarPr
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-gray-400">
+        <span className="text-sm font-medium text-white/40">
           {nextRank.rank} {nextRank.tier}
         </span>
-        <span className="text-lg font-black text-[#ffd700]">
+        <span className="text-lg font-black text-red-500">
           +{nextRank.mmrNeeded} MMR
         </span>
       </div>
       <div className="relative w-full h-3 bg-white/5 rounded-full overflow-hidden">
         <div 
           className={`
-            h-full bg-gradient-to-r from-[#ffd700] to-[#ffed4e]
+            h-full bg-gradient-to-r from-red-600 to-red-400
             ${animated ? 'transition-all duration-1000 ease-out' : ''}
           `}
           style={{ width: `${Math.min(progress, 100)}%` }}
@@ -66,8 +66,8 @@ export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarPr
         </div>
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-gray-500">{currentThreshold} MMR</span>
-        <span className="text-xs text-gray-500">{nextThreshold} MMR</span>
+        <span className="text-xs text-white/30">{currentThreshold} MMR</span>
+        <span className="text-xs text-white/30">{nextThreshold} MMR</span>
       </div>
     </div>
   )

@@ -26,22 +26,17 @@ export function CursorReactiveBackground() {
   )
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none bg-black overflow-hidden">
-      {/* Simple clean background - subtle hex pattern */}
-      <div className="absolute inset-0 opacity-[0.015]">
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `
-              repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(255, 215, 0, 0.1) 60deg, transparent 120deg),
-              repeating-conic-gradient(from 30deg at 50% 50%, transparent 0deg, rgba(255, 215, 0, 0.08) 45deg, transparent 90deg)
-            `,
-            backgroundSize: '200px 200px, 150px 150px',
-          }}
-        />
-      </div>
+    <div className="fixed inset-0 z-0 pointer-events-none bg-[#1a1a1a] overflow-hidden">
+      {/* Base Pattern - Hexagonal Grid */}
+      <div 
+        className="absolute inset-0 opacity-[0.03]" 
+        style={{ 
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231a1a1a' fill-opacity='0.4'%3E%3Cpath d='M10 0h40L50 10H20L10 0zm10 20h40l-10 10H20L10 20zm0 40h40l-10 10H20L10 40zM-10 40h40l-10 10H-10L-20 40z'/%3E%3Cpath d='M60 0h40L90 10H60L50 0zm0 20h40l-10 10H60L50 20zm0 40h40l-10 10H60L50 40z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '80px 80px'
+        }}
+      />
       
-      {/* Cursor-reactive yellow highlight */}
+      {/* Cursor Reactive Pattern - Red highlights that follow cursor */}
       <motion.div 
         style={{ 
           WebkitMaskImage: radialMask,
@@ -49,36 +44,33 @@ export function CursorReactiveBackground() {
         }}
         className="absolute inset-0 z-10 hidden md:block"
       >
-        {/* Yellow hexagonal pattern that lights up */}
+        {/* Red Hexagonal Grid Lines */}
         <div 
-          className="absolute inset-0 opacity-[0.3]"
-          style={{
-            backgroundImage: `
-              repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(255, 215, 0, 0.4) 60deg, transparent 120deg),
-              repeating-conic-gradient(from 30deg at 50% 50%, transparent 0deg, rgba(255, 215, 0, 0.3) 45deg, transparent 90deg)
-            `,
-            backgroundSize: '200px 200px, 150px 150px',
+          className="absolute inset-0 opacity-[0.6]" 
+          style={{ 
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23dc2626' fill-opacity='0.6'%3E%3Cpath d='M10 0h40L50 10H20L10 0zm10 20h40l-10 10H20L10 20zm0 40h40l-10 10H20L10 40zM-10 40h40l-10 10H-10L-20 40z'/%3E%3Cpath d='M60 0h40L90 10H60L50 0zm0 20h40l-10 10H60L50 20zm0 40h40l-10 10H60L50 40z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundSize: '80px 80px'
           }}
         />
         
-        {/* Soft yellow glow following cursor */}
+        {/* Dynamic spotlight glow following cursor - Red primary */}
         <motion.div 
           style={{ 
             left: spotlightX,
             top: spotlightY,
             transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, rgba(255, 215, 0, 0.12) 0%, rgba(255, 215, 0, 0.06) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(220, 38, 38, 0.12) 0%, rgba(220, 38, 38, 0.06) 40%, transparent 70%)',
           }}
           className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
         />
       </motion.div>
 
-      {/* Subtle grain texture */}
+      {/* Subtle texture overlay */}
       <div 
-        className="absolute inset-0 opacity-[0.008] mix-blend-overlay pointer-events-none"
+        className="absolute inset-0 opacity-[0.01] mix-blend-overlay pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          backgroundSize: '300px 300px',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundSize: '250px 250px',
         }}
       />
     </div>
