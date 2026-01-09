@@ -394,8 +394,9 @@ process.on('SIGTERM', () => {
 
 // Start HTTP server for Fly.io health checks
 // Fly.io requires apps to listen on a port bound to 0.0.0.0
+import * as http from 'http';
+
 const PORT = process.env.PORT || 8080;
-const http = require('http');
 
 const server = http.createServer((req: any, res: any) => {
   // Simple health check endpoint
