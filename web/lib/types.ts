@@ -82,6 +82,7 @@ export interface MatchPlayerStat {
   mmr_after: number
   created_at: string
   player?: Player
+  match?: Match
 }
 
 export interface RankHistory {

@@ -2,11 +2,9 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export function DiscordLoginButton() {
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleDiscordLogin = async () => {
@@ -16,7 +14,7 @@ export function DiscordLoginButton() {
       // Get the current URL for redirect
       const redirectUrl = `${window.location.origin}/auth/callback`
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
           redirectTo: redirectUrl,
