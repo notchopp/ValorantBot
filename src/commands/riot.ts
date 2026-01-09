@@ -182,16 +182,19 @@ async function handleUnlink(
   const userId = interaction.user.id;
   
   // Defer reply immediately using safe helper
-  await safeDefer(interaction, { ephemeral: true });
+  await safeDefer(interaction, true);
 
   const { riotIDService, roleUpdateService, databaseService } = services;
 
-  // Check database first to see if there's a Riot ID linked
-  let hasRiotID = false;
+  // Check database first to log for debugging
   if (databaseService) {
     const dbPlayer = await databaseService.getPlayer(userId);
-    hasRiotID = !!(dbPlayer?.riot_name && dbPlayer?.riot_tag);
-    console.log('Unlink check', { userId, hasRiotID, riotName: dbPlayer?.riot_name, riotTag: dbPlayer?.riot_tag });
+    console.log('Unlink attempt', { 
+      userId, 
+      hasRiotIDInDB: !!(dbPlayer?.riot_name && dbPlayer?.riot_tag),
+      riotName: dbPlayer?.riot_name, 
+      riotTag: dbPlayer?.riot_tag 
+    });
   }
 
   const unlinked = await riotIDService.unlinkRiotID(userId);

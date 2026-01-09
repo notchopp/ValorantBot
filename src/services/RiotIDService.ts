@@ -60,7 +60,7 @@ export class RiotIDService {
       existsInDatabase = !!(dbPlayer?.riot_name && dbPlayer?.riot_tag);
       
       // If found in database but not in memory, load it first so we can clean it up
-      if (existsInDatabase && dbPlayer.riot_name && dbPlayer.riot_tag) {
+      if (existsInDatabase && dbPlayer && dbPlayer.riot_name && dbPlayer.riot_tag) {
         this.riotIdMap.set(userId, {
           name: dbPlayer.riot_name,
           tag: dbPlayer.riot_tag,
