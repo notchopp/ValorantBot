@@ -97,15 +97,20 @@ async function handleLink(
 
   const { riotIDService, playerService, valorantAPI, databaseService } = services;
   const username = interaction.user.username;
-  const name = interaction.options.getString('name', true);
-  const tag = interaction.options.getString('tag', true);
+  const nameRaw = interaction.options.getString('name', true);
+  const tagRaw = interaction.options.getString('tag', true);
   const region = interaction.options.getString('region') || undefined;
+
+  // Normalize inputs (ensure tags are strings, handle numeric tags like "1017")
+  const name = nameRaw.trim();
+  const tag = String(tagRaw).trim(); // Ensure tag is always a string
 
   // Get or create player first
   await playerService.getOrCreatePlayer(userId, username);
 
   // Verify account exists via API
   if (valorantAPI) {
+    console.log('Verifying Riot account via API', { name, tag, tagType: typeof tag });
     const account = await valorantAPI.getAccount(name, tag);
     if (!account) {
       await interaction.editReply(

@@ -241,15 +241,55 @@ export class ValorantAPIService {
   async getAccount(name: string, tag: string): Promise<ValorantAccount | null> {
     await this.waitForRateLimit();
     try {
-      const response = await this.api.get<{ status: number; data: ValorantAccount }>(
-        `/v2/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`
-      );
-      return response.data.data;
+      // Ensure tag is treated as a string (handles numeric tags like "1017")
+      const encodedName = encodeURIComponent(name.trim());
+      const encodedTag = encodeURIComponent(String(tag).trim());
+      
+      const url = `/v2/account/${encodedName}/${encodedTag}`;
+      console.log('Fetching Valorant account', { name, tag, encodedName, encodedTag, url });
+      
+      const response = await this.api.get<{ status: number; data: ValorantAccount }>(url);
+      
+      // Handle different possible response structures
+      if (response.data?.data) {
+        const account = response.data.data;
+        if (account.puuid && account.name && account.tag) {
+          console.log('Account found successfully', { 
+            name: account.name, 
+            tag: account.tag, 
+            puuid: account.puuid.substring(0, 8) + '...' 
+          });
+          return account;
+        }
+      }
+      
+      // If response structure is different, try direct access
+      if (response.data && 'puuid' in response.data && 'name' in response.data && 'tag' in response.data) {
+        console.log('Account found (alternative response structure)');
+        // Type assertion after checking required fields
+        return response.data as unknown as ValorantAccount;
+      }
+      
+      console.warn('Unexpected response structure from account API', { 
+        status: response.status, 
+        dataKeys: Object.keys(response.data || {}) 
+      });
+      return null;
     } catch (error: any) {
+      // Log detailed error information
+      console.error(`Error fetching account for ${name}#${tag}:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        responseData: error.response?.data,
+        url: error.config?.url,
+      });
+      
       if (error.response?.status === 404) {
         return null;
       }
-      console.error(`Error fetching account for ${name}#${tag}:`, error.message);
+      
+      // For other errors, still return null but log the details
       return null;
     }
   }

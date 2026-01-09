@@ -189,12 +189,16 @@ export default async function handler(
       return;
     }
 
-    if (typeof riotName !== 'string' || riotName.length < 1 || riotName.length > 50) {
+    // Normalize inputs (ensure tags are strings, even if numeric like "1017")
+    const normalizedName = typeof riotName === 'string' ? riotName.trim() : String(riotName || '').trim();
+    const normalizedTag = typeof riotTag === 'string' ? riotTag.trim() : String(riotTag || '').trim();
+
+    if (!normalizedName || normalizedName.length < 1 || normalizedName.length > 50) {
       res.status(400).json({ success: false, error: 'Invalid riotName format' });
       return;
     }
 
-    if (typeof riotTag !== 'string' || riotTag.length < 1 || riotTag.length > 10) {
+    if (!normalizedTag || normalizedTag.length < 1 || normalizedTag.length > 10) {
       res.status(400).json({ success: false, error: 'Invalid riotTag format' });
       return;
     }
@@ -205,7 +209,7 @@ export default async function handler(
       return;
     }
 
-    console.log('Verifying account', { userId, username, riotName, riotTag, region });
+    console.log('Verifying account', { userId, username, riotName: normalizedName, riotTag: normalizedTag, region });
 
     // Check if player already exists and is verified
     const { data: existingPlayer, error: fetchError } = await supabase
@@ -228,45 +232,76 @@ export default async function handler(
       return;
     }
 
-    // Step 1: Get account for PUUID
-    console.log('Fetching account information', { riotName, riotTag });
+    // Step 1: Get account for PUUID (using normalized values from above)
+    console.log('Fetching account information', { 
+      riotName: normalizedName, 
+      riotTag: normalizedTag,
+    });
     
     let puuid: string | null = null;
     let accountRegion: string = region;
     try {
-      const accountUrl = `/v2/account/${encodeURIComponent(riotName)}/${encodeURIComponent(riotTag)}`;
-      console.log('Calling Valorant Account API', { url: accountUrl });
+      const encodedName = encodeURIComponent(normalizedName);
+      const encodedTag = encodeURIComponent(normalizedTag);
+      const accountUrl = `/v2/account/${encodedName}/${encodedTag}`;
+      
+      console.log('Calling Valorant Account API', { 
+        url: accountUrl,
+        encodedName,
+        encodedTag,
+      });
       
       const accountResponse = await valorantAPI.get<{ status: number; data: any }>(accountUrl);
-      puuid = accountResponse.data.data?.puuid;
-      accountRegion = accountResponse.data.data?.region || region;
+      
+      // Handle different possible response structures
+      const accountData = accountResponse.data?.data || accountResponse.data;
+      puuid = accountData?.puuid;
+      accountRegion = accountData?.region || region;
       
       console.log('Account response received', {
-        riotName,
-        riotTag,
-        puuid: puuid ? 'found' : 'not found',
+        riotName: normalizedName,
+        riotTag: normalizedTag,
+        puuid: puuid ? puuid.substring(0, 8) + '...' : 'not found',
         accountRegion,
+        hasData: !!accountData,
+        dataKeys: accountData ? Object.keys(accountData) : [],
       });
       
       if (!puuid) {
-        console.error('PUUID not found in account response');
+        console.error('PUUID not found in account response', {
+          responseStatus: accountResponse.status,
+          responseDataStructure: Object.keys(accountResponse.data || {}),
+          accountDataStructure: accountData ? Object.keys(accountData) : [],
+        });
         res.status(404).json({
           success: false,
-          error: 'Could not find Riot account. Please check your Riot ID.',
+          error: `Could not find Riot account "${normalizedName}#${normalizedTag}". Please check your username and tag.`,
         });
         return;
       }
     } catch (error: any) {
       console.error('Error fetching account', {
-        riotName,
-        riotTag,
+        riotName: normalizedName,
+        riotTag: normalizedTag,
         status: error.response?.status,
+        statusText: error.response?.statusText,
         message: error.message,
-        data: error.response?.data,
+        responseData: error.response?.data,
+        url: error.config?.url,
       });
+      
+      // Provide more specific error messages
+      if (error.response?.status === 404) {
+        res.status(404).json({
+          success: false,
+          error: `Could not find Riot account "${normalizedName}#${normalizedTag}". Please check your username and tag.`,
+        });
+        return;
+      }
+      
       res.status(500).json({
         success: false,
-        error: 'Failed to fetch account information. Please try again.',
+        error: `Failed to fetch account information: ${error.message || 'Unknown error'}. Please try again.`,
       });
       return;
     }
