@@ -3,7 +3,7 @@ import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { StatCard } from '@/components/StatCard'
 import { ActivityFeed } from '@/components/ActivityFeed'
-import { CommentSection } from '@/components/CommentSection'
+import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
 import { Player, ActivityFeed as ActivityFeedType, Comment, MatchPlayerStat, RankHistory } from '@/lib/types'
 import { notFound } from 'next/navigation'
 
@@ -192,7 +192,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
         {/* Comments */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-8 backdrop-blur-xl">
           <h2 className="text-2xl font-black text-white mb-6">Comments</h2>
-          <CommentSection
+          <CommentSectionWrapper
             targetType="profile"
             targetId={playerData.id}
             comments={profileComments}

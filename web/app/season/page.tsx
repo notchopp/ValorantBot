@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { RankBadge } from '@/components/RankBadge'
 import { SeasonCountdown } from '@/components/SeasonCountdown'
-import { CommentSection } from '@/components/CommentSection'
+import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
 import { Player, Season, Comment } from '@/lib/types'
 import Link from 'next/link'
 
@@ -146,7 +146,7 @@ export default async function SeasonPage() {
         {/* Season Comments */}
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-8 backdrop-blur-xl">
           <h2 className="text-2xl font-black text-white mb-6">Season Discussion</h2>
-          <CommentSection
+          <CommentSectionWrapper
             targetType="season"
             targetId={currentSeason.id}
             comments={seasonComments}
