@@ -17,10 +17,11 @@ export function RankBadge({ mmr, size = 'md', showTier = true }: RankBadgeProps)
   }
   
   const getRankColor = (rank: string) => {
-    if (rank === 'X') return 'bg-white text-black'
-    if (rank === 'CHALLENGER') return 'bg-red-600 text-white'
+    // Exact GRNDS rank colors
+    if (rank === 'X') return 'bg-white text-black border border-white/10'
+    if (rank === 'CHALLENGER') return 'bg-[#ff0000] text-white'
     if (rank === 'BREAKPOINT') return 'bg-black text-white border border-white/20'
-    if (rank === 'GRNDS') return 'bg-orange-500 text-black'
+    if (rank === 'GRNDS') return 'bg-[#ff8c00] text-black'
     return 'bg-gray-700 text-white'
   }
   

@@ -8,21 +8,38 @@ import Link from 'next/link'
 export default async function SeasonPage() {
   const supabase = await createClient()
   
-  // Get active season
-  const { data: season } = await supabase
+  // Get active season or upcoming season
+  const { data: activeSeason } = await supabase
     .from('seasons')
     .select('*')
     .eq('is_active', true)
     .single()
   
-  const currentSeason = season as Season | null
+  // If no active season, check for upcoming season (starts soon)
+  let currentSeason = activeSeason as Season | null
+  let seasonStartsSoon = false
+  
+  if (!currentSeason) {
+    const { data: upcomingSeason } = await supabase
+      .from('seasons')
+      .select('*')
+      .gte('start_date', new Date().toISOString())
+      .order('start_date', { ascending: true })
+      .limit(1)
+      .single()
+    
+    if (upcomingSeason) {
+      currentSeason = upcomingSeason as Season
+      seasonStartsSoon = true
+    }
+  }
   
   if (!currentSeason) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 relative z-10">
-        <div className="text-center max-w-md">
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter">No Active Season</h1>
-          <p className="text-lg md:text-xl text-white/60 font-light leading-relaxed">Check back later for the next season!</p>
+        <div className="text-center max-w-md glass rounded-[2rem] p-8 md:p-12 border border-white/5">
+          <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter uppercase">No Season</h1>
+          <p className="text-lg md:text-xl text-white/60 font-light leading-relaxed">Check back later for the next competitive season!</p>
         </div>
       </div>
     )
@@ -71,8 +88,18 @@ export default async function SeasonPage() {
           
           {/* Countdown */}
           <div className="max-w-2xl mx-auto mb-12 md:mb-20">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Season Ends In</h2>
-            <SeasonCountdown endDate={currentSeason.end_date} />
+            {seasonStartsSoon ? (
+              <>
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Season Starts In</h2>
+                <SeasonCountdown endDate={currentSeason.start_date} />
+                <p className="text-sm md:text-base text-white/40 mt-4 font-light">Get ready to compete when the season begins!</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Season Ends In</h2>
+                <SeasonCountdown endDate={currentSeason.end_date} />
+              </>
+            )}
           </div>
         </div>
         
