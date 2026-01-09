@@ -35,6 +35,22 @@
     {
       "source": "/welcome.HTML",
       "destination": "/api/welcome"
+    },
+    {
+      "source": "/leaderboard",
+      "destination": "/api/leaderboard-page"
+    },
+    {
+      "source": "/Leaderboard",
+      "destination": "/api/leaderboard-page"
+    },
+    {
+      "source": "/LEADERBOARD",
+      "destination": "/api/leaderboard-page"
+    },
+    {
+      "source": "/leaderboard.html",
+      "destination": "/api/leaderboard-page"
     }
   ],
   "env": {
