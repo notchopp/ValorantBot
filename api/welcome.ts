@@ -2,6 +2,7 @@
  * Vercel API: Welcome Page
  * 
  * Serves the welcome.html page
+ * Updated: Fixed TypeScript error
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
