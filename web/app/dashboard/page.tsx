@@ -35,7 +35,16 @@ export default async function DashboardPage() {
   // First check identities array (Supabase stores provider user ID here)
   // Then check metadata, then fallback to user.id
   const identities = user.identities || []
-  const discordIdentity = identities.find((id: any) => id.provider === 'discord')
+  interface Identity {
+    provider: string
+    identity_data?: {
+      id?: string
+      preferred_username?: string
+      username?: string
+    }
+    user_id?: string
+  }
+  const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
   const discordUserId = discordIdentity?.identity_data?.id || 
                         discordIdentity?.user_id ||
                         user.user_metadata?.provider_user_id ||

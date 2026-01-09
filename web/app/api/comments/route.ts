@@ -47,8 +47,20 @@ export async function POST(request: Request) {
       )
     }
     
-    // Get Discord user ID from OAuth metadata (Discord ID is in provider_id or sub)
-    const discordUserId = user.user_metadata?.provider_id || 
+    // Get Discord user ID from OAuth - check identities array first
+    const identities = user.identities || []
+    interface Identity {
+      provider: string
+      identity_data?: {
+        id?: string
+      }
+      user_id?: string
+    }
+    const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
+    const discordUserId = discordIdentity?.identity_data?.id || 
+                          discordIdentity?.user_id ||
+                          user.user_metadata?.provider_user_id ||
+                          user.user_metadata?.provider_id || 
                           user.user_metadata?.sub || 
                           user.user_metadata?.discord_id ||
                           user.id
