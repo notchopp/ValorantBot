@@ -34,7 +34,15 @@ export async function execute(
     databaseService: DatabaseService;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction session timed out - user may have clicked command multiple times');
+      return;
+    }
+    throw error;
+  }
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -45,9 +53,17 @@ export async function execute(
     // Get player data
     const player = await databaseService.getPlayer(userId);
     if (!player) {
-      await interaction.editReply(
-        '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
-      );
+      try {
+        await interaction.editReply(
+          '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
+        );
+      } catch (error: any) {
+        if (error?.code === 10062) {
+          console.warn('Interaction session timed out - user may have clicked command multiple times');
+          return;
+        }
+        throw error;
+      }
       return;
     }
 
@@ -55,9 +71,17 @@ export async function execute(
     const sessionStats = await getTodaySessionStats(databaseService, player.id);
 
     if (sessionStats.matchesPlayed === 0) {
-      await interaction.editReply(
-        "📊 No games played today yet. Queue up and start grinding! 💪"
-      );
+      try {
+        await interaction.editReply(
+          "📊 No games played today yet. Queue up and start grinding! 💪"
+        );
+      } catch (error: any) {
+        if (error?.code === 10062) {
+          console.warn('Interaction session timed out - user may have clicked command multiple times');
+          return;
+        }
+        throw error;
+      }
       return;
     }
 
@@ -170,17 +194,38 @@ export async function execute(
       text: `Session started at midnight | Use /history for detailed match history`,
     });
 
-    await interaction.editReply({ embeds: [embed] });
-  } catch (error) {
+    try {
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error: any) {
+      if (error?.code === 10062) {
+        console.warn('Interaction session timed out - user may have clicked command multiple times');
+        return;
+      }
+      throw error;
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction session timed out - user may have clicked command multiple times');
+      return;
+    }
+
     console.error('Session command error', {
       userId,
       username,
       error: error instanceof Error ? error.message : String(error),
     });
     
-    await interaction.editReply({
-      content: '❌ An error occurred while fetching your session. Please try again later.',
-    });
+    try {
+      await interaction.editReply({
+        content: '❌ An error occurred while fetching your session. Please try again later.',
+      });
+    } catch (replyError: any) {
+      if (replyError?.code !== 10062) {
+        console.error('Failed to send error reply for session command', {
+          error: replyError instanceof Error ? replyError.message : String(replyError),
+        });
+      }
+    }
   }
 }
 

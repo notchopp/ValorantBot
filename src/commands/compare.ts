@@ -39,14 +39,30 @@ export async function execute(
     databaseService: DatabaseService;
   }
 ) {
-  await interaction.deferReply();
+  try {
+    await interaction.deferReply();
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction compare timed out - user may have clicked command multiple times');
+      return;
+    }
+    throw error;
+  }
 
   const user1 = interaction.user;
   const user2 = interaction.options.getUser('user', true);
 
   // Prevent comparing with yourself
   if (user1.id === user2.id) {
-    await interaction.editReply('❌ You cannot compare with yourself! Try comparing with someone else.');
+    try {
+      await interaction.editReply('❌ You cannot compare with yourself! Try comparing with someone else.');
+    } catch (error: any) {
+      if (error?.code === 10062) {
+        console.warn('Interaction compare timed out - user may have clicked command multiple times');
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -60,16 +76,32 @@ export async function execute(
     ]);
 
     if (!player1Data) {
-      await interaction.editReply(
-        `❌ ${user1.username} is not verified. Use \`/verify\` to get started.`
-      );
+      try {
+        await interaction.editReply(
+          `❌ ${user1.username} is not verified. Use \`/verify\` to get started.`
+        );
+      } catch (error: any) {
+        if (error?.code === 10062) {
+          console.warn('Interaction compare timed out - user may have clicked command multiple times');
+          return;
+        }
+        throw error;
+      }
       return;
     }
 
     if (!player2Data) {
-      await interaction.editReply(
-        `❌ ${user2.username} is not verified or has no stats yet.`
-      );
+      try {
+        await interaction.editReply(
+          `❌ ${user2.username} is not verified or has no stats yet.`
+        );
+      } catch (error: any) {
+        if (error?.code === 10062) {
+          console.warn('Interaction compare timed out - user may have clicked command multiple times');
+          return;
+        }
+        throw error;
+      }
       return;
     }
 
@@ -160,17 +192,38 @@ export async function execute(
       });
     }
 
-    await interaction.editReply({ embeds: [embed] });
-  } catch (error) {
+    try {
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error: any) {
+      if (error?.code === 10062) {
+        console.warn('Interaction compare timed out - user may have clicked command multiple times');
+        return;
+      }
+      throw error;
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction compare timed out - user may have clicked command multiple times');
+      return;
+    }
+
     console.error('Compare command error', {
       user1: user1.id,
       user2: user2.id,
       error: error instanceof Error ? error.message : String(error),
     });
     
-    await interaction.editReply({
-      content: '❌ An error occurred while comparing players. Please try again later.',
-    });
+    try {
+      await interaction.editReply({
+        content: '❌ An error occurred while comparing players. Please try again later.',
+      });
+    } catch (replyError: any) {
+      if (replyError?.code !== 10062) {
+        console.error('Failed to send error reply for compare command', {
+          error: replyError instanceof Error ? replyError.message : String(replyError),
+        });
+      }
+    }
   }
 }
 
