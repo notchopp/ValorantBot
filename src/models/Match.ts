@@ -14,6 +14,9 @@ export interface Match {
   };
   map: string;
   host: Player;
+  hostInviteCode?: string; // Valorant custom game invite code
+  hostConfirmed?: boolean; // Whether host has confirmed they're ready
+  hostSelectedAt?: Date; // When host was selected
   startTime: Date;
   endTime?: Date;
   winner?: 'A' | 'B';

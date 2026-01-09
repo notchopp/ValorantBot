@@ -99,6 +99,17 @@ async function handleStart(
       return;
     }
 
+    // Check for #GRNDS MAKER role
+    const member = await interaction.guild.members.fetch(userId);
+    const grndsMakerRole = interaction.guild.roles.cache.find(
+      (role) => role.name === '#GRNDS MAKER'
+    );
+    
+    if (grndsMakerRole && !member.roles.cache.has(grndsMakerRole.id)) {
+      await interaction.editReply('❌ Only users with the **#GRNDS MAKER** role can start queues.');
+      return;
+    }
+
     const { queueService, matchService } = services;
 
     // Check if queue is already active
@@ -624,7 +635,7 @@ function createMatchEmbed(
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setTitle('🎮 Match Created!')
-    .setColor(0x00ff00)
+    .setColor(match.hostConfirmed ? 0x00ff00 : 0xff9900)
     .addFields({
       name: 'Map',
       value: match.map,
@@ -632,7 +643,7 @@ function createMatchEmbed(
     })
     .addFields({
       name: 'Host',
-      value: match.host.username,
+      value: `<@${match.host.userId}>`,
       inline: true,
     })
     .addFields({
@@ -640,6 +651,23 @@ function createMatchEmbed(
       value: match.matchId,
       inline: true,
     });
+
+  // Add host status
+  if (match.hostConfirmed && match.hostInviteCode) {
+    embed.addFields({
+      name: '✅ Host Confirmed',
+      value: `Invite Code: \`${match.hostInviteCode}\``,
+      inline: false,
+    });
+    embed.setDescription('Host is ready! Join using the invite code above.');
+  } else {
+      embed.addFields({
+        name: '⏳ Waiting for Host',
+        value: `<@${match.host.userId}> must create a custom game in Valorant and use \`/host confirm\` to enter the invite code.\n\nUse \`/host info\` to see all players.`,
+        inline: false,
+      });
+      embed.setDescription('Match is pending host confirmation. Host has 10 minutes to create the game and enter the code.');
+  }
 
   const teamAList = match.teams.teamA.players
     .map((p: any) => {
@@ -1067,6 +1095,17 @@ async function handleJoinButton(
       match.teams.teamA.players = teamAPlayers;
       match.teams.teamB.players = teamBPlayers;
       match.host = teamAPlayers.find((p: any) => p?.userId === processResult.match?.hostUserId) || teamAPlayers[0];
+      
+      // Set host fields from database
+      const dbMatch = await databaseService.getMatch(match.matchId);
+      if (dbMatch) {
+        match.hostSelectedAt = dbMatch.host_selected_at ? new Date(dbMatch.host_selected_at) : new Date();
+        match.hostConfirmed = dbMatch.host_confirmed || false;
+        match.hostInviteCode = dbMatch.host_invite_code || undefined;
+      } else {
+        match.hostSelectedAt = new Date();
+        match.hostConfirmed = false;
+      }
 
       // Create voice channels and assign team roles
       const { teamAChannel, teamBChannel } = await voiceChannelService.setupTeamVoiceChannels(
@@ -1081,6 +1120,29 @@ async function handleJoinButton(
       // Send match announcement with voice channel info
       const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel);
       await interaction.channel?.send({ embeds: [embed] });
+      
+      // Notify host to confirm
+      if (interaction.guild && !match.hostConfirmed) {
+        try {
+          const hostMember = await interaction.guild.members.fetch(match.host.userId);
+          await hostMember.send(
+            `🎮 You've been selected as the **host** for the match!\n\n` +
+            `**Match ID:** ${match.matchId}\n` +
+            `**Map:** ${match.map}\n\n` +
+            `**Steps to host:**\n` +
+            `1. Create a custom game in Valorant\n` +
+            `2. Valorant will generate a unique invite code\n` +
+            `3. Use \`/host confirm\` and enter the code Valorant gave you\n\n` +
+            `You have 10 minutes to confirm, or a new host will be selected.\n\n` +
+            `Use \`/host pass\` if you don't want to host.`
+          );
+        } catch (error) {
+          console.warn('Could not send host notification DM', {
+            hostId: match.host.userId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       // Clear queue after match creation (async)
       await queueService.clear();

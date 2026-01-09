@@ -147,6 +147,8 @@ export default async function handler(
         match_id: matchId,
         map: selectedMap,
         host_user_id: hostUserId,
+        host_selected_at: new Date().toISOString(),
+        host_confirmed: false,
         team_a: teamA,
         team_b: teamB,
         match_type: 'custom',

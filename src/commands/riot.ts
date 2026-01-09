@@ -225,6 +225,7 @@ async function handleInfo(
     riotIDService: RiotIDService;
     playerService: PlayerService;
     valorantAPI?: ValorantAPIService;
+    databaseService?: DatabaseService;
   }
 ) {
   const userId = interaction.user.id;
@@ -242,16 +243,34 @@ async function handleInfo(
     throw error;
   }
 
-  const { riotIDService, playerService, valorantAPI } = services;
+  const { riotIDService, playerService, databaseService } = services;
 
-  const riotId = riotIDService.getRiotID(userId);
-    // Force refresh from database to get latest data
-    const player = await playerService.getPlayer(userId, true);
+  // Try to get Riot ID from memory first, then from database
+  let riotId = riotIDService.getRiotID(userId);
+  
+  // If not in memory, try database
+  if (!riotId && databaseService) {
+    const dbPlayer = await databaseService.getPlayer(userId);
+    if (dbPlayer?.riot_name && dbPlayer?.riot_tag) {
+      // Load into memory for future use
+      await riotIDService.linkRiotID(
+        userId,
+        dbPlayer.riot_name,
+        dbPlayer.riot_tag,
+        dbPlayer.riot_region || undefined,
+        dbPlayer.riot_puuid || undefined
+      );
+      riotId = riotIDService.getRiotID(userId);
+    }
+  }
 
   if (!riotId) {
     await interaction.editReply('❌ You do not have a Riot ID linked. Use `/riot link` to link your account.');
     return;
   }
+
+  // Force refresh from database to get latest data
+  const player = await playerService.getPlayer(userId, true);
 
   const embed = new EmbedBuilder()
     .setTitle('Riot ID Information')
@@ -267,7 +286,24 @@ async function handleInfo(
       inline: true,
     });
 
-  if (player?.rank) {
+  // Get Discord rank from database if available
+  if (databaseService) {
+    const dbPlayer = await databaseService.getPlayer(userId);
+    if (dbPlayer?.discord_rank && dbPlayer.discord_rank !== 'Unranked') {
+      embed.addFields({
+        name: 'Discord Rank',
+        value: dbPlayer.discord_rank,
+        inline: true,
+      });
+      if (dbPlayer.current_mmr !== undefined) {
+        embed.addFields({
+          name: 'Discord MMR',
+          value: dbPlayer.current_mmr.toString(),
+          inline: true,
+        });
+      }
+    }
+  } else if (player?.rank) {
     embed.addFields({
       name: 'Current Rank',
       value: player.rank,
@@ -275,21 +311,29 @@ async function handleInfo(
     });
   }
 
-  // Fetch fresh data from API if available
+  // Add Valorant rank from API if available
+  const { valorantAPI } = services;
   if (valorantAPI && riotId.region) {
     try {
       const mmr = await valorantAPI.getMMR(riotId.region, riotId.name, riotId.tag);
-      if (mmr) {
+      if (mmr && mmr.currenttierpatched) {
         embed.addFields({
-          name: 'MMR',
+          name: 'Valorant Rank',
+          value: mmr.currenttierpatched,
+          inline: true,
+        });
+        embed.addFields({
+          name: 'Valorant MMR',
           value: mmr.elo.toString(),
           inline: true,
         });
-        embed.addFields({
-          name: 'Ranking in Tier',
-          value: `#${mmr.ranking_in_tier}`,
-          inline: true,
-        });
+        if (mmr.ranking_in_tier > 0) {
+          embed.addFields({
+            name: 'Ranking in Tier',
+            value: `#${mmr.ranking_in_tier}`,
+            inline: true,
+          });
+        }
       }
     } catch (error) {
       // Silently fail, just show cached data

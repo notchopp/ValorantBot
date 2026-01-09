@@ -318,6 +318,14 @@ export async function handleMatchReportModal(
       return;
     }
 
+    // Check if host has confirmed (match must be in-progress to report)
+    if (currentMatch.status === 'pending' || !currentMatch.hostConfirmed) {
+      await interaction.editReply({
+        content: '❌ Match cannot be reported yet. Host must confirm using `/host confirm` first.',
+      });
+      return;
+    }
+
     const winner = interaction.fields.getTextInputValue('winner').toUpperCase();
     const scoreText = interaction.fields.getTextInputValue('score');
     const teamAStatsText = interaction.fields.getTextInputValue('team_a_stats');

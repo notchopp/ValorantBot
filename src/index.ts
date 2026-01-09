@@ -14,6 +14,10 @@ import { RoleUpdateService } from './services/RoleUpdateService';
 import { VoiceChannelService } from './services/VoiceChannelService';
 import { VercelAPIService } from './services/VercelAPIService';
 import { SkillGapAnalyzer } from './services/SkillGapAnalyzer';
+import { HostTimeoutService } from './services/HostTimeoutService';
+import { AutoMatchDetectionService } from './services/AutoMatchDetectionService';
+import { DiscordLogger } from './services/DiscordLogger';
+import { initializeLogger } from './utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -69,6 +73,7 @@ const skillGapAnalyzer = new SkillGapAnalyzer(databaseService);
 // Initialize Vercel API Service
 const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
 
+
 // Log Vercel API status on startup
 if (process.env.VERCEL_API_URL) {
   console.log('✅ VERCEL_API_URL is set:', process.env.VERCEL_API_URL);
@@ -94,6 +99,11 @@ const services = {
   skillGapAnalyzer,
   config: appConfig,
 } as const;
+
+// Background services (initialized after client is ready)
+let hostTimeoutService: HostTimeoutService | null = null;
+let autoMatchDetectionService: AutoMatchDetectionService | null = null;
+let discordLogger: DiscordLogger | null = null;
 
 // Create Discord client
 const client = new Client({
@@ -211,7 +221,11 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       } catch (replyError: any) {
         // If we can't reply (e.g., interaction expired), just log it
         if (replyError?.code !== 10062) {
-          console.error('Failed to send error reply:', replyError);
+          const replyErrorMsg = 'Failed to send error reply';
+          console.error(replyErrorMsg, replyError);
+          if (discordLogger) {
+            discordLogger.error(replyErrorMsg, { error: replyError });
+          }
         }
       }
     }
@@ -223,9 +237,32 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         try {
           await matchCommand.handleMatchReportModal(interaction, services);
         } catch (error) {
-          console.error('Error handling match report modal:', error);
+          const errorMsg = 'Error handling match report modal';
+          console.error(errorMsg, error);
+          if (discordLogger) {
+            discordLogger.error(errorMsg, { error });
+          }
           await interaction.reply({
             content: 'There was an error processing the match report.',
+            ephemeral: true,
+          });
+        }
+      }
+    }
+    // Handle host confirm modal
+    else if (interaction.customId === 'host_confirm_modal') {
+      const hostCommand = client.commands.get('host');
+      if (hostCommand && 'handleHostConfirmModal' in hostCommand) {
+        try {
+          await hostCommand.handleHostConfirmModal(interaction, services);
+        } catch (error) {
+          const errorMsg = 'Error handling host confirm modal';
+          console.error(errorMsg, error);
+          if (discordLogger) {
+            discordLogger.error(errorMsg, { error });
+          }
+          await interaction.reply({
+            content: 'There was an error processing the host confirmation.',
             ephemeral: true,
           });
         }
@@ -238,7 +275,11 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       try {
         await queueCommand.handleButtonInteraction(interaction, services);
       } catch (error) {
-        console.error('Error handling button interaction:', error);
+        const errorMsg = 'Error handling button interaction';
+        console.error(errorMsg, error);
+        if (discordLogger) {
+          discordLogger.error(errorMsg, { error, customId: interaction.customId });
+        }
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({
             content: 'There was an error processing your request.',
@@ -255,6 +296,20 @@ client.once('ready', async () => {
   console.log(`✅ Bot logged in as ${client.user?.tag}`);
   console.log(`📊 Valorant API: ${valorantAPI ? 'Enabled' : 'Disabled'}`);
   
+  // Initialize Discord logger
+  const logChannelId = process.env.DISCORD_LOG_CHANNEL_ID || null;
+  if (logChannelId) {
+    discordLogger = new DiscordLogger(client, logChannelId);
+    initializeLogger(discordLogger);
+    await discordLogger.log('info', 'Bot started and Discord logger initialized', {
+      botTag: client.user?.tag,
+      valorantAPI: valorantAPI ? 'Enabled' : 'Disabled',
+    });
+  } else {
+    console.warn('⚠️  DISCORD_LOG_CHANNEL_ID not set - Discord logging disabled');
+    console.warn('Set it with: fly secrets set DISCORD_LOG_CHANNEL_ID=your-channel-id');
+  }
+  
   // Load queue state from database on startup
   try {
     await queueService.loadQueueFromDatabase();
@@ -269,27 +324,70 @@ client.once('ready', async () => {
     // Continue even if queue load fails
   }
   
+  // Initialize and start background services
+  try {
+    hostTimeoutService = new HostTimeoutService(
+      databaseService,
+      matchService,
+      playerService,
+      client
+    );
+    hostTimeoutService.start();
+    console.log('✅ Host timeout service started');
+  } catch (error) {
+    console.error('Failed to start host timeout service', { error });
+  }
+
+  try {
+    autoMatchDetectionService = new AutoMatchDetectionService(
+      databaseService,
+      matchService,
+      valorantAPI,
+      vercelAPI,
+      playerService,
+      client
+    );
+    autoMatchDetectionService.start();
+    console.log('✅ Auto-match detection service started');
+  } catch (error) {
+    console.error('Failed to start auto-match detection service', { error });
+  }
+  
   registerCommands();
 });
 
 // Error handling
 client.on('error', (error) => {
-  console.error('Discord client error:', error);
+  const errorMsg = 'Discord client error';
+  console.error(errorMsg, error);
+  if (discordLogger) {
+    discordLogger.error(errorMsg, { error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error);
+  const errorMsg = 'Unhandled promise rejection';
+  console.error(errorMsg, error);
+  if (discordLogger) {
+    discordLogger.error(errorMsg, { error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down gracefully...');
+  // Stop background services
+  if (hostTimeoutService) hostTimeoutService.stop();
+  if (autoMatchDetectionService) autoMatchDetectionService.stop();
   client.destroy();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('\n🛑 Shutting down gracefully...');
+  // Stop background services
+  if (hostTimeoutService) hostTimeoutService.stop();
+  if (autoMatchDetectionService) autoMatchDetectionService.stop();
   client.destroy();
   process.exit(0);
 });

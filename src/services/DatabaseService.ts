@@ -14,6 +14,22 @@ export class DatabaseService {
     return supabaseClient;
   }
   /**
+   * Get player by Riot ID (name and tag)
+   */
+  async getPlayerByRiotID(riotName: string, riotTag: string): Promise<DatabasePlayer | null> {
+    const supabase = this.getSupabase();
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .eq('riot_name', riotName)
+      .eq('riot_tag', riotTag)
+      .single();
+
+    if (error || !data) return null;
+    return data;
+  }
+
+  /**
    * Get or create a player in the database
    */
   async getOrCreatePlayer(discordUserId: string, discordUsername: string): Promise<DatabasePlayer | null> {
@@ -330,9 +346,10 @@ export class DatabaseService {
           match_type: match.matchType || 'custom',
           map: match.map,
           host_id: hostPlayer.id,
+          host_user_id: match.hostUserId, // Store Discord user ID for easy lookup
           team_a: teamAJson,
           team_b: teamBJson,
-          status: 'in-progress',
+          status: 'pending', // Start as pending until host confirms
         })
         .select()
         .single();
@@ -364,6 +381,10 @@ export class DatabaseService {
       winner?: 'A' | 'B';
       score?: { teamA: number; teamB: number };
       status?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+      host_user_id?: string;
+      host_invite_code?: string | null;
+      host_confirmed?: boolean;
+      host_selected_at?: string | null;
     }
   ): Promise<boolean> {
     try {
@@ -378,6 +399,10 @@ export class DatabaseService {
           updateData.completed_at = new Date().toISOString();
         }
       }
+      if (updates.host_user_id !== undefined) updateData.host_user_id = updates.host_user_id;
+      if (updates.host_invite_code !== undefined) updateData.host_invite_code = updates.host_invite_code;
+      if (updates.host_confirmed !== undefined) updateData.host_confirmed = updates.host_confirmed;
+      if (updates.host_selected_at !== undefined) updateData.host_selected_at = updates.host_selected_at;
 
       const { error } = await supabase
         .from('matches')

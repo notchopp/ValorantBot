@@ -40,6 +40,10 @@ export interface DatabaseMatch {
   match_date: string;
   map?: string | null;
   host_id?: string | null;
+  host_user_id?: string | null;
+  host_invite_code?: string | null;
+  host_confirmed?: boolean | null;
+  host_selected_at?: string | null;
   team_a: string[]; // Array of player IDs
   team_b: string[]; // Array of player IDs
   winner?: 'A' | 'B' | null;

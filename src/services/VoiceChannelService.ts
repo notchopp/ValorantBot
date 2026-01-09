@@ -291,8 +291,22 @@ export class VoiceChannelService {
             if (isInQueueLobby || member.voice.channel) {
               // Move from queue lobby or any other VC
               await member.voice.setChannel(teamAChannel, 'Assigned to Team A');
+            } else {
+              // Player not in VC - send DM prompt
+              try {
+                await member.send(
+                  `🎮 You've been assigned to **Team A**!\n\n` +
+                  `Please join your team voice channel: <#${teamAChannel.id}>\n` +
+                  `You've been given the **Team A** role.`
+                );
+              } catch (error) {
+                // DM failed (user has DMs disabled) - log but continue
+                console.warn('Could not send VC prompt DM to Team A player', {
+                  userId: player.userId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
             }
-            // If not in VC, can't force move (Discord limitation)
           }
         } catch (error) {
           console.error('Error assigning Team A role/moving user', {
@@ -326,8 +340,22 @@ export class VoiceChannelService {
             if (isInQueueLobby || member.voice.channel) {
               // Move from queue lobby or any other VC
               await member.voice.setChannel(teamBChannel, 'Assigned to Team B');
+            } else {
+              // Player not in VC - send DM prompt
+              try {
+                await member.send(
+                  `🎮 You've been assigned to **Team B**!\n\n` +
+                  `Please join your team voice channel: <#${teamBChannel.id}>\n` +
+                  `You've been given the **Team B** role.`
+                );
+              } catch (error) {
+                // DM failed (user has DMs disabled) - log but continue
+                console.warn('Could not send VC prompt DM to Team B player', {
+                  userId: player.userId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
             }
-            // If not in VC, can't force move (Discord limitation)
           }
         } catch (error) {
           console.error('Error assigning Team B role/moving user', {
