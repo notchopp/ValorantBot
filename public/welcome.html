@@ -12,18 +12,20 @@
         }
 
         :root {
-            --bg-primary: #0a0a0a;
-            --bg-secondary: #121212;
-            --bg-card: #1a1a1a;
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-card: #111111;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --text-muted: #666666;
-            --accent-primary: #ff4655;
-            --accent-secondary: #ff6b6b;
-            --accent-glow: rgba(255, 70, 85, 0.15);
-            --border-color: #2a2a2a;
-            --gradient-1: linear-gradient(135deg, #ff4655 0%, #ff6b6b 100%);
-            --gradient-2: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            --text-secondary: #cccccc;
+            --text-muted: #888888;
+            --accent-yellow: #ffd700;
+            --accent-yellow-dark: #ccaa00;
+            --accent-yellow-glow: rgba(255, 215, 0, 0.15);
+            --border-color: #333333;
+            --rank-grnds: #ff8c00;
+            --rank-breakpoint: #000000;
+            --rank-challenger: #ff0000;
+            --rank-x: #ffffff;
         }
 
         body {
@@ -43,7 +45,7 @@
 
         /* Hero Section */
         .hero {
-            background: var(--gradient-2);
+            background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
             padding: 80px 0 60px;
             text-align: center;
@@ -58,7 +60,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: radial-gradient(circle at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+            background: radial-gradient(circle at 50% 0%, var(--accent-yellow-glow) 0%, transparent 70%);
             pointer-events: none;
         }
 
@@ -67,10 +69,7 @@
             font-weight: 700;
             letter-spacing: -0.02em;
             margin-bottom: 16px;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--accent-yellow);
             position: relative;
             z-index: 1;
         }
@@ -147,15 +146,13 @@
         }
 
         .rank-tier:hover {
-            border-color: var(--accent-primary);
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px var(--accent-glow);
+            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
         }
 
         .rank-tier-name {
             font-size: 18px;
             font-weight: 600;
-            color: var(--text-primary);
             margin-bottom: 4px;
         }
 
@@ -164,9 +161,41 @@
             color: var(--text-secondary);
         }
 
+        .rank-tier.grnds {
+            border-color: var(--rank-grnds);
+            background: rgba(255, 140, 0, 0.05);
+        }
+
+        .rank-tier.grnds .rank-tier-name {
+            color: var(--rank-grnds);
+        }
+
+        .rank-tier.breakpoint {
+            border-color: var(--rank-breakpoint);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .rank-tier.breakpoint .rank-tier-name {
+            color: var(--text-primary);
+        }
+
+        .rank-tier.challenger {
+            border-color: var(--rank-challenger);
+            background: rgba(255, 0, 0, 0.05);
+        }
+
+        .rank-tier.challenger .rank-tier-name {
+            color: var(--rank-challenger);
+        }
+
         .rank-tier.x-rank {
-            background: linear-gradient(135deg, rgba(255, 70, 85, 0.1) 0%, rgba(255, 107, 107, 0.05) 100%);
-            border-color: var(--accent-primary);
+            border-color: var(--rank-x);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .rank-tier.x-rank .rank-tier-name {
+            color: var(--rank-x);
         }
 
         /* Command Categories */
@@ -179,10 +208,6 @@
             align-items: center;
             gap: 12px;
             margin-bottom: 24px;
-        }
-
-        .category-icon {
-            font-size: 24px;
         }
 
         .category-title {
@@ -209,19 +234,19 @@
         }
 
         .command:hover {
-            border-color: var(--accent-primary);
+            border-color: var(--accent-yellow);
             transform: translateX(4px);
-            box-shadow: 0 4px 16px var(--accent-glow);
+            box-shadow: 0 4px 16px var(--accent-yellow-glow);
         }
 
         .command-name {
             font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
             font-size: 16px;
             font-weight: 600;
-            color: var(--accent-primary);
+            color: var(--accent-yellow);
             margin-bottom: 8px;
             display: inline-block;
-            background: rgba(255, 70, 85, 0.1);
+            background: rgba(255, 215, 0, 0.1);
             padding: 4px 12px;
             border-radius: 6px;
         }
@@ -252,8 +277,8 @@
         .steps-list li::before {
             content: counter(step-counter);
             counter-increment: step-counter;
-            background: var(--gradient-1);
-            color: white;
+            background: var(--accent-yellow);
+            color: var(--bg-primary);
             width: 32px;
             height: 32px;
             border-radius: 8px;
@@ -286,14 +311,14 @@
             content: '→';
             position: absolute;
             left: 0;
-            color: var(--accent-primary);
+            color: var(--accent-yellow);
             font-weight: 600;
         }
 
         /* Guidelines */
         .guideline-box {
             background: var(--bg-card);
-            border-left: 3px solid var(--accent-primary);
+            border-left: 3px solid var(--accent-yellow);
             border-radius: 8px;
             padding: 20px 24px;
             margin: 24px 0;
@@ -313,6 +338,137 @@
 
         .guideline-box p:last-child {
             margin-bottom: 0;
+        }
+
+        /* Leaderboard */
+        .leaderboard-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            margin: 32px 0;
+        }
+
+        .leaderboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .leaderboard-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .refresh-btn {
+            background: var(--accent-yellow);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .refresh-btn:hover {
+            background: var(--accent-yellow-dark);
+            transform: scale(1.05);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table th {
+            text-align: left;
+            padding: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .leaderboard-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .leaderboard-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .leaderboard-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .rank-number {
+            font-weight: 600;
+            color: var(--accent-yellow);
+            width: 40px;
+        }
+
+        .player-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .player-rank {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .player-rank.grnds {
+            background: rgba(255, 140, 0, 0.2);
+            color: var(--rank-grnds);
+        }
+
+        .player-rank.breakpoint {
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .player-rank.challenger {
+            background: rgba(255, 0, 0, 0.2);
+            color: var(--rank-challenger);
+        }
+
+        .player-rank.x-rank {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--rank-x);
+        }
+
+        .player-stats {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: var(--rank-challenger);
         }
 
         /* Footer */
@@ -339,10 +495,7 @@
         .footer-cta {
             font-size: 24px;
             font-weight: 600;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--accent-yellow);
             margin-top: 8px;
         }
 
@@ -367,6 +520,15 @@
             .section {
                 margin-bottom: 60px;
             }
+
+            .leaderboard-table {
+                font-size: 14px;
+            }
+
+            .leaderboard-table th,
+            .leaderboard-table td {
+                padding: 10px 8px;
+            }
         }
 
         /* Smooth scroll */
@@ -376,8 +538,8 @@
 
         /* Selection */
         ::selection {
-            background: var(--accent-primary);
-            color: white;
+            background: var(--accent-yellow);
+            color: var(--bg-primary);
         }
     </style>
 </head>
@@ -410,15 +572,15 @@
                     We use a custom rank system with real MMR (Match Making Rating) that goes up and down based on your performance in custom games. Here's how it breaks down:
                 </p>
                 <div class="rank-tiers">
-                    <div class="rank-tier">
+                    <div class="rank-tier grnds">
                         <div class="rank-tier-name">GRNDS I-V</div>
                         <div class="rank-tier-mmr">0-999 MMR - Everyone starts here, grind your way up</div>
                     </div>
-                    <div class="rank-tier">
+                    <div class="rank-tier breakpoint">
                         <div class="rank-tier-name">BREAKPOINT I-V</div>
                         <div class="rank-tier-mmr">1000-1999 MMR - You're getting good, keep pushing</div>
                     </div>
-                    <div class="rank-tier">
+                    <div class="rank-tier challenger">
                         <div class="rank-tier-name">CHALLENGER I-V</div>
                         <div class="rank-tier-mmr">2000-2999 MMR - Top tier players, respect</div>
                     </div>
@@ -432,6 +594,21 @@
                 </p>
             </div>
 
+            <!-- Leaderboard -->
+            <div class="section">
+                <h2 class="section-title">Leaderboard</h2>
+                <p class="section-subtitle">Top players ranked by MMR</p>
+                <div class="leaderboard-section">
+                    <div class="leaderboard-header">
+                        <h3 class="leaderboard-title">Top Players</h3>
+                        <button class="refresh-btn" id="refreshLeaderboard">Refresh</button>
+                    </div>
+                    <div id="leaderboardContent">
+                        <div class="loading">Loading leaderboard...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Getting Started -->
             <div class="section">
                 <h2 class="section-title">Getting Started</h2>
@@ -442,12 +619,12 @@
                 <ol class="steps-list">
                     <li>
                         <div>
-                            <strong>Link your Riot account:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/riot link name:YourName tag:1234 region:na</code>
+                            <strong>Link your Riot account:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/riot link name:YourName tag:1234 region:na</code>
                         </div>
                     </li>
                     <li>
                         <div>
-                            <strong>Get verified and placed:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/verify</code> - This calculates your starting MMR and assigns your Discord rank role
+                            <strong>Get verified and placed:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/verify</code> - This calculates your starting MMR and assigns your Discord rank role
                         </div>
                     </li>
                 </ol>
@@ -464,14 +641,13 @@
                 <!-- Progression Commands -->
                 <div class="command-category">
                     <div class="category-header">
-                        <span class="category-icon">📊</span>
                         <h3 class="category-title">Progression Commands</h3>
                     </div>
                     <p class="category-description">
                         These are your bread and butter for tracking improvement. Use these to see where you're at and where you're going.
                     </p>
-                    <p class="category-description" style="color: var(--accent-primary); font-weight: 500;">
-                        <strong>Coming Soon:</strong> AI powered commands like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px;">/agent</code> (daily AI analysis sessions) and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px;">/predict</code> (pre-match win probability) are in development and will be released in future updates.
+                    <p class="category-description" style="color: var(--accent-yellow); font-weight: 500;">
+                        <strong>Coming Soon:</strong> AI powered commands like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px;">/agent</code> (daily AI analysis sessions) and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px;">/predict</code> (pre-match win probability) are in development and will be released in future updates.
                     </p>
                     <div class="command">
                         <div class="command-name">/progress</div>
@@ -502,7 +678,6 @@
                 <!-- Social & Competition Commands -->
                 <div class="command-category">
                     <div class="category-header">
-                        <span class="category-icon">⚔️</span>
                         <h3 class="category-title">Social & Competition Commands</h3>
                     </div>
                     <p class="category-description">
@@ -531,7 +706,6 @@
                 <!-- AI Analysis Commands -->
                 <div class="command-category">
                     <div class="category-header">
-                        <span class="category-icon">🧠</span>
                         <h3 class="category-title">AI Analysis Commands</h3>
                     </div>
                     <p class="category-description">
@@ -548,7 +722,6 @@
                 <!-- Account & Stats Commands -->
                 <div class="command-category">
                     <div class="category-header">
-                        <span class="category-icon">🎮</span>
                         <h3 class="category-title">Account & Stats Commands</h3>
                     </div>
                     <p class="category-description">
@@ -613,7 +786,6 @@
                 <!-- Queue & Match Commands -->
                 <div class="command-category">
                     <div class="category-header">
-                        <span class="category-icon">🎯</span>
                         <h3 class="category-title">Queue & Match Commands</h3>
                     </div>
                     <p class="category-description">
@@ -661,11 +833,11 @@
                 </div>
                 <div class="guideline-box">
                     <strong>Daily limits apply to certain commands:</strong>
-                    <p><code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/why</code> - Limited to 3 uses per day. This is an AI powered analysis command that requires deep data processing. We plan to increase this limit in the future based on server capacity and demand.</p>
+                    <p><code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/why</code> - Limited to 3 uses per day. This is an AI powered analysis command that requires deep data processing. We plan to increase this limit in the future based on server capacity and demand.</p>
                 </div>
                 <div class="guideline-box">
                     <strong>Command visibility:</strong>
-                    <p>Some commands are visible only to you (like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/progress</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/streak</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/history</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/session</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/why</code>) to keep your personal stats private and create a healthier competitive culture. Others like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/compare</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/hot</code>, and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/xwatch</code> are public to encourage social interaction and friendly competition.</p>
+                    <p>Some commands are visible only to you (like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/progress</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/streak</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/history</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/session</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/why</code>) to keep your personal stats private and create a healthier competitive culture. Others like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/compare</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/hot</code>, and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/xwatch</code> are public to encourage social interaction and friendly competition.</p>
                 </div>
                 <div class="guideline-box">
                     <strong>Most commands are instant:</strong>
@@ -681,9 +853,9 @@
             <div class="section">
                 <h2 class="section-title">Tips & Tricks</h2>
                 <ul class="tips-list">
-                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/progress</code> before and after your gaming session to track daily improvement</li>
-                    <li>Check <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/hot</code> to see who you're competing against for MMR gains</li>
-                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/compare</code> to study X rank players and learn from the best</li>
+                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/progress</code> before and after your gaming session to track daily improvement</li>
+                    <li>Check <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/hot</code> to see who you're competing against for MMR gains</li>
+                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 215, 0, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-yellow);">/compare</code> to study X rank players and learn from the best</li>
                     <li>Your peak MMR is tracked forever, so you can always see your best performance</li>
                     <li>Win streaks give you momentum, the system rewards consistency</li>
                     <li>MVPs in matches get recognized in your stats, so play for the team but also pop off when you can</li>
@@ -719,8 +891,79 @@
             <p class="footer-remember">
                 <strong>Remember:</strong> This system is about making ranked fun and competitive. Grind hard, climb the ladder, and don't take losses too seriously. Every X rank player started at GRNDS I.
             </p>
-            <p class="footer-cta">Let's run it up. 🔥</p>
+            <p class="footer-cta">Let's run it up.</p>
         </div>
     </div>
+
+    <script>
+        function getRankClass(rankName) {
+            if (!rankName) return '';
+            const rank = rankName.toUpperCase();
+            if (rank.includes('GRNDS')) return 'grnds';
+            if (rank.includes('BREAKPOINT')) return 'breakpoint';
+            if (rank.includes('CHALLENGER')) return 'challenger';
+            if (rank.includes('X RANK') || rank === 'X') return 'x-rank';
+            return '';
+        }
+
+        async function loadLeaderboard() {
+            const content = document.getElementById('leaderboardContent');
+            const refreshBtn = document.getElementById('refreshLeaderboard');
+            
+            content.innerHTML = '<div class="loading">Loading leaderboard...</div>';
+            refreshBtn.disabled = true;
+
+            try {
+                // Get the current domain to construct API URL
+                const apiUrl = window.location.origin + '/api/leaderboard?limit=25';
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (!data.success || !data.players || data.players.length === 0) {
+                    content.innerHTML = '<div class="error">No players found. Join a queue to start tracking stats!</div>';
+                    return;
+                }
+
+                let html = '<table class="leaderboard-table">';
+                html += '<thead><tr>';
+                html += '<th style="width: 60px;">Rank</th>';
+                html += '<th>Player</th>';
+                html += '<th style="text-align: right;">MMR</th>';
+                html += '<th style="text-align: right;">W/L</th>';
+                html += '<th style="text-align: right;">Win Rate</th>';
+                html += '</tr></thead><tbody>';
+
+                data.players.forEach((player) => {
+                    const rankClass = getRankClass(player.rankName);
+                    html += '<tr>';
+                    html += `<td class="rank-number">#${player.rank}</td>`;
+                    html += '<td>';
+                    html += `<span class="player-name">${player.username}</span>`;
+                    if (player.rankName) {
+                        html += ` <span class="player-rank ${rankClass}">${player.rankName}</span>`;
+                    }
+                    html += '</td>';
+                    html += `<td class="player-stats" style="text-align: right; font-weight: 600;">${player.mmr}</td>`;
+                    html += `<td class="player-stats" style="text-align: right;">${player.wins}W / ${player.losses}L</td>`;
+                    html += `<td class="player-stats" style="text-align: right;">${player.winRate}%</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                content.innerHTML = '<div class="error">Failed to load leaderboard. Please try again later.</div>';
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Load leaderboard on page load
+        document.addEventListener('DOMContentLoaded', loadLeaderboard);
+
+        // Refresh button handler
+        document.getElementById('refreshLeaderboard').addEventListener('click', loadLeaderboard);
+    </script>
 </body>
 </html>
