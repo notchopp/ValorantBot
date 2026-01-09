@@ -6,6 +6,10 @@ import { ActivityFeed as ActivityFeedType } from '@/lib/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
+// Force dynamic rendering to ensure fresh data
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface PlayerData {
   id: string
   discord_user_id: string
@@ -27,55 +31,83 @@ export default async function DashboardPage() {
     redirect('/auth/login')
   }
   
-  // Get or create player data
+  // Get Discord user ID from OAuth - Discord OAuth stores it in identities
+  // First check identities array (Supabase stores provider user ID here)
+  // Then check metadata, then fallback to user.id
+  const identities = user.identities || []
+  const discordIdentity = identities.find((id: any) => id.provider === 'discord')
+  const discordUserId = discordIdentity?.identity_data?.id || 
+                        discordIdentity?.user_id ||
+                        user.user_metadata?.provider_user_id ||
+                        user.user_metadata?.provider_id || 
+                        user.user_metadata?.sub || 
+                        user.user_metadata?.discord_id ||
+                        user.id // Last resort fallback
+  
+  // Get Discord username from OAuth metadata
+  const discordUsername = discordIdentity?.identity_data?.preferred_username ||
+                          discordIdentity?.identity_data?.username ||
+                          user.user_metadata?.preferred_username || 
+                          user.user_metadata?.global_name ||
+                          user.user_metadata?.full_name || 
+                          user.user_metadata?.name || 
+                          user.user_metadata?.username ||
+                          user.email?.split('@')[0] || 
+                          'Player'
+  
+  // Get or create player data - query by actual Discord user ID
   let { data: playerData } = await supabase
     .from('players')
     .select('*')
-    .eq('discord_user_id', user.id)
-    .single()
+    .eq('discord_user_id', discordUserId)
+    .maybeSingle()
   
-  // If no player exists, create one with defaults
+  // If no player exists, create one
   if (!playerData) {
-    // Try to get username from auth metadata or user object
-    const username = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Player'
-    
     const { data: newPlayer } = await supabase
       .from('players')
       .insert({
-        discord_user_id: user.id,
-        discord_username: username,
+        discord_user_id: discordUserId,
+        discord_username: discordUsername,
         current_mmr: 0,
         peak_mmr: 0,
+        discord_rank: 'GRNDS I',
       })
       .select()
       .single()
     
-    playerData = newPlayer
+    if (newPlayer) {
+      playerData = newPlayer as PlayerData
+    }
   }
   
-  const player = playerData as PlayerData | null
-  
-  // Default values if no player
-  const playerDefaults = {
-    id: user.id,
-    discord_user_id: user.id,
-    discord_username: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Player',
+  // Ensure all fields have values (handle nulls from DB)
+  const playerDataToUse: PlayerData = playerData ? {
+    id: playerData.id,
+    discord_user_id: playerData.discord_user_id,
+    discord_username: playerData.discord_username ?? discordUsername,
+    riot_name: playerData.riot_name ?? null,
+    riot_tag: playerData.riot_tag ?? null,
+    current_mmr: (playerData.current_mmr ?? 0) as number,
+    peak_mmr: (playerData.peak_mmr ?? 0) as number,
+    discord_rank: playerData.discord_rank ?? 'GRNDS I',
+  } : {
+    id: discordUserId,
+    discord_user_id: discordUserId,
+    discord_username: discordUsername,
     riot_name: null,
     riot_tag: null,
     current_mmr: 0,
     peak_mmr: 0,
-    discord_rank: null,
+    discord_rank: 'GRNDS I',
   }
   
-  const playerDataToUse = player || playerDefaults
-  
-  // Get player's match stats (only if player exists in DB)
-  const { data: matchStats } = player ? await supabase
+  // Get player's match stats
+  const { data: matchStats } = await supabase
     .from('match_player_stats')
     .select('*, match:matches(*)')
-    .eq('player_id', player.id)
+    .eq('player_id', playerDataToUse.id)
     .order('created_at', { ascending: false })
-    : { data: null }
   
   interface MatchStatWithMatch {
     team: 'A' | 'B'
@@ -101,13 +133,12 @@ export default async function DashboardPage() {
   const netMMR = recentMatches.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
   
   // Get activity feed
-  const { data: activities } = player ? await supabase
+  const { data: activities } = await supabase
     .from('activity_feed')
     .select('*, player:players(*)')
-    .eq('player_id', player.id)
+    .eq('player_id', playerDataToUse.id)
     .order('created_at', { ascending: false })
     .limit(10)
-    : { data: null }
   
   const activityFeed = (activities as ActivityFeedType[]) || []
   
@@ -124,7 +155,7 @@ export default async function DashboardPage() {
     .from('seasons')
     .select('*')
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
   
   return (
     <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import { CursorReactiveBackground } from "@/components/CursorReactiveBackground";
+import { AuthButton } from "@/components/AuthButton";
 
 export const metadata: Metadata = {
   title: "GRNDS Hub - Competitive Dashboard",
@@ -48,12 +49,7 @@ export default function RootLayout({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link 
-                href="/auth/login"
-                className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-[#ffd700] text-black rounded-xl hover:bg-[#ffed4e] transition-all shadow-xl"
-              >
-                Sign In
-              </Link>
+              <AuthButton />
             </div>
           </div>
         </nav>

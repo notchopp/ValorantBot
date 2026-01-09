@@ -47,14 +47,18 @@ export async function POST(request: Request) {
       )
     }
     
-    // Get player by discord_user_id (from auth.uid())
-    // Note: This assumes auth.uid() matches discord_user_id
-    // When Discord OAuth is configured, this will work automatically
+    // Get Discord user ID from OAuth metadata (Discord ID is in provider_id or sub)
+    const discordUserId = user.user_metadata?.provider_id || 
+                          user.user_metadata?.sub || 
+                          user.user_metadata?.discord_id ||
+                          user.id
+    
+    // Get player by discord_user_id (actual Discord ID, not Supabase UUID)
     const { data: player, error: playerError } = await supabase
       .from('players')
       .select('id')
-      .eq('discord_user_id', user.id)
-      .single()
+      .eq('discord_user_id', discordUserId)
+      .maybeSingle()
     
     if (playerError || !player) {
       return Response.json(
