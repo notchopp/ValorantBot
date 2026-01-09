@@ -7,11 +7,17 @@
       "maxDuration": 30
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/welcome.html",
-      "dest": "/welcome.html"
+      "source": "/welcome",
+      "destination": "/api/welcome"
     },
+    {
+      "source": "/welcome.html",
+      "destination": "/api/welcome"
+    }
+  ],
+  "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
