@@ -5,6 +5,7 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('streak')
@@ -22,15 +23,8 @@ export async function execute(
     databaseService: DatabaseService;
   }
 ) {
-  try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction streak timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error;
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, true);
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -41,17 +35,9 @@ export async function execute(
     // Get player data
     const player = await databaseService.getPlayer(userId);
     if (!player) {
-      try {
-        await interaction.editReply(
-          '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction streak timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.',
+      });
       return;
     }
 
@@ -59,17 +45,9 @@ export async function execute(
     const matchHistory = await getPlayerMatchHistory(databaseService, player.id, 50);
 
     if (!matchHistory || matchHistory.length === 0) {
-      try {
-        await interaction.editReply(
-          '❌ No match history found. Play some games to track your streaks!'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction streak timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ No match history found. Play some games to track your streaks!',
+      });
       return;
     }
 
@@ -160,38 +138,20 @@ export async function execute(
       });
     }
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction streak timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction streak timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Streak command error', {
-      userId,
-      username,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while fetching your streak. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Streak command error', {
+        userId,
+        username,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for streak command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while fetching your streak. Please try again later.',
+    });
   }
 }
 

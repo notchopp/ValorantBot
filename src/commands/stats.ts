@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { PlayerService } from '../services/PlayerService';
 import { getKD, getWinRate } from '../models/Player';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('stats')
@@ -19,15 +20,8 @@ export async function execute(
     playerService: PlayerService;
   }
 ) {
-  try {
-    await interaction.deferReply();
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction stats timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error;
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, false);
 
   const targetUser = interaction.options.getUser('user') || interaction.user;
   const userId = targetUser.id;
@@ -39,17 +33,9 @@ export async function execute(
     const player = await playerService.getPlayer(userId, true);
 
     if (!player) {
-      try {
-        await interaction.editReply(
-          `❌ No stats found for ${username}. They need to join a queue first.`
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction stats timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: `❌ No stats found for ${username}. They need to join a queue first.`,
+      });
       return;
     }
 
@@ -116,37 +102,19 @@ export async function execute(
       });
     }
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction stats timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction stats timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Stats command error', {
-      userId,
-      username,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while fetching stats. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Stats command error', {
+        userId,
+        username,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for stats command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while fetching stats. Please try again later.',
+    });
   }
 }

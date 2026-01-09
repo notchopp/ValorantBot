@@ -5,6 +5,7 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('session')
@@ -34,15 +35,8 @@ export async function execute(
     databaseService: DatabaseService;
   }
 ) {
-  try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction session timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error;
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, true);
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -53,17 +47,9 @@ export async function execute(
     // Get player data
     const player = await databaseService.getPlayer(userId);
     if (!player) {
-      try {
-        await interaction.editReply(
-          '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction session timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.',
+      });
       return;
     }
 
@@ -71,17 +57,9 @@ export async function execute(
     const sessionStats = await getTodaySessionStats(databaseService, player.id);
 
     if (sessionStats.matchesPlayed === 0) {
-      try {
-        await interaction.editReply(
-          "📊 No games played today yet. Queue up and start grinding! 💪"
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction session timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: "📊 No games played today yet. Queue up and start grinding! 💪",
+      });
       return;
     }
 
@@ -194,38 +172,20 @@ export async function execute(
       text: `Session started at midnight | Use /history for detailed match history`,
     });
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction session timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction session timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Session command error', {
-      userId,
-      username,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while fetching your session. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Session command error', {
+        userId,
+        username,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for session command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while fetching your session. Please try again later.',
+    });
   }
 }
 

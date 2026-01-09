@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('rank')
@@ -23,15 +24,8 @@ export async function execute(
     rankCalculationService: RankCalculationService;
   }
 ) {
-  try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction rank timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error;
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, true);
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -42,17 +36,9 @@ export async function execute(
     // Get player data
     const player = await databaseService.getPlayer(userId);
     if (!player) {
-      try {
-        await interaction.editReply(
-          '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction rank timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.',
+      });
       return;
     }
 
@@ -60,15 +46,9 @@ export async function execute(
     const progression = await rankCalculationService.getRankProgression(userId);
 
     if (!progression) {
-      try {
-        await interaction.editReply('❌ Could not fetch rank information.');
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction rank timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ Could not fetch rank information.',
+      });
       return;
     }
 
@@ -135,38 +115,20 @@ export async function execute(
     });
   }
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction rank timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction rank timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Rank command error', {
-      userId,
-      username,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while fetching your rank. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Rank command error', {
+        userId,
+        username,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for rank command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while fetching your rank. Please try again later.',
+    });
   }
 }
 

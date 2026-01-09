@@ -5,6 +5,7 @@ import {
   User,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('compare')
@@ -39,30 +40,17 @@ export async function execute(
     databaseService: DatabaseService;
   }
 ) {
-  try {
-    await interaction.deferReply();
-  } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction compare timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error;
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, false);
 
   const user1 = interaction.user;
   const user2 = interaction.options.getUser('user', true);
 
   // Prevent comparing with yourself
   if (user1.id === user2.id) {
-    try {
-      await interaction.editReply('❌ You cannot compare with yourself! Try comparing with someone else.');
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction compare timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, {
+      content: '❌ You cannot compare with yourself! Try comparing with someone else.',
+    });
     return;
   }
 
@@ -76,32 +64,16 @@ export async function execute(
     ]);
 
     if (!player1Data) {
-      try {
-        await interaction.editReply(
-          `❌ ${user1.username} is not verified. Use \`/verify\` to get started.`
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction compare timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: `❌ ${user1.username} is not verified. Use \`/verify\` to get started.`,
+      });
       return;
     }
 
     if (!player2Data) {
-      try {
-        await interaction.editReply(
-          `❌ ${user2.username} is not verified or has no stats yet.`
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction compare timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: `❌ ${user2.username} is not verified or has no stats yet.`,
+      });
       return;
     }
 
@@ -192,38 +164,20 @@ export async function execute(
       });
     }
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction compare timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    if (error?.code === 10062) {
-      console.warn('Interaction compare timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Compare command error', {
-      user1: user1.id,
-      user2: user2.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while comparing players. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Compare command error', {
+        user1: user1.id,
+        user2: user2.id,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for compare command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while comparing players. Please try again later.',
+    });
   }
 }
 
