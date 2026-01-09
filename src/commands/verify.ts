@@ -93,10 +93,12 @@ export async function execute(
     // Update Discord role if verification succeeded
     if (interaction.guild && verifyResult.discordRank && roleUpdateService) {
       try {
-        console.info('Assigning Discord role after verification', {
+        console.log('🎭 Assigning Discord role after verification', {
           userId,
-          oldRank: existingPlayer.discord_rank || 'Unranked',
-          newRank: verifyResult.discordRank,
+          username,
+          rank: verifyResult.discordRank,
+          guildId: interaction.guild.id,
+          guildName: interaction.guild.name,
         });
 
         await roleUpdateService.updatePlayerRole(
@@ -106,17 +108,40 @@ export async function execute(
           interaction.guild
         );
 
-        console.info('✅ Discord role assigned successfully', {
+        console.log('✅ Discord role assigned successfully', {
           userId,
-          rank: verifyResult.discordRank,
+          username,
+          newRank: verifyResult.discordRank,
         });
       } catch (error) {
-        console.error('Failed to assign Discord role after verification', {
+        console.error('❌ Failed to assign Discord role after verification', {
           userId,
+          username,
           rank: verifyResult.discordRank,
           error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
         });
         // Continue - role update is non-critical for verification
+        // Add a follow-up message to inform user
+        try {
+          await interaction.followUp({
+            content: `⚠️ Verification complete but role assignment failed for rank **${verifyResult.discordRank}**. Please contact an admin.`,
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (followUpError) {
+          // Ignore if followUp fails
+          console.warn('Could not send role failure follow-up', {
+            error: followUpError instanceof Error ? followUpError.message : String(followUpError),
+          });
+        }
+      }
+    } else {
+      if (!interaction.guild) {
+        console.warn('⚠️ Cannot assign role: not in a guild', { userId });
+      } else if (!verifyResult.discordRank) {
+        console.warn('⚠️ Cannot assign role: no discordRank in result', { userId });
+      } else if (!roleUpdateService) {
+        console.warn('⚠️ Cannot assign role: roleUpdateService not available', { userId });
       }
     }
 
