@@ -88,6 +88,10 @@ async function getHotPlayers(
 ): Promise<HotPlayer[]> {
   try {
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return [];
+    }
 
     // Calculate date 7 days ago
     const sevenDaysAgo = new Date();
@@ -161,6 +165,7 @@ async function getHotPlayers(
 
     for (const [playerId, stats] of sortedPlayers) {
       // Get player details
+      if (!supabase) continue;
       const { data: player, error: playerError } = await supabase
         .from('players')
         .select('discord_user_id, discord_username, discord_rank, current_mmr')

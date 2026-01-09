@@ -127,7 +127,7 @@ export async function execute(
       },
       {
         name: 'Avg Per Game',
-        value: `**${avgMMRPerGame >= 0 ? '+' : ''}${avgMMRPerGame}**`,
+        value: `**${(typeof avgMMRPerGame === 'number' ? avgMMRPerGame : parseFloat(String(avgMMRPerGame))) >= 0 ? '+' : ''}${avgMMRPerGame}**`,
         inline: true,
       },
       {
@@ -166,10 +166,6 @@ export async function execute(
     }
 
     // Add motivational footer
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const hoursPlayed = ((now.getTime() - startOfDay.getTime()) / (1000 * 60 * 60)).toFixed(1);
-    
     embed.setFooter({
       text: `Session started at midnight | Use /history for detailed match history`,
     });
@@ -197,6 +193,22 @@ async function getTodaySessionStats(
 ): Promise<SessionStats> {
   try {
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return {
+        matchesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        totalMMRChange: 0,
+        startingMMR: 0,
+        currentMMR: 0,
+        kills: 0,
+        deaths: 0,
+        assists: 0,
+        mvps: 0,
+        bestGame: null,
+      };
+    }
 
     // Get start of today (midnight)
     const now = new Date();
@@ -256,21 +268,22 @@ async function getTodaySessionStats(
     const totalMMRChange = currentMMR - startingMMR;
 
     for (const match of data) {
-      const won = match.matches.winner === match.team;
+      const matchData = match.matches as any;
+      const won = matchData?.winner === match.team;
       const mmrChange = match.mmr_after - match.mmr_before;
       
       if (won) wins++;
-      kills += match.kills;
-      deaths += match.deaths;
-      assists += match.assists;
+      kills += match.kills || 0;
+      deaths += match.deaths || 0;
+      assists += match.assists || 0;
       if (match.mvp) mvps++;
 
       // Track best game (highest MMR gain + good KDA)
       if (mmrChange > bestMMRGain) {
         bestMMRGain = mmrChange;
         bestGame = {
-          map: match.matches.map,
-          kda: `${match.kills}/${match.deaths}/${match.assists}`,
+          map: matchData?.map || 'Unknown',
+          kda: `${match.kills || 0}/${match.deaths || 0}/${match.assists || 0}`,
           mmrGain: mmrChange,
         };
       }

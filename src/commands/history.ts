@@ -151,6 +151,10 @@ async function getPlayerMatchHistory(
 ): Promise<MatchHistoryEntry[]> {
   try {
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return [];
+    }
 
     // Get match player stats with match details
     const { data, error } = await supabase

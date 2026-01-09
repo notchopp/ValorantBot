@@ -160,6 +160,10 @@ async function getPlayerMatchHistory(
 ): Promise<MatchResult[]> {
   try {
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return [];
+    }
 
     // Get match player stats ordered by match date (most recent first)
     const { data, error } = await supabase

@@ -103,6 +103,7 @@ async function getXRankPlayers(
     const X_RANK_THRESHOLD = 3000;
 
     // Get top players by MMR
+    if (!supabase) return [];
     const { data: topPlayers, error } = await supabase
       .from('players')
       .select('id, discord_user_id, discord_username, current_mmr, peak_mmr')
@@ -121,6 +122,7 @@ async function getXRankPlayers(
       const player = topPlayers[i];
 
       // Get win/loss stats
+      if (!supabase) continue;
       const { data: statsData } = await supabase
         .from('match_player_stats')
         .select(`
@@ -138,7 +140,8 @@ async function getXRankPlayers(
 
       if (statsData) {
         for (const stat of statsData) {
-          if (stat.matches.winner === stat.team) {
+          const matchData = stat.matches as any;
+          if (matchData?.winner === stat.team) {
             wins++;
           } else {
             losses++;
@@ -153,6 +156,7 @@ async function getXRankPlayers(
       const twentyFourHoursAgo = new Date();
       twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
+      if (!supabase) continue;
       const { data: recentMatches } = await supabase
         .from('match_player_stats')
         .select(`

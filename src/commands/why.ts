@@ -84,8 +84,19 @@ export async function execute(
       return;
     }
 
-    // Check if player has enough games
-    if (!player.stats || player.stats.gamesPlayed < 5) {
+    // Check if player has enough games by counting matches
+    const supabaseCheck = databaseService.supabase;
+    if (!supabaseCheck) {
+      await interaction.editReply('❌ Database not available. Please try again later.');
+      return;
+    }
+    
+    const { count: matchCount } = await supabaseCheck
+      .from('match_player_stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('player_id', player.id);
+    
+    if (!matchCount || matchCount < 5) {
       await interaction.editReply(
         '❌ You need to play at least 5 games before I can analyze your performance. Queue up and come back!'
       );
@@ -190,6 +201,10 @@ async function analyzePerformance(
 ): Promise<PerformanceAnalysis | null> {
   try {
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return null;
+    }
 
     // Get last 20 matches
     const { data: matches, error } = await supabase
@@ -223,7 +238,8 @@ async function analyzePerformance(
     let mmrChanges: number[] = [];
 
     for (const match of matches) {
-      const won = match.matches.winner === match.team;
+      const matchData = match.matches as any;
+      const won = matchData?.winner === match.team;
       if (won) wins++;
 
       const kd = match.deaths > 0 ? match.kills / match.deaths : match.kills;

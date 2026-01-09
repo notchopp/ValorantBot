@@ -2,11 +2,9 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
-  MessageFlags,
   User,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
-import { getKD, getWinRate } from '../models/Player';
 
 export const data = new SlashCommandBuilder()
   .setName('compare')
@@ -191,6 +189,11 @@ async function getPlayerComparisonData(
 
     // Get player stats from match_player_stats
     const supabase = databaseService.supabase;
+    if (!supabase) {
+      console.error('Supabase not initialized');
+      return null;
+    }
+    
     const { data: statsData, error } = await supabase
       .from('match_player_stats')
       .select(`
@@ -235,19 +238,12 @@ async function getPlayerComparisonData(
       }
     }
 
-    // Get wins/losses from player stats table if available
-    // For now, calculate from stored player data
-    const winRate = player.stats?.wins && player.stats?.gamesPlayed 
-      ? ((player.stats.wins / player.stats.gamesPlayed) * 100).toFixed(1)
+    // Calculate win rate from games played (wins/losses calculated from match data would require team info)
+    const winRate = gamesPlayed > 0 && wins > 0
+      ? ((wins / gamesPlayed) * 100).toFixed(1)
       : '0.0';
     
-    wins = player.stats?.wins || 0;
-    const losses = player.stats?.losses || 0;
-    gamesPlayed = player.stats?.gamesPlayed || gamesPlayed;
-    kills = player.stats?.kills || kills;
-    deaths = player.stats?.deaths || deaths;
-    assists = player.stats?.assists || assists;
-    mvps = player.stats?.mvps || mvps;
+    const losses = gamesPlayed - wins;
 
     const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
 
