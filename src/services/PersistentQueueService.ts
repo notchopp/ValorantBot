@@ -1,5 +1,6 @@
 import { Client, TextChannel, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { QueueService } from './QueueService';
+import { DatabaseService } from './DatabaseService';
 import { Config } from '../config/config';
 
 /**
@@ -13,6 +14,7 @@ export class PersistentQueueService {
   constructor(
     private client: Client,
     private queueService: QueueService,
+    private databaseService: DatabaseService,
     private config: Config
   ) {}
 
@@ -57,7 +59,7 @@ export class PersistentQueueService {
       }
 
       // Create new persistent queue message
-      const embed = this.createPersistentQueueEmbed();
+      const embed = await this.createPersistentQueueEmbed();
       const buttons = this.createQueueButtons();
 
       const message = await lobbyChannel.send({
@@ -101,7 +103,7 @@ export class PersistentQueueService {
         return;
       }
 
-      const embed = this.createPersistentQueueEmbed();
+      const embed = await this.createPersistentQueueEmbed();
       const buttons = this.createQueueButtons();
 
       await message.edit({
@@ -118,46 +120,74 @@ export class PersistentQueueService {
   /**
    * Create the embed for the persistent queue message
    */
-  private createPersistentQueueEmbed(): EmbedBuilder {
+  private async createPersistentQueueEmbed(): Promise<EmbedBuilder> {
     const queueStatus = this.queueService.getCurrentQueueSizeSync();
     const maxPlayers = this.config.queue.maxPlayers;
 
-      // Find #GRNDSMAKER role for mention
-      let grndsMakerMention = '#GRNDSMAKER';
-      try {
-        const guilds = this.client.guilds.cache;
-        for (const guild of guilds.values()) {
-          const role = guild.roles.cache.find(
-            (r) => r.name === '#GRNDSMAKER'
-          );
-          if (role) {
-            grndsMakerMention = `<@&${role.id}>`;
-            break;
-          }
+    // Find #GRNDSMAKER role for mention
+    let grndsMakerMention = '#GRNDSMAKER';
+    try {
+      const guilds = this.client.guilds.cache;
+      for (const guild of guilds.values()) {
+        const role = guild.roles.cache.find(
+          (r) => r.name === '#GRNDSMAKER'
+        );
+        if (role) {
+          grndsMakerMention = `<@&${role.id}>`;
+          break;
         }
-      } catch (error) {
-        // Fallback to text if role not found
       }
+    } catch (error) {
+      // Fallback to text if role not found
+    }
 
-      const embed = new EmbedBuilder()
-        .setTitle('Queue is Always Open!')
-        .setDescription(
-          '**Anyone can join the queue!** Click the button below or use `/queue join`\n\n' +
-          `**Need a new queue started?** Ping ${grndsMakerMention} or any mod!\n` +
-          '**#GRNDSMAKER** control queues - they\'re given to consistent active players to start queues at any time.'
-        )
-        .setColor(0x00ff00)
-        .addFields({
-          name: 'Players in Queue',
-          value: `${queueStatus}/${maxPlayers}`,
-          inline: true,
-        })
-        .addFields({
-          name: 'Status',
-          value: queueStatus >= maxPlayers ? 'Full' : 'Open',
-          inline: true,
-        })
-        .setFooter({ text: 'Persistent Queue • Always available • Use /queue start to create a new queue' });
+    const embed = new EmbedBuilder()
+      .setTitle('Queue is Always Open!')
+      .setDescription(
+        '**Anyone can join the queue!** Click the button below or use `/queue join`\n\n' +
+        `**Need a new queue started?** Ping ${grndsMakerMention} or any mod!\n` +
+        '**#GRNDSMAKER** control queues - they\'re given to consistent active players to start queues at any time.'
+      )
+      .setColor(0x00ff00)
+      .addFields({
+        name: 'Players in Queue',
+        value: `${queueStatus}/${maxPlayers}`,
+        inline: true,
+      })
+      .addFields({
+        name: 'Status',
+        value: queueStatus >= maxPlayers ? 'Full' : 'Open',
+        inline: true,
+      });
+
+    // Get queue players with their rank and MMR
+    try {
+      const players = await this.databaseService.getQueuePlayersWithData();
+      
+      if (players.length > 0) {
+        const playerList = players
+          .slice(0, 10) // Show first 10 players
+          .map((p, index) => {
+            const rank = p.discord_rank !== 'Unranked' ? p.discord_rank : 'Unranked';
+            const mmr = p.current_mmr || 0;
+            return `${index + 1}. <@${p.discord_user_id}> - ${rank} (${mmr} MMR)`;
+          })
+          .join('\n');
+
+        embed.addFields({
+          name: 'In Queue',
+          value: playerList || 'None',
+          inline: false,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching queue players for persistent queue', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Continue without player list if there's an error
+    }
+
+    embed.setFooter({ text: 'Persistent Queue • Always available • Use /queue start to create a new queue' });
 
     return embed;
   }

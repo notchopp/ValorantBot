@@ -665,6 +665,54 @@ export class DatabaseService {
   }
 
   /**
+   * Get queue players with their player data (rank, MMR, etc.)
+   */
+  async getQueuePlayersWithData(): Promise<DatabasePlayer[]> {
+    try {
+      const supabase = this.getSupabase();
+      
+      // First get queue entries
+      const { data: queueEntries, error: queueError } = await supabase
+        .from('queue')
+        .select('player_id')
+        .order('joined_at', { ascending: true });
+
+      if (queueError || !queueEntries || queueEntries.length === 0) {
+        return [];
+      }
+
+      // Get player IDs
+      const playerIds = queueEntries.map((entry) => entry.player_id);
+
+      // Get player data for all queued players
+      const { data: players, error: playersError } = await supabase
+        .from('players')
+        .select('id, discord_user_id, discord_username, discord_rank, discord_rank_value, current_mmr, peak_mmr')
+        .in('id', playerIds);
+
+      if (playersError) {
+        console.error('Error getting queue players with data', {
+          error: playersError.message,
+        });
+        return [];
+      }
+
+      // Sort players by their order in the queue
+      const playerMap = new Map(players?.map((p) => [p.id, p]) || []);
+      const sortedPlayers = queueEntries
+        .map((entry) => playerMap.get(entry.player_id))
+        .filter((p): p is DatabasePlayer => p !== undefined);
+
+      return sortedPlayers;
+    } catch (error) {
+      console.error('Error getting queue players with data', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
    * Clear all players from queue
    */
   async clearQueue(): Promise<boolean> {
