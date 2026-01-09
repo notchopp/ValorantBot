@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
+import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
   .setName('progress')
@@ -18,16 +19,8 @@ export async function execute(
     rankCalculationService: RankCalculationService;
   }
 ) {
-  try {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  } catch (error: any) {
-    // If defer fails (e.g., interaction already expired), just return
-    if (error?.code === 10062) {
-      console.warn('Interaction progress timed out - user may have clicked command multiple times');
-      return;
-    }
-    throw error; // Re-throw if it's a different error
-  }
+  // Defer IMMEDIATELY before any async operations
+  await safeDefer(interaction, true);
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -38,48 +31,26 @@ export async function execute(
     // Get player data
     const player = await databaseService.getPlayer(userId);
     if (!player) {
-      try {
-        await interaction.editReply(
-          '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction progress timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.',
+      });
       return;
     }
 
     // Check if player has rank
     if (!player.discord_rank || player.discord_rank === 'Unranked') {
-      try {
-        await interaction.editReply(
-          '❌ You need to be ranked first. Use `/verify` to get your initial rank placement.'
-        );
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction progress timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ You need to be ranked first. Use `/verify` to get your initial rank placement.',
+      });
       return;
     }
 
     // Get rank progression
     const progression = await rankCalculationService.getRankProgression(userId);
     if (!progression) {
-      try {
-        await interaction.editReply('❌ Could not fetch rank progression.');
-      } catch (error: any) {
-        if (error?.code === 10062) {
-          console.warn('Interaction progress timed out - user may have clicked command multiple times');
-          return;
-        }
-        throw error;
-      }
+      await safeEditReply(interaction, {
+        content: '❌ Could not fetch rank progression.',
+      });
       return;
     }
 
@@ -176,40 +147,20 @@ export async function execute(
       });
     }
 
-    try {
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      if (error?.code === 10062) {
-        console.warn('Interaction progress timed out - user may have clicked command multiple times');
-        return;
-      }
-      throw error;
-    }
+    await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {
-    // Handle interaction timeout errors gracefully
-    if (error?.code === 10062) {
-      console.warn('Interaction progress timed out - user may have clicked command multiple times');
-      return;
-    }
-
-    console.error('Progress command error', {
-      userId,
-      username,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    
-    try {
-      await interaction.editReply({
-        content: '❌ An error occurred while fetching your progression. Please try again later.',
+    // Only log if it's not a timeout error (timeout errors are handled silently)
+    if (error?.code !== 10062) {
+      console.error('Progress command error', {
+        userId,
+        username,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (replyError: any) {
-      // If we can't reply (e.g., interaction expired), just log it
-      if (replyError?.code !== 10062) {
-        console.error('Failed to send error reply for progress command', {
-          error: replyError instanceof Error ? replyError.message : String(replyError),
-        });
-      }
     }
+    
+    await safeEditReply(interaction, {
+      content: '❌ An error occurred while fetching your progression. Please try again later.',
+    });
   }
 }
 
