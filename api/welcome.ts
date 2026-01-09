@@ -9,7 +9,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 export default function handler(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse
 ) {
   try {
