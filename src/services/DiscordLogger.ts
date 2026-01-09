@@ -145,22 +145,40 @@ export class DiscordLogger {
    * Log a message to Discord
    */
   async log(level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any): Promise<void> {
-    // Always log to console first
+    // Always log to console first - use originalConsole to avoid recursion
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
     
-    switch (level) {
-      case 'error':
-        console.error(logMessage, data || '');
-        break;
-      case 'warn':
-        console.warn(logMessage, data || '');
-        break;
-      case 'debug':
-        console.debug(logMessage, data || '');
-        break;
-      default:
-        console.log(logMessage, data || '');
+    // Use originalConsole to avoid infinite recursion
+    if (this.originalConsole) {
+      switch (level) {
+        case 'error':
+          this.originalConsole.error(logMessage, data || '');
+          break;
+        case 'warn':
+          this.originalConsole.warn(logMessage, data || '');
+          break;
+        case 'debug':
+          this.originalConsole.debug(logMessage, data || '');
+          break;
+        default:
+          this.originalConsole.log(logMessage, data || '');
+      }
+    } else {
+      // Fallback if originalConsole not set yet
+      switch (level) {
+        case 'error':
+          console.error(logMessage, data || '');
+          break;
+        case 'warn':
+          console.warn(logMessage, data || '');
+          break;
+        case 'debug':
+          console.debug(logMessage, data || '');
+          break;
+        default:
+          console.log(logMessage, data || '');
+      }
     }
 
     // Add to queue for Discord
@@ -201,9 +219,12 @@ export class DiscordLogger {
             logEntry.retried = true;
             this.logQueue.unshift(logEntry);
           }
-          console.error('Failed to send log to Discord', {
-            error: error instanceof Error ? error.message : String(error),
-          });
+          // Use originalConsole to avoid recursion
+          if (this.originalConsole) {
+            this.originalConsole.error('Failed to send log to Discord', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       }
     } finally {
@@ -292,7 +313,10 @@ export class DiscordLogger {
    */
   info(message: string, data?: any): void {
     this.log('info', message, data).catch((error) => {
-      console.error('Failed to log info to Discord', { error });
+      // Use originalConsole to avoid recursion
+      if (this.originalConsole) {
+        this.originalConsole.error('Failed to log info to Discord', { error });
+      }
     });
   }
 
@@ -301,7 +325,10 @@ export class DiscordLogger {
    */
   warn(message: string, data?: any): void {
     this.log('warn', message, data).catch((error) => {
-      console.error('Failed to log warn to Discord', { error });
+      // Use originalConsole to avoid recursion
+      if (this.originalConsole) {
+        this.originalConsole.error('Failed to log warn to Discord', { error });
+      }
     });
   }
 
@@ -310,7 +337,10 @@ export class DiscordLogger {
    */
   error(message: string, data?: any): void {
     this.log('error', message, data).catch((error) => {
-      console.error('Failed to log error to Discord', { error });
+      // Use originalConsole to avoid recursion
+      if (this.originalConsole) {
+        this.originalConsole.error('Failed to log error to Discord', { error });
+      }
     });
   }
 
@@ -319,7 +349,10 @@ export class DiscordLogger {
    */
   debug(message: string, data?: any): void {
     this.log('debug', message, data).catch((error) => {
-      console.error('Failed to log debug to Discord', { error });
+      // Use originalConsole to avoid recursion
+      if (this.originalConsole) {
+        this.originalConsole.error('Failed to log debug to Discord', { error });
+      }
     });
   }
 }

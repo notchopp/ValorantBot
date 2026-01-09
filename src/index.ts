@@ -292,7 +292,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 });
 
 // Bot ready
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`✅ Bot logged in as ${client.user?.tag}`);
   console.log(`📊 Valorant API: ${valorantAPI ? 'Enabled' : 'Disabled'}`);
   
