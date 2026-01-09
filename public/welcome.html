@@ -419,6 +419,114 @@
             margin-bottom: 0;
         }
 
+        /* Leaderboard Snapshot */
+        .leaderboard-snapshot {
+            background: var(--bg-card);
+            backdrop-filter: blur(40px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            margin: 40px 0;
+        }
+
+        .snapshot-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .snapshot-table th {
+            text-align: left;
+            padding: 12px 8px;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .snapshot-table td {
+            padding: 14px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .snapshot-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .snapshot-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .snapshot-rank-number {
+            font-weight: 900;
+            color: var(--accent-yellow);
+            width: 50px;
+            font-size: 16px;
+        }
+
+        .snapshot-player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .snapshot-player-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+
+        .snapshot-player-rank {
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+
+        .snapshot-player-rank.grnds {
+            color: var(--rank-grnds);
+        }
+
+        .snapshot-player-rank.breakpoint {
+            color: var(--text-primary);
+        }
+
+        .snapshot-player-rank.challenger {
+            color: var(--rank-challenger);
+        }
+
+        .snapshot-player-rank.x-rank {
+            color: var(--rank-x);
+        }
+
+        .snapshot-player-stats {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 300;
+        }
+
+        .snapshot-mmr-stat {
+            font-weight: 700;
+            color: var(--accent-yellow);
+        }
+
+        .snapshot-loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        .snapshot-error {
+            text-align: center;
+            padding: 40px;
+            color: var(--rank-challenger);
+            font-weight: 300;
+        }
 
         /* Footer */
         .footer {
