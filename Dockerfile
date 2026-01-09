@@ -17,8 +17,8 @@ RUN npm run build
 # Remove devDependencies to reduce image size
 RUN npm prune --production
 
-# Expose port (if needed for health checks)
-EXPOSE 3000
+# Expose port for Fly.io health checks
+EXPOSE 8080
 
 # Start the bot
 CMD ["npm", "start"]

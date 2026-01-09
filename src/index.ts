@@ -392,5 +392,29 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+// Start HTTP server for Fly.io health checks
+// Fly.io requires apps to listen on a port bound to 0.0.0.0
+const PORT = process.env.PORT || 8080;
+const http = require('http');
+
+const server = http.createServer((req: any, res: any) => {
+  // Simple health check endpoint
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      bot: client.user ? 'online' : 'connecting',
+      timestamp: new Date().toISOString()
+    }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Health check server listening on 0.0.0.0:${PORT}`);
+});
+
 // Login
 client.login(appConfig.bot.token);

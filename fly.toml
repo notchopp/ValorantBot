@@ -11,8 +11,32 @@ primary_region = 'iad'
 [env]
   NODE_ENV = "production"
 
-# Discord bots don't need HTTP services - they connect to Discord's API
-# Keep machines running and don't require HTTP health checks
+# HTTP service for health checks (required by Fly.io)
+# Discord bot connects to Discord's API, but we need HTTP for Fly.io proxy
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.http_checks]
+    interval = "10s"
+    timeout = "2s"
+    grace_period = "5s"
+
+    [[services.http_checks]]
+      method = "GET"
+      path = "/health"
+      protocol = "http"
+      tls_skip_verify = false
+
 [deploy]
   strategy = "immediate"
 
