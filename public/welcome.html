@@ -567,10 +567,15 @@
             <div class="section">
                 <h2 class="section-title">Leaderboard</h2>
                 <p class="section-subtitle">Top players ranked by MMR</p>
-                <div style="text-align: center; padding: 40px 0;">
-                    <a href="/leaderboard" style="display: inline-block; padding: 16px 32px; background: var(--accent-yellow); color: var(--bg-primary); text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px; letter-spacing: 0.05em; text-transform: uppercase; transition: all 0.2s ease;">
-                        View Full Leaderboard →
-                    </a>
+                <div class="leaderboard-snapshot">
+                    <div id="leaderboardSnapshot">
+                        <div class="loading">Loading leaderboard...</div>
+                    </div>
+                    <div style="text-align: center; padding: 32px 0 0 0;">
+                        <a href="/leaderboard" style="display: inline-block; padding: 16px 32px; background: var(--accent-yellow); color: var(--bg-primary); text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px; letter-spacing: 0.05em; text-transform: uppercase; transition: all 0.2s ease;">
+                            View Full Leaderboard →
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -874,6 +879,68 @@
         });
 
         updateSpotlight();
+
+        // Leaderboard snapshot functions
+        function getRankClass(rankName) {
+            if (!rankName) return '';
+            const rank = rankName.toUpperCase();
+            if (rank.includes('GRNDS')) return 'grnds';
+            if (rank.includes('BREAKPOINT')) return 'breakpoint';
+            if (rank.includes('CHALLENGER')) return 'challenger';
+            if (rank.includes('X RANK') || rank === 'X') return 'x-rank';
+            return '';
+        }
+
+        async function loadLeaderboardSnapshot() {
+            const content = document.getElementById('leaderboardSnapshot');
+            
+            content.innerHTML = '<div class="snapshot-loading">Loading leaderboard...</div>';
+
+            try {
+                const apiUrl = window.location.origin + '/api/leaderboard?limit=10';
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (!data.success || !data.players || data.players.length === 0) {
+                    content.innerHTML = '<div class="snapshot-error">No players found. Join a queue to start tracking stats!</div>';
+                    return;
+                }
+
+                let html = '<table class="snapshot-table">';
+                html += '<thead><tr>';
+                html += '<th style="width: 60px;">Rank</th>';
+                html += '<th>Player</th>';
+                html += '<th style="text-align: right;">MMR</th>';
+                html += '<th style="text-align: right;">W/L</th>';
+                html += '</tr></thead><tbody>';
+
+                data.players.forEach((player) => {
+                    const rankClass = getRankClass(player.rankName);
+                    html += '<tr>';
+                    html += `<td class="snapshot-rank-number">#${player.rank}</td>`;
+                    html += '<td>';
+                    html += '<div class="snapshot-player-info">';
+                    html += `<span class="snapshot-player-name">${player.username}</span>`;
+                    if (player.rankName) {
+                        html += `<span class="snapshot-player-rank ${rankClass}">${player.rankName}</span>`;
+                    }
+                    html += '</div>';
+                    html += '</td>';
+                    html += `<td class="snapshot-player-stats snapshot-mmr-stat" style="text-align: right;">${player.mmr}</td>`;
+                    html += `<td class="snapshot-player-stats" style="text-align: right;">${player.wins}W / ${player.losses}L</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading leaderboard snapshot:', error);
+                content.innerHTML = '<div class="snapshot-error">Failed to load leaderboard. Please try again later.</div>';
+            }
+        }
+
+        // Load leaderboard snapshot on page load
+        document.addEventListener('DOMContentLoaded', loadLeaderboardSnapshot);
 
         // Create particles
         const particlesContainer = document.getElementById('cursorParticles');
