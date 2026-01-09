@@ -5,7 +5,7 @@ import { ProfileEditForm } from '@/components/ProfileEditForm'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function ProfileEditPage({ params }: { params: { userId: string } }) {
+export default async function ProfileEditPage({ params: _params }: { params: { userId: string } }) {
   const supabase = await createClient()
   
   // Check authentication

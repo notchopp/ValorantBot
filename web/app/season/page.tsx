@@ -58,6 +58,13 @@ export default async function SeasonPage() {
   const players = (leaderboard as Player[]) || []
   
   // Calculate season stats for each player (matches, win rate, etc.)
+  interface SeasonMatchStat {
+    team: 'A' | 'B'
+    mmr_after: number
+    mmr_before: number
+    match?: { match_date: string; winner?: 'A' | 'B' }
+  }
+  
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
       // Get match stats for this player this season
@@ -68,8 +75,8 @@ export default async function SeasonPage() {
         .gte('created_at', currentSeason.start_date)
         .lte('created_at', currentSeason.end_date)
       
-      const stats = matchStats || []
-      const wins = stats.filter((s: any) => {
+      const stats = (matchStats as SeasonMatchStat[]) || []
+      const wins = stats.filter((s) => {
         if (s.match) {
           return s.match.winner === s.team
         }
@@ -78,7 +85,7 @@ export default async function SeasonPage() {
       
       const totalMatches = stats.length
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
-      const netMMR = stats.reduce((sum: number, s: any) => sum + (s.mmr_after - s.mmr_before), 0)
+      const netMMR = stats.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
       
       return {
         ...player,

@@ -20,6 +20,15 @@ export default async function LeaderboardPage() {
   const players = (leaderboard as Player[]) || []
   
   // Calculate stats for each player (K/D, Win Rate, etc.) from match_player_stats
+  interface MatchStatWithMatch {
+    team: 'A' | 'B'
+    kills: number
+    deaths: number
+    mmr_after: number
+    mmr_before: number
+    match?: { winner?: 'A' | 'B' }
+  }
+  
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
       const { data: matchStats } = await supabase
@@ -27,8 +36,8 @@ export default async function LeaderboardPage() {
         .select('*, match:matches(winner)')
         .eq('player_id', player.id)
       
-      const stats = matchStats || []
-      const wins = stats.filter((s: any) => {
+      const stats = (matchStats as MatchStatWithMatch[]) || []
+      const wins = stats.filter((s) => {
         if (s.match) {
           return s.match.winner === s.team
         }
@@ -37,8 +46,8 @@ export default async function LeaderboardPage() {
       
       const totalMatches = stats.length
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
-      const totalKills = stats.reduce((sum: number, s: any) => sum + (s.kills || 0), 0)
-      const totalDeaths = stats.reduce((sum: number, s: any) => sum + (s.deaths || 0), 0)
+      const totalKills = stats.reduce((sum, s) => sum + (s.kills || 0), 0)
+      const totalDeaths = stats.reduce((sum, s) => sum + (s.deaths || 0), 0)
       const kd = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : '0.00'
       
       return {

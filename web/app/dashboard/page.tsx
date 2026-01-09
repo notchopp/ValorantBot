@@ -156,7 +156,7 @@ export default async function DashboardPage() {
             season={null}
             matchHistory={[]}
             rankProgression={[]}
-            playerId={playerDataToUse.id}
+            userProfile={null}
           />
         </div>
       </div>
@@ -305,7 +305,6 @@ export default async function DashboardPage() {
       season={season}
       matchHistory={matchHistory}
       rankProgression={rankProgression}
-      playerId={playerDataToUse.id}
       userProfile={userProfile}
     />
   )
@@ -324,7 +323,6 @@ function DashboardContent({
   season,
   matchHistory,
   rankProgression,
-  playerId,
   userProfile,
 }: {
   playerDataToUse: PlayerData
@@ -338,7 +336,6 @@ function DashboardContent({
   season: { id: string; name: string } | null
   matchHistory: MatchHistoryEntry[]
   rankProgression: RankProgressionEntry[]
-  playerId: string
   userProfile?: { display_name?: string | null; bio?: string | null } | null
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'

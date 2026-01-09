@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { DiscordLoginButton } from '@/components/DiscordLoginButton'
 
 export default async function LoginPage({
-  searchParams,
+  searchParams: _searchParams,
 }: {
   searchParams: { error?: string; next?: string }
 }) {
