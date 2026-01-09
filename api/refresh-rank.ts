@@ -251,9 +251,6 @@ export default async function handler(
           ranking_in_tier: mmrData.current?.ranking_in_tier || 0,
           mmr_change_to_last_game: mmrData.current?.mmr_change_to_last_game || 0,
           elo: mmrData.current?.elo || 0,
-          name: mmrData.name || riotName,
-          tag: mmrData.tag || riotTag,
-          old: mmrData.old || false,
           games_needed_for_rating: mmrData.current?.games_needed_for_rating || 0,
         };
       }
