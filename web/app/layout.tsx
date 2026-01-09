@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
+import { CursorReactiveBackground } from "@/components/CursorReactiveBackground";
 
 export const metadata: Metadata = {
   title: "GRNDS Hub - Competitive Dashboard",
@@ -13,49 +14,50 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <div className="grain-overlay" />
-        <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-8">
-                <Link href="/" className="text-2xl font-black text-[#ffd700] tracking-tight">
-                  GRNDS
-                </Link>
-                <div className="hidden md:flex items-center gap-6">
-                  <Link 
-                    href="/dashboard" 
-                    className="text-sm font-medium text-gray-400 hover:text-[#ffd700] transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link 
-                    href="/season" 
-                    className="text-sm font-medium text-gray-400 hover:text-[#ffd700] transition-colors"
-                  >
-                    Season
-                  </Link>
-                  <Link 
-                    href="/leaderboard" 
-                    className="text-sm font-medium text-gray-400 hover:text-[#ffd700] transition-colors"
-                  >
-                    Leaderboard
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased font-sans tracking-tight" suppressHydrationWarning>
+        <CursorReactiveBackground />
+        <nav className="fixed top-0 left-0 right-0 z-[100] border-b border-white/5 bg-black/80 backdrop-blur-2xl transition-all duration-700 py-4 md:py-6">
+          <div className="max-w-[1400px] mx-auto px-4 md:px-8 flex items-center justify-between">
+            <div className="flex items-center gap-4 md:gap-6">
+              <Link href="/" className="text-xl md:text-2xl font-black text-[#ffd700] tracking-tighter">
+                GRNDS
+              </Link>
+              <div className="hidden md:flex items-center gap-8">
                 <Link 
-                  href="/auth/login"
-                  className="px-4 py-2 text-sm font-semibold bg-[#ffd700] text-black rounded-lg hover:bg-[#ccaa00] transition-colors"
+                  href="/dashboard" 
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
                 >
-                  Sign In
+                  Dashboard
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
+                </Link>
+                <Link 
+                  href="/season" 
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
+                >
+                  Season
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
+                </Link>
+                <Link 
+                  href="/leaderboard" 
+                  className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-[#ffd700] transition-colors relative group"
+                >
+                  Leaderboard
+                  <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-[#ffd700] transition-all group-hover:w-full" />
                 </Link>
               </div>
             </div>
+            <div className="flex items-center gap-4">
+              <Link 
+                href="/auth/login"
+                className="px-4 md:px-6 py-2 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] bg-[#ffd700] text-black rounded-xl hover:bg-[#ffed4e] transition-all shadow-xl"
+              >
+                Sign In
+              </Link>
+            </div>
           </div>
         </nav>
-        <main className="relative z-10 pt-16">
+        <main className="relative z-10 pt-16 md:pt-20 min-h-screen">
           {children}
         </main>
       </body>
