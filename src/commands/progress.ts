@@ -2,7 +2,6 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
-  MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
