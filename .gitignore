@@ -1,6 +1,16 @@
 node_modules/
+web/node_modules/
 dist/
+.next/
+web/.next/
+out/
+web/out/
 .env
+.env.local
+.env.*.local
+web/.env
+web/.env.local
+web/.env.*.local
 *.log
 .DS_Store
 .vscode/
@@ -8,3 +18,4 @@ dist/
 *.swp
 *.swo
 *~
+*.tsbuildinfo

@@ -10,7 +10,7 @@ interface CommentSectionProps {
   onSubmit?: (content: string) => Promise<void>
 }
 
-export function CommentSection({ targetType, targetId, comments, onSubmit }: CommentSectionProps) {
+export function CommentSection({ comments, onSubmit }: CommentSectionProps) {
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -39,8 +39,8 @@ export function CommentSection({ targetType, targetId, comments, onSubmit }: Com
     try {
       await onSubmit(content)
       setContent('')
-    } catch (err: any) {
-      setError(err.message || 'Failed to post comment')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to post comment')
     } finally {
       setIsSubmitting(false)
     }

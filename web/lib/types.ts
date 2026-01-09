@@ -33,7 +33,7 @@ export interface ActivityFeed {
   activity_type: 'rank_up' | 'rank_down' | 'mvp' | 'big_mmr_gain' | 'big_mmr_loss' | 'achievement'
   title: string
   description: string | null
-  metadata: Record<string, any> | null
+  metadata: Record<string, unknown> | null
   created_at: string
   player?: Player
 }

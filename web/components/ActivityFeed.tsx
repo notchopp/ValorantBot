@@ -1,7 +1,6 @@
 'use client'
 
 import { ActivityFeed as ActivityFeedType } from '@/lib/types'
-import { RankBadge } from './RankBadge'
 
 interface ActivityFeedProps {
   activities: ActivityFeedType[]
@@ -81,7 +80,9 @@ export function ActivityFeed({ activities, limit }: ActivityFeedProps) {
               )}
               {activity.metadata && activity.activity_type === 'rank_up' && (
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-gray-500">+{activity.metadata.mmr_change} MMR</span>
+                  <span className="text-xs text-gray-500">
+                    +{(activity.metadata as { mmr_change?: number }).mmr_change || 0} MMR
+                  </span>
                 </div>
               )}
             </div>

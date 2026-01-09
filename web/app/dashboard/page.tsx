@@ -4,7 +4,6 @@ import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { StatCard } from '@/components/StatCard'
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { Player, ActivityFeed as ActivityFeedType, MatchPlayerStat } from '@/lib/types'
-import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
