@@ -19,7 +19,15 @@ export async function execute(
     playerService: PlayerService;
   }
 ) {
-  await interaction.deferReply();
+  try {
+    await interaction.deferReply();
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction stats timed out - user may have clicked command multiple times');
+      return;
+    }
+    throw error;
+  }
 
   const targetUser = interaction.options.getUser('user') || interaction.user;
   const userId = targetUser.id;
@@ -31,9 +39,17 @@ export async function execute(
     const player = await playerService.getPlayer(userId, true);
 
     if (!player) {
-      await interaction.editReply(
-        `❌ No stats found for ${username}. They need to join a queue first.`
-      );
+      try {
+        await interaction.editReply(
+          `❌ No stats found for ${username}. They need to join a queue first.`
+        );
+      } catch (error: any) {
+        if (error?.code === 10062) {
+          console.warn('Interaction stats timed out - user may have clicked command multiple times');
+          return;
+        }
+        throw error;
+      }
       return;
     }
 
@@ -100,16 +116,37 @@ export async function execute(
       });
     }
 
-    await interaction.editReply({ embeds: [embed] });
-  } catch (error) {
+    try {
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error: any) {
+      if (error?.code === 10062) {
+        console.warn('Interaction stats timed out - user may have clicked command multiple times');
+        return;
+      }
+      throw error;
+    }
+  } catch (error: any) {
+    if (error?.code === 10062) {
+      console.warn('Interaction stats timed out - user may have clicked command multiple times');
+      return;
+    }
+
     console.error('Stats command error', {
       userId,
       username,
       error: error instanceof Error ? error.message : String(error),
     });
     
-    await interaction.editReply({
-      content: '❌ An error occurred while fetching stats. Please try again later.',
-    });
+    try {
+      await interaction.editReply({
+        content: '❌ An error occurred while fetching stats. Please try again later.',
+      });
+    } catch (replyError: any) {
+      if (replyError?.code !== 10062) {
+        console.error('Failed to send error reply for stats command', {
+          error: replyError instanceof Error ? replyError.message : String(replyError),
+        });
+      }
+    }
   }
 }
