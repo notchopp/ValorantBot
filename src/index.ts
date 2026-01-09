@@ -207,27 +207,48 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return; // Silently ignore timeout errors
       }
 
-      const reply = {
-        content: 'There was an error while executing this command!',
-        flags: MessageFlags.Ephemeral as any,
-      };
+      // Handle already acknowledged errors gracefully
+      if (error?.code === 40060) {
+        // Interaction was already acknowledged - command likely handled it
+        return; // Silently ignore
+      }
 
-      try {
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp(reply);
-        } else {
-          await interaction.reply(reply);
+      // Only try to send error reply if interaction hasn't been handled yet
+      // Commands may have already handled the error themselves (via safeEditReply)
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({
+            content: 'There was an error while executing this command!',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (replyError: any) {
+          // If we can't reply (e.g., interaction expired or already acknowledged), just log it
+          if (replyError?.code !== 10062 && replyError?.code !== 40060) {
+            const replyErrorMsg = 'Failed to send error reply';
+            console.error(replyErrorMsg, replyError);
+            if (discordLogger) {
+              discordLogger.error(replyErrorMsg, { error: replyError });
+            }
+          }
         }
-      } catch (replyError: any) {
-        // If we can't reply (e.g., interaction expired), just log it
-        if (replyError?.code !== 10062) {
-          const replyErrorMsg = 'Failed to send error reply';
-          console.error(replyErrorMsg, replyError);
-          if (discordLogger) {
-            discordLogger.error(replyErrorMsg, { error: replyError });
+      } else if (interaction.deferred && !interaction.replied) {
+        // If deferred but not replied, we can still edit
+        try {
+          await interaction.editReply({
+            content: 'There was an error while executing this command!',
+          });
+        } catch (replyError: any) {
+          // If we can't edit (e.g., already acknowledged), just log it
+          if (replyError?.code !== 10062 && replyError?.code !== 40060) {
+            const replyErrorMsg = 'Failed to send error reply';
+            console.error(replyErrorMsg, replyError);
+            if (discordLogger) {
+              discordLogger.error(replyErrorMsg, { error: replyError });
+            }
           }
         }
       }
+      // If already replied, don't try to reply again (would cause 40060 error)
     }
   } else if (interaction.isModalSubmit()) {
     // Handle match report modal
@@ -244,7 +265,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           }
           await interaction.reply({
             content: 'There was an error processing the match report.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -263,7 +284,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           }
           await interaction.reply({
             content: 'There was an error processing the host confirmation.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -283,7 +304,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({
             content: 'There was an error processing your request.',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }

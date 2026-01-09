@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
+import { ChatInputCommandInteraction, MessageFlags, InteractionResponse } from 'discord.js';
 
 /**
  * Safely defer an interaction reply
@@ -42,18 +42,23 @@ export async function safeEditReply(
     } else {
       // Fallback: if somehow not deferred, try to reply
       const replyOptions: any = {
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       };
       if (typeof options === 'string') {
         replyOptions.content = options;
       } else if (options && typeof options === 'object') {
         Object.assign(replyOptions, options);
+        // Convert deprecated ephemeral to flags if present
+        if (replyOptions.ephemeral) {
+          replyOptions.flags = MessageFlags.Ephemeral;
+          delete replyOptions.ephemeral;
+        }
       }
       await interaction.reply(replyOptions);
     }
   } catch (error: any) {
-    // If interaction expired (10062), silently ignore - nothing we can do
-    if (error?.code === 10062) {
+    // If interaction expired (10062) or already acknowledged (40060), silently ignore
+    if (error?.code === 10062 || error?.code === 40060) {
       return;
     }
     // Re-throw other errors
