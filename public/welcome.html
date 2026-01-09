@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRNDS - Welcome Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #121212;
+            --bg-card: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --accent-primary: #ff4655;
+            --accent-secondary: #ff6b6b;
+            --accent-glow: rgba(255, 70, 85, 0.15);
+            --border-color: #2a2a2a;
+            --gradient-1: linear-gradient(135deg, #ff4655 0%, #ff6b6b 100%);
+            --gradient-2: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-2);
+            border-bottom: 1px solid var(--border-color);
+            padding: 80px 0 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 0%, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero .subtitle {
+            font-size: 20px;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero .tagline {
+            font-size: 16px;
+            color: var(--text-muted);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Content Sections */
+        .content {
+            padding: 60px 0;
+        }
+
+        .section {
+            margin-bottom: 80px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .section-subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        .intro-text {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.8;
+        }
+
+        .intro-text strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Rank Tiers */
+        .rank-tiers {
+            display: grid;
+            gap: 16px;
+            margin: 32px 0;
+        }
+
+        .rank-tier {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+            transition: all 0.3s ease;
+        }
+
+        .rank-tier:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-glow);
+        }
+
+        .rank-tier-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .rank-tier-mmr {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .rank-tier.x-rank {
+            background: linear-gradient(135deg, rgba(255, 70, 85, 0.1) 0%, rgba(255, 107, 107, 0.05) 100%);
+            border-color: var(--accent-primary);
+        }
+
+        /* Command Categories */
+        .command-category {
+            margin-bottom: 48px;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .category-icon {
+            font-size: 24px;
+        }
+
+        .category-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .category-description {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.7;
+        }
+
+        /* Commands */
+        .command {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .command:hover {
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .command-name {
+            font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+            display: inline-block;
+            background: rgba(255, 70, 85, 0.1);
+            padding: 4px 12px;
+            border-radius: 6px;
+        }
+
+        .command-description {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* Lists */
+        .steps-list {
+            list-style: none;
+            margin: 24px 0;
+        }
+
+        .steps-list li {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .steps-list li::before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            background: var(--gradient-1);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .steps-list {
+            counter-reset: step-counter;
+        }
+
+        .tips-list {
+            list-style: none;
+            margin: 24px 0;
+        }
+
+        .tips-list li {
+            padding: 12px 0;
+            padding-left: 28px;
+            position: relative;
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        .tips-list li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        /* Guidelines */
+        .guideline-box {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent-primary);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 24px 0;
+        }
+
+        .guideline-box strong {
+            color: var(--text-primary);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .guideline-box p {
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .guideline-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 60px 0;
+            text-align: center;
+            margin-top: 80px;
+        }
+
+        .footer-remember {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.8;
+        }
+
+        .footer-remember strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .footer-cta {
+            font-size: 24px;
+            font-weight: 600;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-top: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+
+            .hero .subtitle {
+                font-size: 18px;
+            }
+
+            .section-title {
+                font-size: 28px;
+            }
+
+            .content {
+                padding: 40px 0;
+            }
+
+            .section {
+                margin-bottom: 60px;
+            }
+        }
+
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Selection */
+        ::selection {
+            background: var(--accent-primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <h1>Welcome to GRNDS</h1>
+            <p class="subtitle">Your Custom Ranked System</p>
+            <p class="tagline">Making ranked fun again, one game at a time</p>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container">
+            <!-- Introduction -->
+            <div class="section">
+                <p class="intro-text">
+                    Yo! Welcome to <strong>#GRNDS</strong>. This is a passion project I built to make ranked fun again. Everything you see here is custom made for you, from the ground up. No boring Riot ranks here, we run our own show with custom tiers, real time MMR tracking, and commands that actually make you want to queue up and grind.
+                </p>
+                <p class="intro-text">
+                    This system is all about competition, progression, and that dopamine hit when you see your MMR go up. Whether you're trying to hit X rank or just flex your stats on your friends, we got you covered.
+                </p>
+            </div>
+
+            <!-- Rank System -->
+            <div class="section">
+                <h2 class="section-title">The Rank System</h2>
+                <p class="section-subtitle">Real MMR tracking that updates after every game</p>
+                <p class="intro-text">
+                    We use a custom rank system with real MMR (Match Making Rating) that goes up and down based on your performance in custom games. Here's how it breaks down:
+                </p>
+                <div class="rank-tiers">
+                    <div class="rank-tier">
+                        <div class="rank-tier-name">GRNDS I-V</div>
+                        <div class="rank-tier-mmr">0-999 MMR - Everyone starts here, grind your way up</div>
+                    </div>
+                    <div class="rank-tier">
+                        <div class="rank-tier-name">BREAKPOINT I-V</div>
+                        <div class="rank-tier-mmr">1000-1999 MMR - You're getting good, keep pushing</div>
+                    </div>
+                    <div class="rank-tier">
+                        <div class="rank-tier-name">CHALLENGER I-V</div>
+                        <div class="rank-tier-mmr">2000-2999 MMR - Top tier players, respect</div>
+                    </div>
+                    <div class="rank-tier x-rank">
+                        <div class="rank-tier-name">X Rank</div>
+                        <div class="rank-tier-mmr">3000+ MMR - The elite, only top 10 players, the absolute best</div>
+                    </div>
+                </div>
+                <p class="intro-text" style="margin-top: 24px;">
+                    Your rank updates automatically after every game. Win and you go up, lose and you go down. It's that simple.
+                </p>
+            </div>
+
+            <!-- Getting Started -->
+            <div class="section">
+                <h2 class="section-title">Getting Started</h2>
+                <p class="section-subtitle">Two steps to unlock everything</p>
+                <p class="intro-text">
+                    Before you can use any commands, you need to verify your account:
+                </p>
+                <ol class="steps-list">
+                    <li>
+                        <div>
+                            <strong>Link your Riot account:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/riot link name:YourName tag:1234 region:na</code>
+                        </div>
+                    </li>
+                    <li>
+                        <div>
+                            <strong>Get verified and placed:</strong> <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/verify</code> - This calculates your starting MMR and assigns your Discord rank role
+                        </div>
+                    </li>
+                </ol>
+                <p class="intro-text" style="margin-top: 24px;">
+                    That's it. Once you're verified, all the commands below unlock for you.
+                </p>
+            </div>
+
+            <!-- Command Guide -->
+            <div class="section">
+                <h2 class="section-title">Command Guide</h2>
+                <p class="section-subtitle">Everything you need to track, compete, and climb</p>
+
+                <!-- Progression Commands -->
+                <div class="command-category">
+                    <div class="category-header">
+                        <span class="category-icon">📊</span>
+                        <h3 class="category-title">Progression Commands</h3>
+                    </div>
+                    <p class="category-description">
+                        These are your bread and butter for tracking improvement. Use these to see where you're at and where you're going.
+                    </p>
+                    <p class="category-description" style="color: var(--accent-primary); font-weight: 500;">
+                        <strong>Coming Soon:</strong> AI powered commands like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px;">/agent</code> (daily AI analysis sessions) and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px;">/predict</code> (pre-match win probability) are in development and will be released in future updates.
+                    </p>
+                    <div class="command">
+                        <div class="command-name">/progress</div>
+                        <div class="command-description">
+                            Shows your detailed rank progression with a visual MMR bar, your current rank, how much MMR you need for the next rank, and even estimates how many wins you need. This is your main dashboard.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/streak</div>
+                        <div class="command-description">
+                            Check your current win or loss streak. See the MMR impact, your best win streak, worst loss streak, and your last 5 games. Great for when you're on fire or need motivation to break a losing streak.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/history [count]</div>
+                        <div class="command-description">
+                            View your recent match history. Set count from 1 to 25 (default is 10). Each match shows your K/D/A, MMR change, map, date, and MVP badges if you popped off. Perfect for reviewing your recent performance.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/session</div>
+                        <div class="command-description">
+                            See today's grind summary. Shows all your games from today, your W/L record, total MMR change, K/D ratio, MVP count, and highlights your best game. Use this at the end of your session to see if you're improving.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Social & Competition Commands -->
+                <div class="command-category">
+                    <div class="category-header">
+                        <span class="category-icon">⚔️</span>
+                        <h3 class="category-title">Social & Competition Commands</h3>
+                    </div>
+                    <p class="category-description">
+                        These commands are all about comparison and rivalry. Use them to see how you stack up and who's climbing.
+                    </p>
+                    <div class="command">
+                        <div class="command-name">/compare @user</div>
+                        <div class="command-description">
+                            Compare yourself with any other player side by side. Shows rank, MMR, win rate, K/D, MVPs, and peak MMR. Determines an overall winner based on 5 categories. Great for settling debates about who's better.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/hot</div>
+                        <div class="command-description">
+                            See the top 10 players with the biggest MMR gains in the last 7 days. Shows who's climbing fast, their win rates, and how many games they played. This is your leaderboard for recent performance, updated in real time.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/xwatch</div>
+                        <div class="command-description">
+                            Track the X rank leaderboard, the top 10 players with 3000+ MMR. Shows 24 hour MMR trends so you can see who's moving up or down. Crown emoji for the #1 player. This is where legends are made.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Analysis Commands -->
+                <div class="command-category">
+                    <div class="category-header">
+                        <span class="category-icon">🧠</span>
+                        <h3 class="category-title">AI Analysis Commands</h3>
+                    </div>
+                    <p class="category-description">
+                        Use AI to get insights into your performance and identify areas for improvement.
+                    </p>
+                    <div class="command">
+                        <div class="command-name">/why</div>
+                        <div class="command-description">
+                            Get an AI powered breakdown of why you might be losing or stuck at your current rank. Analyzes your recent match performance, identifies patterns, and provides specific insights based on your stats. Perfect for when you're tilted and need to understand what's going wrong. Limited to 3 uses per day to ensure quality analysis, we plan to increase this limit in the future based on demand.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Account & Stats Commands -->
+                <div class="command-category">
+                    <div class="category-header">
+                        <span class="category-icon">🎮</span>
+                        <h3 class="category-title">Account & Stats Commands</h3>
+                    </div>
+                    <p class="category-description">
+                        Basic commands for managing your account and viewing stats.
+                    </p>
+                    <div class="command">
+                        <div class="command-name">/rank</div>
+                        <div class="command-description">
+                            Quick view of your current rank, MMR, and progress to next rank. Simpler than /progress if you just want the basics.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/mmr</div>
+                        <div class="command-description">
+                            Same as /rank - quick view of your current rank, MMR, and progress to next rank.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/stats [@user]</div>
+                        <div class="command-description">
+                            View detailed stats for yourself or another player. Shows games played, wins, losses, win rate, K/D, MVPs, and points. Good for a quick stat check.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/riot link</div>
+                        <div class="command-description">
+                            Link your Riot account. Required before verification.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/riot unlink</div>
+                        <div class="command-description">
+                            Unlink your Riot account and remove your rank role. Use this if you want to start over or link a different account.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/riot info</div>
+                        <div class="command-description">
+                            View your linked Riot ID and current rank info.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/riot refresh</div>
+                        <div class="command-description">
+                            Refresh your rank from Valorant API. If you ranked up in Valorant, use this to potentially boost your Discord rank (capped at GRNDS V).
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/verify</div>
+                        <div class="command-description">
+                            Get your initial rank placement. Only works once per account after linking.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/leaderboard</div>
+                        <div class="command-description">
+                            View the server leaderboard showing top players by MMR.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Queue & Match Commands -->
+                <div class="command-category">
+                    <div class="category-header">
+                        <span class="category-icon">🎯</span>
+                        <h3 class="category-title">Queue & Match Commands</h3>
+                    </div>
+                    <p class="category-description">
+                        Commands for joining games and reporting matches.
+                    </p>
+                    <div class="command">
+                        <div class="command-name">/queue join</div>
+                        <div class="command-description">
+                            Join the queue for a 5v5 custom game. When 10 players join, teams are automatically balanced based on MMR.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/queue leave</div>
+                        <div class="command-description">
+                            Leave the queue if you changed your mind.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/queue status</div>
+                        <div class="command-description">
+                            Check who's in queue and how many spots are left.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/match report</div>
+                        <div class="command-description">
+                            Report match results after a custom game finishes. This updates everyone's MMR and ranks.
+                        </div>
+                    </div>
+                    <div class="command">
+                        <div class="command-name">/match cancel</div>
+                        <div class="command-description">
+                            Cancel an ongoing match if needed.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage Guidelines -->
+            <div class="section">
+                <h2 class="section-title">Usage Guidelines</h2>
+                <div class="guideline-box">
+                    <strong>Respect the commands.</strong>
+                    <p>Don't spam them. We encourage use but be reasonable. These commands hit the database and some do complex calculations, so give them a second to breathe between uses.</p>
+                </div>
+                <div class="guideline-box">
+                    <strong>Daily limits apply to certain commands:</strong>
+                    <p><code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/why</code> - Limited to 3 uses per day. This is an AI powered analysis command that requires deep data processing. We plan to increase this limit in the future based on server capacity and demand.</p>
+                </div>
+                <div class="guideline-box">
+                    <strong>Command visibility:</strong>
+                    <p>Some commands are visible only to you (like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/progress</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/streak</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/history</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/session</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/why</code>) to keep your personal stats private and create a healthier competitive culture. Others like <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/compare</code>, <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/hot</code>, and <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/xwatch</code> are public to encourage social interaction and friendly competition.</p>
+                </div>
+                <div class="guideline-box">
+                    <strong>Most commands are instant:</strong>
+                    <p>All the progression and social commands are available anytime you want (within rate limits). Check your streak 100 times a day if that's your thing, we don't judge.</p>
+                </div>
+                <div class="guideline-box">
+                    <strong>Queue up and play:</strong>
+                    <p>The more games you play, the more accurate your MMR becomes and the more interesting your stats get. This system thrives on active players grinding games.</p>
+                </div>
+            </div>
+
+            <!-- Tips & Tricks -->
+            <div class="section">
+                <h2 class="section-title">Tips & Tricks</h2>
+                <ul class="tips-list">
+                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/progress</code> before and after your gaming session to track daily improvement</li>
+                    <li>Check <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/hot</code> to see who you're competing against for MMR gains</li>
+                    <li>Use <code style="font-family: 'SF Mono', monospace; background: rgba(255, 70, 85, 0.1); padding: 2px 8px; border-radius: 4px; color: var(--accent-primary);">/compare</code> to study X rank players and learn from the best</li>
+                    <li>Your peak MMR is tracked forever, so you can always see your best performance</li>
+                    <li>Win streaks give you momentum, the system rewards consistency</li>
+                    <li>MVPs in matches get recognized in your stats, so play for the team but also pop off when you can</li>
+                </ul>
+            </div>
+
+            <!-- Technical Stuff -->
+            <div class="section">
+                <h2 class="section-title">Technical Stuff</h2>
+                <ul class="tips-list">
+                    <li>MMR changes are calculated based on team balance, individual performance, and win/loss</li>
+                    <li>Rank roles are assigned automatically after verification and after each match</li>
+                    <li>All stats are updated in real time from the database</li>
+                    <li>The bot follows strict guardrails for reliability (error handling, timeouts, logging)</li>
+                </ul>
+            </div>
+
+            <!-- Need Help -->
+            <div class="section">
+                <h2 class="section-title">Need Help?</h2>
+                <p class="intro-text">
+                    If commands aren't working or you're seeing errors, contact an admin. The bot logs everything, so we can debug issues quickly.
+                </p>
+                <p class="intro-text">
+                    If you want to contribute ideas for new features or improvements, drop them in the feedback channel. This is a community project and I'm always adding new stuff.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="container">
+            <p class="footer-remember">
+                <strong>Remember:</strong> This system is about making ranked fun and competitive. Grind hard, climb the ladder, and don't take losses too seriously. Every X rank player started at GRNDS I.
+            </p>
+            <p class="footer-cta">Let's run it up. 🔥</p>
+        </div>
+    </div>
+</body>
+</html>
