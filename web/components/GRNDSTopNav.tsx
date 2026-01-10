@@ -11,8 +11,6 @@ import { createClient } from "@/lib/supabase/client";
 import { PlayerSearch } from "./PlayerSearch";
 import { useAccentColor } from "@/lib/AccentColorContext";
 
-const RED = "#ef4444";
-
 type Tab = "dashboard" | "season" | "leaderboard" | "profile";
 
 interface GRNDSTopNavProps {
