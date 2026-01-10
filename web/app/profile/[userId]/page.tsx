@@ -184,11 +184,11 @@ export default async function ProfilePage({ params }: { params: { userId: string
                     {isOwnProfile && (
                       <Link
                         href={`/profile/${userId}/edit`}
-                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
-                        style={{ '--hover-border': `${profileAccentColor}80` } as React.CSSProperties}
+                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-[var(--profile-accent-color)]/50 transition-all group"
+                        style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
                         title="Edit Profile"
                       >
-                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 transition-colors" style={{ color: profileAccentColor }} onMouseEnter={(e) => e.currentTarget.style.color = profileAccentColor} onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-[var(--profile-accent-color)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </Link>
@@ -276,10 +276,8 @@ export default async function ProfilePage({ params }: { params: { userId: string
                   return (
                     <div
                       key={stat.match?.match_date || stat.created_at}
-                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl transition-all"
-                      style={{ '--hover-border': `${profileAccentColor}4d` } as React.CSSProperties}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${profileAccentColor}4d`}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
+                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-[var(--profile-accent-color)]/30 transition-all"
+                      style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-black" style={{ color: isWin ? '#22c55e' : profileAccentColor }}>
@@ -317,14 +315,12 @@ export default async function ProfilePage({ params }: { params: { userId: string
                     <Link
                       key={comment.id}
                       href={`/profile/${targetPlayer?.discord_user_id || ''}`}
-                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all group"
-                      style={{ '--hover-border': `${profileAccentColor}4d` } as React.CSSProperties}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${profileAccentColor}4d`}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
+                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-[var(--profile-accent-color)]/30 transition-all group"
+                      style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-white/40">
-                          On <span className="text-white/60 font-medium transition-colors" style={{ '--hover-color': profileAccentColor } as React.CSSProperties} onMouseEnter={(e) => e.currentTarget.style.color = profileAccentColor} onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}>{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
+                          On <span className="text-white/60 font-medium group-hover:text-[var(--profile-accent-color)] transition-colors">{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
                         </div>
                         <span className="text-xs text-white/40">
                           {new Date(comment.created_at).toLocaleDateString()}
