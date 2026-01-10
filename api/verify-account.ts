@@ -10,6 +10,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import axios, { AxiosInstance } from 'axios';
+import { randomUUID } from 'crypto';
 
 // Types
 interface VerifyRequest {
@@ -46,15 +47,20 @@ interface ValorantMMR {
 }
 
 
-// Initialize Supabase
+// Initialize Supabase with SERVICE_ROLE_KEY for writes (bypasses RLS)
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
+  throw new Error('Missing Supabase environment variables (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 // Initialize Valorant API client
 const valorantAPI: AxiosInstance = axios.create({
@@ -482,7 +488,14 @@ export default async function handler(
     });
 
     // Step 3: Create or update player in database
-    const playerData = {
+    // Check if player exists to determine if we need to generate id
+    const { data: existingPlayerData } = await supabase
+      .from('players')
+      .select('id')
+      .eq('discord_user_id', userId)
+      .single();
+
+    const playerData: any = {
       discord_user_id: userId,
       discord_username: username,
       riot_name: riotName,
@@ -495,8 +508,13 @@ export default async function handler(
       peak_mmr: startingMMR,
       verified_at: new Date().toISOString(),
     };
+
+    // Only generate id if player doesn't exist (migration 008 changed id to auth UID without default)
+    if (!existingPlayerData) {
+      playerData.id = randomUUID();
+    }
     
-    console.log('Upserting player to database', { userId, playerData });
+    console.log('Upserting player to database', { userId, playerData, isNewPlayer: !existingPlayerData });
 
     const { data: player, error: upsertError } = await supabase
       .from('players')

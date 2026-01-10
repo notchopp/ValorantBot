@@ -126,9 +126,24 @@ export default async function handler(
   }
 
   try {
-    // Validate environment variables
-    const env = validateEnv();
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+    // Validate environment variables and use SERVICE_ROLE_KEY for writes (bypasses RLS)
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      res.status(500).json({ success: false, error: 'Missing Supabase environment variables (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)' });
+      return;
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // Get VALORANT_API_KEY from env for API client
+    const valorantAPIKey = process.env.VALORANT_API_KEY;
 
     // Initialize Valorant API
     const valorantAPI = axios.create({
@@ -137,14 +152,14 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'ValorantBot-Vercel/1.0',
-        ...(env.VALORANT_API_KEY ? { 
-          'Authorization': env.VALORANT_API_KEY,
+        ...(valorantAPIKey ? { 
+          'Authorization': valorantAPIKey,
         } : {}),
       },
     });
 
     // Log API key status (don't log the actual key)
-    if (env.VALORANT_API_KEY) {
+    if (valorantAPIKey) {
       console.log('✅ Valorant API key is configured for refresh-rank');
     } else {
       console.warn('⚠️  VALORANT_API_KEY is not set - API calls may be rate limited (30 req/min without key)');
