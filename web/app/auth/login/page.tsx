@@ -1,4 +1,4 @@
-import { RiotLoginForm } from '@/components/RiotLoginForm'
+import { DiscordLoginButton } from '@/components/DiscordLoginButton'
 
 export default async function LoginPage() {
   return (
@@ -12,11 +12,19 @@ export default async function LoginPage() {
                 <span className="text-red-500">#GRNDS</span>
               </h1>
               <p className="text-white/60">
-                Enter your Valorant credentials to claim your profile and view your stats
+                Sign in with Discord to claim your profile and view your stats
               </p>
             </div>
 
-            <RiotLoginForm />
+            <div className="space-y-6">
+              <DiscordLoginButton />
+              
+              <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+                <p className="text-sm text-yellow-500 font-medium">
+                  ⚠️ Important: False claiming a profile that is not yours will result in a warning and permanent ban.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -49,17 +57,12 @@ export default async function LoginPage() {
             <div className="pt-8 border-t border-white/5">
               <h2 className="text-3xl font-black mb-4">Claiming Your Profile</h2>
               <p className="text-white/60 leading-relaxed mb-4">
-                Enter your Riot name and tag to claim your profile. Once claimed, you&apos;ll have access to your personal dashboard with all your stats and competitive data.
+                Sign in with Discord to automatically claim your profile. Your Discord account is matched to your player record, and you&apos;ll have immediate access to your personal dashboard with all your stats and competitive data.
               </p>
               <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-                  <p className="text-sm text-yellow-500 font-medium">
-                    ⚠️ Important: False claiming a profile that is not yours will result in a warning and permanent ban.
-                  </p>
-                </div>
                 <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                   <h3 className="font-black text-red-500 mb-2 text-sm">Profile Lock</h3>
-                  <p className="text-xs text-white/60">Once a profile is claimed, it cannot be claimed by anyone else. Make sure you enter your correct Riot credentials.</p>
+                  <p className="text-xs text-white/60">Once a profile is claimed, it cannot be claimed by anyone else. Your Discord account is permanently linked to your player profile.</p>
                 </div>
               </div>
             </div>

@@ -109,12 +109,13 @@ export async function GET(request: Request) {
               console.log('  → Player id needs to be updated from', currentPlayerId, 'to', actorId)
               
               // Use database function to atomically update id and all foreign keys
+              // This function uses a temporary UUID to safely update the primary key
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: updateError } = await (supabaseAdmin.rpc as any)('update_player_id_with_auth_uid', {
                 p_old_player_id: currentPlayerId,
                 p_new_auth_uid: actorId,
                 p_discord_user_id: existingPlayer.discord_user_id,
-                p_display_name: actorName || existingPlayer.discord_username
+                p_display_name: actorName || existingPlayer.discord_username || 'Player'
               })
               
               if (updateError) {
