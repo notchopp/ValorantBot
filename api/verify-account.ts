@@ -217,12 +217,12 @@ export default async function handler(
 
     console.log('Verifying account', { userId, username, riotName: normalizedName, riotTag: normalizedTag, region });
 
-    // Check if player already exists and is verified
-    const { data: existingPlayer, error: fetchError } = await supabase
+    // Check if player already exists and is verified (we'll reuse this data later for insert/update)
+    const { data: existingVerifiedPlayer, error: fetchError } = await supabase
       .from('players')
-      .select('id, discord_rank, current_mmr')
+      .select('id, discord_user_id, discord_rank, current_mmr, peak_mmr')
       .eq('discord_user_id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully
 
     if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found
       console.error('Database error fetching player', { userId, error: fetchError });
@@ -230,10 +230,11 @@ export default async function handler(
       return;
     }
 
-    if (existingPlayer && existingPlayer.discord_rank && existingPlayer.discord_rank !== 'Unranked' && existingPlayer.current_mmr > 0) {
+    // Check if player is already verified and has a rank (prevent re-verification)
+    if (existingVerifiedPlayer && existingVerifiedPlayer.discord_rank && existingVerifiedPlayer.discord_rank !== 'Unranked' && existingVerifiedPlayer.current_mmr > 0) {
       res.status(400).json({
         success: false,
-        error: `Already placed at ${existingPlayer.discord_rank} (${existingPlayer.current_mmr} MMR)`,
+        error: `Already placed at ${existingVerifiedPlayer.discord_rank} (${existingVerifiedPlayer.current_mmr} MMR)`,
       });
       return;
     }
@@ -488,33 +489,19 @@ export default async function handler(
     });
 
     // Step 3: Create or update player in database
-    // Check if player exists (by discord_user_id) to determine insert vs update
-    const { data: existingPlayer, error: checkError } = await supabase
-      .from('players')
-      .select('id, discord_user_id, discord_rank, current_mmr, peak_mmr')
-      .eq('discord_user_id', userId)
-      .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully (returns null, no error if not found)
-
-    // Player exists if we have data with an id (maybeSingle returns null if not found, no error)
-    const playerExists = !!existingPlayer?.id;
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      // Real error occurred (not just "not found")
-      console.error('Error checking for existing player', { userId, error: checkError });
-      res.status(500).json({ success: false, error: 'Database error checking player' });
-      return;
-    }
+    // Reuse the existingVerifiedPlayer data we fetched earlier to determine insert vs update
+    const playerExists = !!existingVerifiedPlayer?.id;
 
     let player;
     let saveError;
 
-    if (playerExists && existingPlayer) {
+    if (playerExists && existingVerifiedPlayer) {
       // Player exists - only update rank/MMR and verification fields (don't touch id)
       console.log('Updating existing player rank/MMR', { 
         userId, 
-        playerId: existingPlayer.id, 
-        oldRank: existingPlayer.discord_rank, 
-        oldMMR: existingPlayer.current_mmr,
+        playerId: existingVerifiedPlayer.id, 
+        oldRank: existingVerifiedPlayer.discord_rank, 
+        oldMMR: existingVerifiedPlayer.current_mmr,
         newRank: discordRank,
         newMMR: startingMMR 
       });
@@ -528,7 +515,7 @@ export default async function handler(
         discord_rank: discordRank,
         discord_rank_value: discordRankValue,
         current_mmr: startingMMR,
-        peak_mmr: Math.max(existingPlayer.peak_mmr || existingPlayer.current_mmr || 0, startingMMR), // Preserve existing peak if higher
+        peak_mmr: Math.max(existingVerifiedPlayer.peak_mmr || existingVerifiedPlayer.current_mmr || 0, startingMMR), // Preserve existing peak if higher
         verified_at: new Date().toISOString(),
       };
       
@@ -576,7 +563,7 @@ export default async function handler(
         error: saveError, 
         playerExists: !!playerExists, 
         operation: playerExists ? 'update' : 'insert',
-        checkError: checkError?.code,
+        fetchError: fetchError?.code,
       });
       res.status(500).json({ success: false, error: 'Failed to save player data' });
       return;
@@ -593,15 +580,15 @@ export default async function handler(
     // Step 4: Log rank history
     console.log('Logging rank history', {
       playerId: player.id,
-      oldRank: existingPlayer?.discord_rank || 'Unranked',
+      oldRank: existingVerifiedPlayer?.discord_rank || 'Unranked',
       newRank: discordRank,
     });
     
     await supabase.from('rank_history').insert({
       player_id: player.id,
-      old_rank: existingPlayer?.discord_rank || 'Unranked',
+      old_rank: existingVerifiedPlayer?.discord_rank || 'Unranked',
       new_rank: discordRank,
-      old_mmr: existingPlayer?.current_mmr || 0,
+      old_mmr: existingVerifiedPlayer?.current_mmr || 0,
       new_mmr: startingMMR,
       reason: 'verification',
     });
