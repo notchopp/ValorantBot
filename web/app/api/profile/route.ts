@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     
     // Parse request body
     const body = await request.json()
-    const { discord_user_id, display_name, bio, favorite_agent, favorite_map } = body
+    const { discord_user_id, display_name, bio, favorite_agent, favorite_map, accent_color } = body
     
     // Validate input with security limits
     if (!discord_user_id) {
@@ -57,6 +57,14 @@ export async function POST(request: Request) {
       )
     }
     
+    // Validate accent color (hex format)
+    if (accent_color && !/^#[0-9A-Fa-f]{6}$/.test(accent_color)) {
+      return NextResponse.json(
+        { error: 'Accent color must be a valid hex color (e.g., #ef4444)' },
+        { status: 400 }
+      )
+    }
+    
     // Verify user owns this profile (use admin client for this check)
     const supabaseAdmin = getSupabaseAdminClient()
     
@@ -83,6 +91,7 @@ export async function POST(request: Request) {
         bio: bio?.trim() || null,
         favorite_agent: favorite_agent?.trim() || null,
         favorite_map: favorite_map?.trim() || null,
+        accent_color: accent_color || '#ef4444',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'discord_user_id'

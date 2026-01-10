@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { ProfileEditForm } from '@/components/ProfileEditForm'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function ProfileEditPage({ params: _params }: { params: { userId: string } }) {
+export default async function ProfileEditPage({ params }: { params: { userId: string } }) {
   const supabase = await createClient()
   
   // Check authentication
@@ -15,31 +16,41 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
     redirect('/auth/login')
   }
   
-  // Get player data directly by id (which is now the auth UID)
-  const { data: player } = await supabase
+  // Get player data by discord_user_id (from URL param)
+  const supabaseAdmin = getSupabaseAdminClient()
+  const { data: player } = await supabaseAdmin
     .from('players')
     .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
+    .eq('discord_user_id', params.userId)
+    .maybeSingle() as { data: { id: string; discord_user_id: string; discord_username: string | null } | null }
   
   if (!player) {
     redirect('/dashboard')
   }
   
-  // Get or create user profile
-  let { data: userProfile } = await supabase
+  // Verify user owns this profile
+  if (player.id !== user.id) {
+    redirect('/dashboard')
+  }
+  
+  // Get or create user profile (use admin client)
+  const { getSupabaseAdminClient } = await import('@/lib/supabase/admin')
+  const supabaseAdmin = getSupabaseAdminClient()
+  
+  let { data: userProfile } = await supabaseAdmin
     .from('user_profiles')
     .select('*')
     .eq('discord_user_id', player.discord_user_id)
-    .maybeSingle()
+    .maybeSingle() as { data: { display_name?: string | null; bio?: string | null; favorite_agent?: string | null; favorite_map?: string | null; accent_color?: string | null } | null }
   
   // If no profile exists, create one
   if (!userProfile) {
-    const { data: newProfile } = await supabase
-      .from('user_profiles')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: newProfile } = await (supabaseAdmin.from('user_profiles') as any)
       .insert({
         discord_user_id: player.discord_user_id,
         display_name: player.discord_username,
+        accent_color: '#ef4444',
       })
       .select()
       .single()
@@ -67,6 +78,7 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
             bio: userProfile?.bio || '',
             favorite_agent: userProfile?.favorite_agent || '',
             favorite_map: userProfile?.favorite_map || '',
+            accent_color: userProfile?.accent_color || '#ef4444',
           }}
           discordUserId={player.discord_user_id}
         />

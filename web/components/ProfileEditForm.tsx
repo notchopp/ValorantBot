@@ -10,6 +10,7 @@ interface ProfileEditFormProps {
     bio: string
     favorite_agent: string
     favorite_map: string
+    accent_color?: string
   }
   discordUserId: string
 }
@@ -25,6 +26,7 @@ export function ProfileEditForm({ initialProfile, discordUserId }: ProfileEditFo
     bio: initialProfile.bio || '',
     favorite_agent: initialProfile.favorite_agent || '',
     favorite_map: initialProfile.favorite_map || '',
+    accent_color: initialProfile.accent_color || '#ef4444',
   })
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,6 +130,36 @@ export function ProfileEditForm({ initialProfile, discordUserId }: ProfileEditFo
             maxLength={20}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 transition-all"
           />
+        </div>
+        
+        {/* Accent Color */}
+        <div>
+          <label htmlFor="accent_color" className="block text-sm font-black uppercase tracking-wider text-white/60 mb-2">
+            Accent Color
+          </label>
+          <div className="flex items-center gap-4">
+            <input
+              type="color"
+              id="accent_color"
+              value={formData.accent_color}
+              onChange={(e) => setFormData({ ...formData, accent_color: e.target.value })}
+              className="w-20 h-12 rounded-xl cursor-pointer border border-white/10 bg-transparent"
+            />
+            <input
+              type="text"
+              value={formData.accent_color}
+              onChange={(e) => {
+                const value = e.target.value
+                if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === '') {
+                  setFormData({ ...formData, accent_color: value || '#ef4444' })
+                }
+              }}
+              placeholder="#ef4444"
+              maxLength={7}
+              className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 transition-all font-mono"
+            />
+          </div>
+          <p className="text-xs text-white/40 mt-2">Customize the accent color used throughout your profile UI</p>
         </div>
       </div>
       

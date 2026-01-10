@@ -129,10 +129,23 @@ export default async function ProfilePage({ params }: { params: { userId: string
         {/* Profile Header */}
         <div className="mb-12 md:mb-20">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
-            <div>
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white mb-2 md:mb-4 tracking-tighter leading-[0.9]">
-                {displayName}
-              </h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-2 md:mb-4">
+                <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tighter leading-[0.9]">
+                  {displayName}
+                </h1>
+                {isOwnProfile && (
+                  <Link
+                    href={`/profile/${userId}/edit`}
+                    className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/50 transition-all group"
+                    title="Edit Profile"
+                  >
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </Link>
+                )}
+              </div>
               <p className="text-lg md:text-xl text-white/60 font-light">
                 {playerData.riot_name && playerData.riot_tag 
                   ? `${playerData.riot_name}#${playerData.riot_tag}`
@@ -145,16 +158,45 @@ export default async function ProfilePage({ params }: { params: { userId: string
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
                 #{leaderboardPosition} on Leaderboard
               </p>
-              {isOwnProfile && (
-                <Link
-                  href={`/profile/${userId}/edit`}
-                  className="mt-2 px-6 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm font-black uppercase tracking-wider text-red-500 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
-                >
-                  Edit Profile
-                </Link>
-              )}
             </div>
           </div>
+          
+          {/* Recent Comments Section */}
+          {profileComments.length > 0 && (
+            <div className="glass rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 border border-white/5 mb-8 md:mb-12">
+              <h2 className="text-xl md:text-2xl font-black text-white mb-4 md:mb-6 tracking-tighter uppercase">Recent Comments</h2>
+              <div className="space-y-3 md:space-y-4">
+                {profileComments.slice(0, 5).map((comment) => {
+                  const author = comment.author as { discord_username?: string | null; discord_user_id?: string } | undefined
+                  return (
+                    <div
+                      key={comment.id}
+                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-white">
+                            {author?.discord_username || 'Unknown'}
+                          </span>
+                          <span className="text-xs text-white/40">
+                            {new Date(comment.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-white/80 font-light leading-relaxed">{comment.content}</p>
+                    </div>
+                  )
+                })}
+              </div>
+              {profileComments.length > 5 && (
+                <div className="mt-4 text-center">
+                  <p className="text-xs text-white/40 font-light">
+                    Showing 5 of {profileComments.length} comments
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* MMR Progress */}
           <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5 mb-8 md:mb-12">

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { GRNDSTopNav } from './GRNDSTopNav'
 
 export async function GRNDSTopNavWrapper() {
@@ -10,8 +11,15 @@ export async function GRNDSTopNavWrapper() {
     return null
   }
   
-  // Use auth UID as discordUserId for navigation (id is now auth UID)
-  const discordUserId = user.id
+  // Get player's discord_user_id for navigation (profile uses discord_user_id in URL)
+  const supabaseAdmin = getSupabaseAdminClient()
+  const { data: player } = await supabaseAdmin
+    .from('players')
+    .select('discord_user_id')
+    .eq('id', user.id)
+    .maybeSingle() as { data: { discord_user_id: string } | null }
+  
+  const discordUserId = player?.discord_user_id || user.id
   
   return <GRNDSTopNav discordUserId={discordUserId} />
 }
