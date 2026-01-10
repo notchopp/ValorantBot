@@ -77,7 +77,7 @@ export function ProfileNav() {
 
   return (
     <Link
-      href={`/profile/${profile.discord_user_id}/edit`}
+      href={`/profile/${profile.discord_user_id}`}
       className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.05] transition-all group"
     >
       <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">

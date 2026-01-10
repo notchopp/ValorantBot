@@ -59,15 +59,27 @@ export default async function DashboardPage() {
   // Use admin client for data fetching (bypasses RLS)
   const supabaseAdmin = getSupabaseAdminClient()
   
+  console.log('Dashboard - Auth user ID:', user.id)
+  console.log('Dashboard - User metadata:', JSON.stringify(user.user_metadata, null, 2))
+  
   // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
-  let { data: userRecord } = await supabaseAdmin
+  const { data: userRecord, error: userRecordError } = await supabaseAdmin
     .from('users')
-    .select('discord_user_id')
+    .select('discord_user_id, pending_discord_link')
     .eq('auth_id', user.id)
-    .maybeSingle() as { data: { discord_user_id: string } | null }
+    .maybeSingle() as { data: { discord_user_id: string | null; pending_discord_link?: boolean } | null, error: unknown }
+  
+  console.log('Dashboard - User record from users table:', userRecord)
+  console.log('Dashboard - User record error:', userRecordError)
+  
+  // Check if user is in pending state (signed in before running /verify)
+  if (userRecord && userRecord.pending_discord_link === true) {
+    console.log('Dashboard - User is in pending state, needs to run /verify in Discord')
+  }
   
   // If no user record exists, try to auto-link from OAuth metadata
-  if (!userRecord) {
+  let finalUserRecord = userRecord
+  if (!finalUserRecord) {
     const identities = user.identities || []
     interface Identity {
       provider: string
@@ -88,17 +100,22 @@ export default async function DashboardPage() {
                                   null
     
     if (discordUserIdFromAuth) {
+      console.log('Dashboard - Trying to auto-link with Discord ID:', discordUserIdFromAuth)
+      
       // Check if player exists with this Discord ID
-      const { data: existingPlayer } = await supabaseAdmin
+      const { data: existingPlayer, error: playerError } = await supabaseAdmin
         .from('players')
         .select('discord_user_id')
         .eq('discord_user_id', discordUserIdFromAuth)
-        .maybeSingle() as { data: { discord_user_id: string } | null }
+        .maybeSingle() as { data: { discord_user_id: string } | null, error: unknown }
+      
+      console.log('Dashboard - Player found:', existingPlayer)
+      console.log('Dashboard - Player error:', playerError)
       
       // If player exists, create/update users table entry using admin client
       if (existingPlayer) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: newUserRecord } = await (supabaseAdmin.from('users') as any)
+        const { data: newUserRecord, error: upsertError } = await (supabaseAdmin.from('users') as any)
           .upsert({
             auth_id: user.id,
             discord_user_id: discordUserIdFromAuth,
@@ -110,15 +127,18 @@ export default async function DashboardPage() {
           .select('discord_user_id')
           .single()
         
+        console.log('Dashboard - Upsert result:', newUserRecord)
+        console.log('Dashboard - Upsert error:', upsertError)
+        
         if (newUserRecord) {
-          userRecord = newUserRecord as { discord_user_id: string }
+          finalUserRecord = newUserRecord as { discord_user_id: string }
         }
       }
     }
   }
   
   // If still no user record exists, show link message
-  if (!userRecord || !userRecord.discord_user_id) {
+  if (!finalUserRecord || !finalUserRecord.discord_user_id) {
     const discordUsername = user.user_metadata?.preferred_username || 
                             user.user_metadata?.global_name ||
                             user.user_metadata?.full_name || 
@@ -166,6 +186,8 @@ export default async function DashboardPage() {
             matchHistory={[]}
             rankProgression={[]}
             userProfile={null}
+            kdRatio="0.00"
+            mvpCount={0}
           />
         </div>
       </div>
@@ -176,7 +198,7 @@ export default async function DashboardPage() {
   const { data: playerData } = await supabaseAdmin
     .from('players')
     .select('*')
-    .eq('discord_user_id', userRecord.discord_user_id)
+    .eq('discord_user_id', finalUserRecord.discord_user_id)
     .maybeSingle() as { data: PlayerData | null }
   
   if (!playerData) {
@@ -259,6 +281,14 @@ export default async function DashboardPage() {
   const recentMatches = stats.slice(0, 10)
   const netMMR = recentMatches.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
   
+  // Calculate K/D ratio
+  const totalKills = stats.reduce((sum, s) => sum + (s.kills || 0), 0)
+  const totalDeaths = stats.reduce((sum, s) => sum + (s.deaths || 0), 0)
+  const kdRatio = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : '0.00'
+  
+  // Calculate MVP count
+  const mvpCount = stats.filter(s => s.mvp).length
+  
   // Get rank progression (rank_history) - use admin client
   const { data: rankHistory } = await supabaseAdmin
     .from('rank_history')
@@ -315,6 +345,8 @@ export default async function DashboardPage() {
       matchHistory={matchHistory}
       rankProgression={rankProgression}
       userProfile={userProfile}
+      kdRatio={kdRatio}
+      mvpCount={mvpCount}
     />
   )
 }
@@ -333,6 +365,8 @@ function DashboardContent({
   matchHistory,
   rankProgression,
   userProfile,
+  kdRatio,
+  mvpCount,
 }: {
   playerDataToUse: PlayerData
   totalMatches: number
@@ -346,6 +380,8 @@ function DashboardContent({
   matchHistory: MatchHistoryEntry[]
   rankProgression: RankProgressionEntry[]
   userProfile?: { display_name?: string | null; bio?: string | null } | null
+  kdRatio: string
+  mvpCount: number
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'
   
@@ -420,17 +456,17 @@ function DashboardContent({
           </div>
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season MMR</div>
-            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${netMMR >= 0 ? 'text-green-500' : netMMR < 0 ? 'text-red-500' : 'text-white/40'}`}>
-              {netMMR >= 0 && netMMR > 0 ? '+' : ''}{netMMR}
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">K/D Ratio</div>
+            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${parseFloat(kdRatio) >= 1.0 ? 'text-green-500' : parseFloat(kdRatio) > 0 ? 'text-red-500' : 'text-white/40'}`}>
+              {kdRatio}
             </div>
-            <div className="text-xs text-white/40">Net change</div>
+            <div className="text-xs text-white/40">Overall stats</div>
           </div>
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Leaderboard</div>
-            <div className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter mb-1">#{leaderboardPosition}</div>
-            <div className="text-xs text-white/40">Global rank</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">MVP Count</div>
+            <div className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter mb-1">{mvpCount}</div>
+            <div className="text-xs text-white/40">Match MVPs</div>
           </div>
         </div>
         
@@ -601,13 +637,13 @@ function DashboardContent({
                 </Link>
               )}
               <Link
-                href={`/profile/${playerDataToUse.discord_user_id}/edit`}
+                href={`/profile/${playerDataToUse.discord_user_id}`}
                 className="block p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.04] transition-all group"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-black text-white mb-1">Profile</div>
-                    <div className="text-xs text-white/40">Customize profile</div>
+                    <div className="text-xs text-white/40">View your profile</div>
                   </div>
                   <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
