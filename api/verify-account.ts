@@ -489,11 +489,13 @@ export default async function handler(
 
     // Step 3: Create or update player in database
     // Check if player exists to determine if we need to generate id
-    const { data: existingPlayerData } = await supabase
+    const { data: existingPlayerData, error: checkError } = await supabase
       .from('players')
       .select('id')
       .eq('discord_user_id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to handle "not found" gracefully
+
+    const isNewPlayer = !existingPlayerData || checkError?.code === 'PGRST116'; // PGRST116 = not found
 
     const playerData: any = {
       discord_user_id: userId,
@@ -510,11 +512,12 @@ export default async function handler(
     };
 
     // Only generate id if player doesn't exist (migration 008 changed id to auth UID without default)
-    if (!existingPlayerData) {
+    // Don't include id for existing players to avoid trying to update it
+    if (isNewPlayer) {
       playerData.id = randomUUID();
     }
     
-    console.log('Upserting player to database', { userId, playerData, isNewPlayer: !existingPlayerData });
+    console.log('Upserting player to database', { userId, playerData: { ...playerData, id: playerData.id ? 'generated' : 'omitted' }, isNewPlayer });
 
     const { data: player, error: upsertError } = await supabase
       .from('players')
