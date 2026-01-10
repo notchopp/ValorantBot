@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
+import { ProfileAccentColor } from '@/components/ProfileAccentColor'
 import { Player, Comment } from '@/lib/types'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -137,19 +138,22 @@ export default async function ProfilePage({ params }: { params: { userId: string
   
   const leaderboardPosition = (position || 0) + 1
   
-  // Get user profile for display name and bio
+  // Get user profile for display name, bio, and accent color
   const { data: userProfile } = await supabaseAdmin
     .from('user_profiles')
-    .select('display_name, bio')
+    .select('display_name, bio, accent_color')
     .eq('discord_user_id', playerData.discord_user_id)
-    .maybeSingle() as { data: { display_name: string | null; bio: string | null } | null }
+    .maybeSingle() as { data: { display_name: string | null; bio: string | null; accent_color?: string | null } | null }
   
   const displayName = userProfile?.display_name || playerData.discord_username || 'Player'
   const userBio = userProfile?.bio || null
+  const profileAccentColor = userProfile?.accent_color || '#ef4444'
   
   return (
-    <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10">
-      <div className="max-w-[1400px] mx-auto">
+    <>
+      <ProfileAccentColor accentColor={profileAccentColor} />
+      <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10" style={{ '--profile-accent': profileAccentColor } as React.CSSProperties}>
+        <div className="max-w-[1400px] mx-auto">
         {/* Profile Header with Avatar */}
         <div className="mb-12 md:mb-20">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
@@ -180,10 +184,11 @@ export default async function ProfilePage({ params }: { params: { userId: string
                     {isOwnProfile && (
                       <Link
                         href={`/profile/${userId}/edit`}
-                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/50 transition-all group"
+                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
+                        style={{ '--hover-border': `${profileAccentColor}80` } as React.CSSProperties}
                         title="Edit Profile"
                       >
-                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 transition-colors" style={{ color: profileAccentColor }} onMouseEnter={(e) => e.currentTarget.style.color = profileAccentColor} onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </Link>
@@ -219,15 +224,15 @@ export default async function ProfilePage({ params }: { params: { userId: string
             <div className="mb-6 md:mb-8">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Current MMR</span>
-                <span className="text-5xl md:text-7xl font-black text-red-500 tracking-tighter">
+                <span className="text-5xl md:text-7xl font-black tracking-tighter" style={{ color: profileAccentColor }}>
                   {playerData.current_mmr}
                 </span>
               </div>
             </div>
-            <MMRProgressBar currentMMR={playerData.current_mmr} />
+            <MMRProgressBar currentMMR={playerData.current_mmr} accentColor={profileAccentColor} />
             <div className="mt-6 flex items-center justify-between text-sm md:text-base">
               <span className="text-white/40 font-light">
-                Peak: <span className="text-red-500 font-black">{playerData.peak_mmr} MMR</span>
+                Peak: <span className="font-black" style={{ color: profileAccentColor }}>{playerData.peak_mmr} MMR</span>
               </span>
             </div>
           </div>
@@ -240,20 +245,20 @@ export default async function ProfilePage({ params }: { params: { userId: string
             </div>
             <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Win Rate</div>
-              <div className={`text-3xl md:text-4xl font-black tracking-tighter ${winRate >= 50 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`text-3xl md:text-4xl font-black tracking-tighter`} style={{ color: winRate >= 50 ? '#22c55e' : profileAccentColor }}>
                 {winRate}%
               </div>
               <div className="text-xs text-white/40 mt-1 font-light">{wins}W / {losses}L</div>
             </div>
             <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">K/D Ratio</div>
-              <div className={`text-3xl md:text-4xl font-black tracking-tighter ${parseFloat(kd) >= 1.0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`text-3xl md:text-4xl font-black tracking-tighter`} style={{ color: parseFloat(kd) >= 1.0 ? '#22c55e' : profileAccentColor }}>
                 {kd}
               </div>
             </div>
             <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">MVP Count</div>
-              <div className="text-3xl md:text-4xl font-black text-red-500 tracking-tighter">{mvpCount}</div>
+              <div className="text-3xl md:text-4xl font-black tracking-tighter" style={{ color: profileAccentColor }}>{mvpCount}</div>
             </div>
           </div>
         </div>
@@ -271,13 +276,16 @@ export default async function ProfilePage({ params }: { params: { userId: string
                   return (
                     <div
                       key={stat.match?.match_date || stat.created_at}
-                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all"
+                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl transition-all"
+                      style={{ '--hover-border': `${profileAccentColor}4d` } as React.CSSProperties}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${profileAccentColor}4d`}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className={`text-sm font-black ${isWin ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="text-sm font-black" style={{ color: isWin ? '#22c55e' : profileAccentColor }}>
                           {isWin ? 'WIN' : 'LOSS'}
                         </div>
-                        <div className={`text-sm font-black ${mmrChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="text-sm font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : profileAccentColor }}>
                           {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
                         </div>
                       </div>
@@ -285,7 +293,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
                         {stat.match?.map || 'Unknown Map'} • {stat.match?.match_date ? new Date(stat.match.match_date).toLocaleDateString() : 'Unknown Date'}
                       </div>
                       <div className="text-xs text-white/40">
-                        {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="text-red-500 font-black">MVP</span>}
+                        {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="font-black" style={{ color: profileAccentColor }}>MVP</span>}
                       </div>
                     </div>
                   )
@@ -309,11 +317,14 @@ export default async function ProfilePage({ params }: { params: { userId: string
                     <Link
                       key={comment.id}
                       href={`/profile/${targetPlayer?.discord_user_id || ''}`}
-                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
+                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] transition-all group"
+                      style={{ '--hover-border': `${profileAccentColor}4d` } as React.CSSProperties}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = `${profileAccentColor}4d`}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)'}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-xs text-white/40">
-                          On <span className="text-white/60 font-medium group-hover:text-red-500 transition-colors">{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
+                          On <span className="text-white/60 font-medium transition-colors" style={{ '--hover-color': profileAccentColor } as React.CSSProperties} onMouseEnter={(e) => e.currentTarget.style.color = profileAccentColor} onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}>{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
                         </div>
                         <span className="text-xs text-white/40">
                           {new Date(comment.created_at).toLocaleDateString()}

@@ -8,6 +8,8 @@
   --accent: #dc2626; /* Red primary */
   --accent-light: #ef4444;
   --accent-dark: #991b1b;
+  --accent-color: #ef4444; /* User's custom accent color - defaults to red */
+  --profile-accent-color: var(--accent-color); /* Profile owner's accent color */
   --bg-primary: #1a1a1a;
   --bg-secondary: #242424;
   --bg-card: rgba(255, 255, 255, 0.03);

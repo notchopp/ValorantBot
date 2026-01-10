@@ -3,9 +3,10 @@ import { getNextRank } from '@/lib/types'
 interface MMRProgressBarProps {
   currentMMR: number
   animated?: boolean
+  accentColor?: string
 }
 
-export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarProps) {
+export function MMRProgressBar({ currentMMR, animated = true, accentColor = '#ef4444' }: MMRProgressBarProps) {
   const nextRank = getNextRank(currentMMR)
   
   if (!nextRank) {
@@ -13,12 +14,15 @@ export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarPr
       <div className="w-full">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-white/40">MAX RANK</span>
-          <span className="text-lg font-black text-red-500">{currentMMR} MMR</span>
+          <span className="text-lg font-black" style={{ color: accentColor }}>{currentMMR} MMR</span>
         </div>
         <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-red-600 to-red-400"
-            style={{ width: '100%' }}
+            className="h-full"
+            style={{ 
+              width: '100%',
+              background: `linear-gradient(to right, ${accentColor}cc, ${accentColor}99)`
+            }}
           />
         </div>
       </div>
@@ -50,17 +54,20 @@ export function MMRProgressBar({ currentMMR, animated = true }: MMRProgressBarPr
         <span className="text-sm font-medium text-white/40">
           {nextRank.rank} {nextRank.tier}
         </span>
-        <span className="text-lg font-black text-red-500">
+        <span className="text-lg font-black" style={{ color: accentColor }}>
           +{nextRank.mmrNeeded} MMR
         </span>
       </div>
       <div className="relative w-full h-3 bg-white/5 rounded-full overflow-hidden">
         <div 
           className={`
-            h-full bg-gradient-to-r from-red-600 to-red-400
+            h-full
             ${animated ? 'transition-all duration-1000 ease-out' : ''}
           `}
-          style={{ width: `${Math.min(progress, 100)}%` }}
+          style={{ 
+            width: `${Math.min(progress, 100)}%`,
+            background: `linear-gradient(to right, ${accentColor}cc, ${accentColor}99)`
+          }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
         </div>
