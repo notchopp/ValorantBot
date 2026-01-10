@@ -169,6 +169,54 @@ CREATE INDEX IF NOT EXISTS idx_players_id ON players(id);
 DROP TRIGGER IF EXISTS check_comment_author ON comments;
 DROP FUNCTION IF EXISTS check_comment_author();
 
+-- Step 12: Create function to update player id (for OAuth callback)
+-- This function handles updating a player's id from old UUID to new auth UID
+-- It updates all foreign key references atomically in a transaction
+CREATE OR REPLACE FUNCTION update_player_id(
+    old_id UUID,
+    new_id UUID,
+    discord_user_id_param TEXT
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    player_exists BOOLEAN;
+BEGIN
+    -- Check if player exists with the old_id and discord_user_id
+    SELECT EXISTS(
+        SELECT 1 FROM players 
+        WHERE id = old_id AND discord_user_id = discord_user_id_param
+    ) INTO player_exists;
+    
+    IF NOT player_exists THEN
+        RETURN FALSE;
+    END IF;
+    
+    -- Check if new_id already exists (can't have duplicate primary keys)
+    IF EXISTS(SELECT 1 FROM players WHERE id = new_id) THEN
+        RETURN FALSE;
+    END IF;
+    
+    -- Update all foreign key references atomically
+    UPDATE matches SET host_id = new_id WHERE host_id = old_id;
+    UPDATE match_player_stats SET player_id = new_id WHERE player_id = old_id;
+    UPDATE rank_history SET player_id = new_id WHERE player_id = old_id;
+    UPDATE queue SET player_id = new_id WHERE player_id = old_id;
+    UPDATE activity_feed SET player_id = new_id WHERE player_id = old_id;
+    UPDATE comments SET author_id = new_id WHERE author_id = old_id;
+    
+    -- Finally, update the primary key
+    UPDATE players SET id = new_id WHERE id = old_id;
+    
+    RETURN TRUE;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- If anything fails, rollback (transaction is implicit in function)
+        RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION update_player_id IS 'Atomically updates a player id and all foreign key references. Used by OAuth callback to link Discord accounts.';
+
 -- Comments
 COMMENT ON COLUMN players.id IS 'Supabase auth.uid() - primary key linking auth to player data';
 COMMENT ON TABLE players IS 'Player data - id is now the Supabase auth UID directly';

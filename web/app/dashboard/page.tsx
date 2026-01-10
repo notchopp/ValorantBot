@@ -49,15 +49,37 @@ export const revalidate = 0
 export default async function DashboardPage() {
   const supabase = await createClient()
   
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser()
+  // Check if user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
   
-  if (!user) {
+  if (authError || !user) {
     redirect('/auth/login')
   }
   
-  // Use admin client for data fetching (bypasses RLS)
+  // Check if user has claimed a profile
   const supabaseAdmin = getSupabaseAdminClient()
+  interface PlayerCheckRow {
+    id: string
+    discord_username: string | null
+    riot_name: string | null
+    riot_tag: string | null
+    current_mmr: number
+  }
+  
+  const { data: player, error: playerError } = await supabaseAdmin
+    .from('players')
+    .select('id, discord_username, riot_name, riot_tag, current_mmr')
+    .eq('id', user.id)
+    .maybeSingle() as { data: PlayerCheckRow | null; error: unknown }
+  
+  if (playerError) {
+    console.error('Error checking player:', playerError)
+  }
+  
+  // If no player found or player.id doesn't match user.id, redirect to claim
+  if (!player || player.id !== user.id) {
+    redirect('/auth/login?step=claim')
+  }
   
   console.log('Dashboard - Auth user ID:', user.id)
   
@@ -68,75 +90,8 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .maybeSingle() as { data: PlayerData | null }
   
-  // If no player found, show link message
   if (!playerData) {
-    const discordUsername = user.user_metadata?.preferred_username || 
-                            user.user_metadata?.global_name ||
-                            user.user_metadata?.full_name || 
-                            user.user_metadata?.name || 
-                            user.user_metadata?.username ||
-                            user.email?.split('@')[0] || 
-                            'Player'
-    
-    const playerDataToUse: PlayerData = {
-      id: user.id,
-      discord_user_id: user.id,
-      discord_username: discordUsername,
-      riot_name: null,
-      riot_tag: null,
-      current_mmr: 0,
-      peak_mmr: 0,
-      discord_rank: 'GRNDS I',
-    }
-    
-    return (
-      <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">
-        <div className="max-w-[1600px] mx-auto">
-          <div className="glass rounded-2xl p-8 border border-red-500/30 mb-8 bg-red-500/5">
-            <h2 className="text-xl font-black text-white mb-4 uppercase tracking-tight">Link Your Discord Account</h2>
-            <p className="text-white/60 mb-4">
-              To view your stats, you need to link your Discord account. You&apos;ve signed in with Discord, but you need to:
-            </p>
-            <div className="space-y-2 text-sm text-white/40 font-mono">
-              <div>1. Join the Discord server</div>
-              <div>2. Run <code className="bg-black/50 px-2 py-1 rounded text-red-500">/riot link</code> and <code className="bg-black/50 px-2 py-1 rounded text-red-500">/verify</code> in Discord</div>
-              <div>3. Refresh this page to see your stats</div>
-            </div>
-          </div>
-          
-          <DashboardContent 
-            playerDataToUse={playerDataToUse}
-            totalMatches={0}
-            wins={0}
-            losses={0}
-            winRate={0}
-            netMMR={0}
-            leaderboardPosition={0}
-            activityFeed={[]}
-            season={null}
-            matchHistory={[]}
-            rankProgression={[]}
-            userProfile={null}
-            kdRatio="0.00"
-            mvpCount={0}
-          />
-        </div>
-      </div>
-    )
-  }
-  
-  // Player data already fetched above
-  if (!playerData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 relative z-10">
-        <div className="text-center max-w-md glass rounded-2xl p-8 border border-white/5">
-          <h1 className="text-4xl font-black text-white mb-4 tracking-tighter uppercase">Player Not Found</h1>
-          <p className="text-base text-white/60 font-light">
-            Your Discord account is linked, but no player data was found. Make sure you&apos;ve used <code className="bg-black/50 px-2 py-1 rounded text-red-500">/verify</code> in Discord.
-          </p>
-        </div>
-      </div>
-    )
+    redirect('/auth/login?step=claim')
   }
   
   const playerDataToUse: PlayerData = {

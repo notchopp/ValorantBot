@@ -16,31 +16,56 @@ export async function GET(request: Request) {
       
       // Extract Discord username (actor_name) from OAuth metadata
       // Based on Supabase logs: actor_id = Supabase UID (user.id), actor_name = Discord username
+      // The actor_name is stored in the identity_data or user_metadata
+      
+      const supabaseAdmin = getSupabaseAdminClient()
+      
+      // Get full user data from auth.users to access the complete identity structure
+      const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(user.id)
+      
+      if (authUserError) {
+        console.error('Error fetching auth user data:', authUserError)
+      }
+      
+      // Log full structure for debugging
+      console.log('=== OAuth Callback: Full User Data ===')
+      console.log('User ID (actor_id):', user.id)
+      console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2))
+      console.log('User identities:', JSON.stringify(user.identities, null, 2))
+      if (authUserData?.user) {
+        console.log('Auth user identities:', JSON.stringify(authUserData.user.identities, null, 2))
+        console.log('Auth user metadata:', JSON.stringify(authUserData.user.user_metadata, null, 2))
+      }
+      
+      // Extract actor_name (Discord username) from identity_data
+      // For Discord OAuth, actor_name is typically in identity_data.name or identity_data.preferred_username
       const identities = user.identities || []
       interface Identity {
         provider: string
         identity_data?: {
-          name?: string  // This is actor_name - Discord username
+          name?: string  // actor_name - Discord username
+          preferred_username?: string
+          username?: string
+          full_name?: string
         }
       }
       
       const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
       
-      // Discord username (actor_name) - ONLY use actor_name, nothing else
+      // Discord username (actor_name) - check identity_data.name first (this is actor_name)
       const actorName = discordIdentity?.identity_data?.name || null
       
       // Actor ID is the Supabase auth UID (user.id)
       const actorId = user.id
       
-      console.log('=== OAuth Callback: User Data Extraction ===')
+      console.log('=== OAuth Callback: Extracted Data ===')
       console.log('Actor ID (Supabase auth UID):', actorId)
-      console.log('Actor Name (Discord username):', actorName)
+      console.log('Actor Name (Discord username from identity_data.name):', actorName)
+      console.log('Discord identity data:', JSON.stringify(discordIdentity?.identity_data, null, 2))
       console.log('User Email:', user.email)
       
       // Match players by actor_name (Discord username) only
       if (actorName) {
-        const supabaseAdmin = getSupabaseAdminClient()
-        
         try {
           // Match player by Discord username (actor_name) only
           interface PlayerData {
