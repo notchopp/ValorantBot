@@ -34,9 +34,6 @@ export default async function ProfileEditPage({ params }: { params: { userId: st
   }
   
   // Get or create user profile (use admin client)
-  const { getSupabaseAdminClient } = await import('@/lib/supabase/admin')
-  const supabaseAdmin = getSupabaseAdminClient()
-  
   let { data: userProfile } = await supabaseAdmin
     .from('user_profiles')
     .select('*')
