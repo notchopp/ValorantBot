@@ -12,6 +12,12 @@ FROM users u
 WHERE p.discord_user_id = u.discord_user_id
 AND u.auth_id IS NOT NULL;
 
+-- Step 2.5: For players without auth_id, keep their existing id
+-- This ensures all players have a value before we drop the old id column
+UPDATE players
+SET auth_id = id
+WHERE auth_id IS NULL;
+
 -- Step 3: Drop all foreign key constraints that reference players(id)
 ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_host_id_fkey;
 ALTER TABLE match_player_stats DROP CONSTRAINT IF EXISTS match_player_stats_player_id_fkey;
