@@ -10,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { PlayerSearch } from "./PlayerSearch";
 import { useAccentColor } from "@/lib/AccentColorContext";
+import { NotificationsBell } from "./NotificationsBell";
 
 type Tab = "dashboard" | "season" | "leaderboard" | "profile";
 
@@ -133,7 +134,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
-
+          <NotificationsBell />
           <motion.button
             onClick={handleSignOut}
             whileHover={{ scale: 1.05 }}
