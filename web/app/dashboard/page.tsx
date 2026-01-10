@@ -65,12 +65,17 @@ export default async function DashboardPage() {
   // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
   const { data: userRecord, error: userRecordError } = await supabaseAdmin
     .from('users')
-    .select('discord_user_id')
+    .select('discord_user_id, pending_discord_link')
     .eq('auth_id', user.id)
-    .maybeSingle() as { data: { discord_user_id: string } | null, error: unknown }
+    .maybeSingle() as { data: { discord_user_id: string | null; pending_discord_link?: boolean } | null, error: unknown }
   
   console.log('Dashboard - User record from users table:', userRecord)
   console.log('Dashboard - User record error:', userRecordError)
+  
+  // Check if user is in pending state (signed in before running /verify)
+  if (userRecord && userRecord.pending_discord_link === true) {
+    console.log('Dashboard - User is in pending state, needs to run /verify in Discord')
+  }
   
   // If no user record exists, try to auto-link from OAuth metadata
   let finalUserRecord = userRecord
