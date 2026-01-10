@@ -96,6 +96,7 @@ export class DatabaseService {
 
   /**
    * Update player's Riot ID information
+   * Uses upsert to ensure player exists before updating
    */
   async updatePlayerRiotID(
     discordUserId: string,
@@ -105,6 +106,35 @@ export class DatabaseService {
     region: string
   ): Promise<boolean> {
     const supabase = this.getSupabase();
+    
+    // First, ensure the player exists in the database
+    // If not, create them (this prevents the null id error)
+    let existingPlayer = await this.getPlayer(discordUserId);
+    if (!existingPlayer) {
+      // Player doesn't exist, create them first with minimal data
+      // Get username from database service if available
+      const { data: createdPlayer, error: createError } = await supabase
+        .from('players')
+        .insert({
+          discord_user_id: discordUserId,
+          discord_username: 'Unknown', // Will be updated when player object is synced
+          discord_rank: 'Unranked',
+          discord_rank_value: 0,
+          discord_mmr: 0,
+          current_mmr: 0,
+          peak_mmr: 0,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating player for Riot ID update:', createError);
+        return false;
+      }
+      existingPlayer = createdPlayer;
+    }
+
+    // Now update their Riot ID (player definitely exists)
     const { error } = await supabase
       .from('players')
       .update({
@@ -116,7 +146,12 @@ export class DatabaseService {
       })
       .eq('discord_user_id', discordUserId);
 
-    return !error;
+    if (error) {
+      console.error('Error updating player Riot ID:', error);
+      return false;
+    }
+
+    return true;
   }
 
   /**
