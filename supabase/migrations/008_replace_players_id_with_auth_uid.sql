@@ -73,9 +73,13 @@ UPDATE players
 SET auth_id = COALESCE(auth_id, id)
 WHERE auth_id IS NULL;
 
+-- Drop foreign keys that depend on players_discord_user_id_key before dropping the constraint
+ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_discord_user;
+ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_discord_user_id_fkey;
+
 -- Now drop constraints and rename
 ALTER TABLE players DROP CONSTRAINT IF EXISTS players_pkey;
-ALTER TABLE players DROP CONSTRAINT IF EXISTS players_discord_user_id_key; -- Drop unique constraint temporarily
+ALTER TABLE players DROP CONSTRAINT IF EXISTS players_discord_user_id_key; -- Drop unique constraint
 ALTER TABLE players DROP COLUMN IF EXISTS id;
 ALTER TABLE players RENAME COLUMN auth_id TO id;
 ALTER TABLE players ALTER COLUMN id SET NOT NULL;
