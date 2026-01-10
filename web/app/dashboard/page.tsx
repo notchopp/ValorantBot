@@ -382,10 +382,10 @@ function DashboardContent({
                       className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className={`text-xs font-black ${isWin ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="text-xs font-black" style={{ color: isWin ? '#22c55e' : userAccentColor }}>
                           {isWin ? 'WIN' : 'LOSS'}
                         </div>
-                        <div className={`text-xs font-black ${mmrChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="text-xs font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : userAccentColor }}>
                           {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
                         </div>
                       </div>
@@ -393,7 +393,7 @@ function DashboardContent({
                         {match.map || 'Unknown Map'}
                       </div>
                       <div className="text-xs text-white/40">
-                        {match.kills}/{match.deaths}/{match.assists} {match.mvp && <span className="text-red-500">MVP</span>}
+                        {match.kills}/{match.deaths}/{match.assists} {match.mvp && <span style={{ color: userAccentColor }}>MVP</span>}
                       </div>
                       <div className="text-xs text-white/30 mt-1">
                         {new Date(match.match_date).toLocaleDateString()}
