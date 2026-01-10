@@ -36,11 +36,12 @@ export async function POST(request: Request) {
       riot_tag: string | null
       current_mmr: number
       discord_user_id: string
+      claimed: boolean
     }
     
     const { data: player, error: playerError } = await supabaseAdmin
       .from('players')
-      .select('id, discord_username, riot_name, riot_tag, current_mmr, discord_user_id')
+      .select('id, discord_username, riot_name, riot_tag, current_mmr, discord_user_id, claimed')
       .eq('riot_name', riotName.trim())
       .eq('riot_tag', riotTag.trim())
       .maybeSingle() as { data: PlayerRow | null; error: unknown }
@@ -60,10 +61,8 @@ export async function POST(request: Request) {
       )
     }
     
-    // Check if profile is already claimed by another user
-    // If player.id exists and is a UUID (not the old Discord ID), it's claimed
-    const playerId = player.id
-    if (playerId && playerId !== player.discord_user_id && playerId !== user.id) {
+    // Check if profile is already claimed
+    if (player.claimed && player.id !== user.id) {
       // Profile is claimed by another user
       return NextResponse.json(
         { error: 'This profile has already been claimed by another user.' },
@@ -97,7 +96,7 @@ export async function POST(request: Request) {
     }
     
     // If profile is already claimed by this user, just return success
-    if (playerId === user.id) {
+    if (player.claimed && player.id === user.id) {
       return NextResponse.json(
         { 
           success: true,
@@ -112,8 +111,10 @@ export async function POST(request: Request) {
       )
     }
     
-    // Claim the profile by updating player.id to user.id
+    // Claim the profile by updating player.id to user.id and setting claimed = true
     // Use the database function to handle foreign key updates
+    const playerId = player.id
+    
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: updateError } = await (supabaseAdmin.rpc as any)('update_player_id_with_auth_uid', {
       p_old_player_id: playerId || player.discord_user_id,
@@ -128,6 +129,17 @@ export async function POST(request: Request) {
         { error: 'Failed to claim profile. Please try again.' },
         { status: 500 }
       )
+    }
+    
+    // Set claimed = true
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: claimedError } = await (supabaseAdmin.from('players') as any)
+      .update({ claimed: true })
+      .eq('id', user.id)
+    
+    if (claimedError) {
+      console.error('Error setting claimed flag:', claimedError)
+      // Don't fail the request, but log the error
     }
     
     return NextResponse.json(
