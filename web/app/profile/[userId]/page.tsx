@@ -380,6 +380,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

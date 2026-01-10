@@ -95,14 +95,14 @@ export default async function DashboardPage() {
     redirect('/auth/login?step=claim')
   }
   
-  // Get user's accent color
-  const { data: userProfile } = await supabaseAdmin
+  // Get user's accent color (will fetch full profile later)
+  const { data: accentColorProfile } = await supabaseAdmin
     .from('user_profiles')
     .select('accent_color')
     .eq('discord_user_id', playerData.discord_user_id)
     .maybeSingle() as { data: { accent_color?: string | null } | null }
   
-  const userAccentColor = userProfile?.accent_color || '#ef4444'
+  const userAccentColor = accentColorProfile?.accent_color || '#ef4444'
   
   const playerDataToUse: PlayerData = {
     id: playerData.id,
