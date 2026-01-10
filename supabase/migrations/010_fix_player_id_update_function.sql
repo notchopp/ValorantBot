@@ -15,6 +15,7 @@ CREATE OR REPLACE FUNCTION update_player_id_with_auth_uid(
 RETURNS void AS $$
 DECLARE
     old_player_record RECORD;
+    original_discord_user_id TEXT;
 BEGIN
     -- Check if player exists with the old_id
     IF NOT EXISTS(SELECT 1 FROM players WHERE id = p_old_player_id) THEN
@@ -26,8 +27,11 @@ BEGIN
         RAISE EXCEPTION 'Player with id % already exists', p_new_auth_uid;
     END IF;
     
-    -- Get the old player record data
+    -- Get the old player record data (before any modifications)
     SELECT * INTO old_player_record FROM players WHERE id = p_old_player_id;
+    
+    -- Store the original discord_user_id before we modify it
+    original_discord_user_id := old_player_record.discord_user_id;
     
     -- Step 1: Temporarily remove unique constraint violation by updating discord_user_id
     -- We'll restore it after creating the new row
@@ -55,7 +59,7 @@ BEGIN
         claimed
     ) VALUES (
         p_new_auth_uid,
-        old_player_record.discord_user_id, -- Restore original discord_user_id
+        original_discord_user_id, -- Restore original discord_user_id
         old_player_record.discord_username,
         old_player_record.riot_name,
         old_player_record.riot_tag,
@@ -92,6 +96,7 @@ BEGIN
         
     -- Step 6: Set claimed = true if not already set
     UPDATE players SET claimed = true WHERE id = p_new_auth_uid AND (claimed IS NULL OR claimed = false);
+    
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
