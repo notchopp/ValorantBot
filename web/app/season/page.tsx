@@ -20,7 +20,7 @@ export default async function SeasonPage() {
     .eq('is_active', true)
     .maybeSingle()
   
-  let currentSeason = (activeSeason as Season) || null
+  let currentSeason: Season | null = (activeSeason as Season | null) || null
   let seasonStartsSoon = false
   
   if (!currentSeason) {

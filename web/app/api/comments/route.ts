@@ -80,9 +80,9 @@ export async function POST(request: Request) {
     }
     
     // Insert comment (use admin client to bypass RLS)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: comment, error: insertError } = await (supabaseAdmin
-      .from('comments') as any)
+    const { data: comment, error: insertError } = await (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabaseAdmin.from('comments') as any)
       .insert({
         author_id: player.id,
         target_type,

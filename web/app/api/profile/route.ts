@@ -74,9 +74,9 @@ export async function POST(request: Request) {
     }
     
     // Update or insert profile (use admin client)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profile, error: profileError } = await (supabaseAdmin
-      .from('user_profiles') as any)
+    const { data: profile, error: profileError } = await (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabaseAdmin.from('user_profiles') as any)
       .upsert({
         discord_user_id,
         display_name: display_name?.trim() || null,

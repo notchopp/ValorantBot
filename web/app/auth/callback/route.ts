@@ -52,8 +52,7 @@ export async function GET(request: Request) {
           if (existingPlayer) {
             // Upsert users table entry (create if doesn't exist, update if exists)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin
-              .from('users') as any)
+            await (supabaseAdmin.from('users') as any)
               .upsert({
                 auth_id: user.id,
                 discord_user_id: discordUserId,
@@ -65,8 +64,7 @@ export async function GET(request: Request) {
             
             // Also ensure user_profile exists (for customization)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin
-              .from('user_profiles') as any)
+            await (supabaseAdmin.from('user_profiles') as any)
               .upsert({
                 discord_user_id: discordUserId,
                 display_name: discordIdentity?.identity_data?.preferred_username || 
