@@ -13,28 +13,62 @@ export default async function SeasonPage() {
   // Use admin client to ensure data access
   const supabaseAdmin = getSupabaseAdminClient()
   
-  // Get active season or upcoming season
-  const { data: activeSeason } = await supabaseAdmin
+  const now = new Date()
+  
+  // Get all seasons ordered by start_date
+  const { data: allSeasonsData } = await supabaseAdmin
     .from('seasons')
     .select('*')
-    .eq('is_active', true)
-    .maybeSingle()
+    .order('start_date', { ascending: false })
   
-  let currentSeason: Season | null = (activeSeason as Season | null) || null
-  let seasonStartsSoon = false
+  const allSeasons = (allSeasonsData as Season[]) || []
   
-  if (!currentSeason) {
-    const { data: upcomingSeason } = await supabaseAdmin
-      .from('seasons')
-      .select('*')
-      .gte('start_date', new Date().toISOString())
-      .order('start_date', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+  // Find the current or upcoming season
+  // Priority: active season that has started, then active season that hasn't started, then upcoming season
+  let currentSeason: Season | null = null
+  let isBeforeStart = false
+  
+  if (allSeasons.length > 0) {
+    // First, try to find an active season
+    const activeSeason = allSeasons.find(s => s.is_active)
     
-    if (upcomingSeason) {
-      currentSeason = upcomingSeason as Season
-      seasonStartsSoon = true
+    if (activeSeason) {
+      const startDate = new Date(activeSeason.start_date)
+      const endDate = new Date(activeSeason.end_date)
+      
+      // If season hasn't started yet
+      if (now < startDate) {
+        currentSeason = activeSeason
+        isBeforeStart = true
+      }
+      // If season has started but hasn't ended
+      else if (now >= startDate && now < endDate) {
+        currentSeason = activeSeason
+        isBeforeStart = false
+      }
+      // If season has ended, look for upcoming season
+      else {
+        const upcomingSeason = allSeasons.find(s => {
+          const sStart = new Date(s.start_date)
+          return sStart > now
+        }) as Season | undefined
+        
+        if (upcomingSeason) {
+          currentSeason = upcomingSeason
+          isBeforeStart = true
+        }
+      }
+    } else {
+      // No active season, find the next upcoming one
+      const upcomingSeason = allSeasons.find(s => {
+        const sStart = new Date(s.start_date)
+        return sStart > now
+      }) as Season | undefined
+      
+      if (upcomingSeason) {
+        currentSeason = upcomingSeason
+        isBeforeStart = true
+      }
     }
   }
   
@@ -59,6 +93,7 @@ export default async function SeasonPage() {
   const players = (leaderboard as Player[]) || []
   
   // Calculate season stats for each player (matches, win rate, etc.)
+  // Only calculate if season has started
   interface SeasonMatchStat {
     team: 'A' | 'B'
     mmr_after: number
@@ -68,25 +103,33 @@ export default async function SeasonPage() {
   
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
-      // Get match stats for this player this season
-      const { data: matchStats } = await supabaseAdmin
-        .from('match_player_stats')
-        .select('*, match:matches(match_date, winner)')
-        .eq('player_id', player.id)
-        .gte('created_at', currentSeason.start_date)
-        .lte('created_at', currentSeason.end_date)
+      // Only get match stats if season has started
+      let totalMatches = 0
+      let wins = 0
+      let winRate = 0
+      let netMMR = 0
       
-      const stats = (matchStats as SeasonMatchStat[]) || []
-      const wins = stats.filter((s) => {
-        if (s.match) {
-          return s.match.winner === s.team
-        }
-        return s.mmr_after > s.mmr_before
-      }).length
-      
-      const totalMatches = stats.length
-      const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
-      const netMMR = stats.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
+      if (!isBeforeStart && currentSeason) {
+        // Get match stats for this player this season
+        const { data: matchStats } = await supabaseAdmin
+          .from('match_player_stats')
+          .select('*, match:matches(match_date, winner)')
+          .eq('player_id', player.id)
+          .gte('created_at', currentSeason.start_date)
+          .lte('created_at', currentSeason.end_date)
+        
+        const stats = (matchStats as SeasonMatchStat[]) || []
+        wins = stats.filter((s) => {
+          if (s.match) {
+            return s.match.winner === s.team
+          }
+          return s.mmr_after > s.mmr_before
+        }).length
+        
+        totalMatches = stats.length
+        winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0
+        netMMR = stats.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
+      }
       
       return {
         ...player,
@@ -138,21 +181,21 @@ export default async function SeasonPage() {
             <div className="text-right hidden sm:block">
               <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Status</div>
               <div className="text-lg font-black text-white">
-                {seasonStartsSoon ? 'Starts Soon' : 'Active'}
+                {isBeforeStart ? 'Starting Soon' : 'Active'}
               </div>
             </div>
           </div>
           
           {/* Countdown & Stats */}
           <div className="glass rounded-2xl p-6 border border-white/5 mb-8">
-            {seasonStartsSoon ? (
+            {isBeforeStart ? (
               <>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Starts In</div>
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Starting</div>
                 <SeasonCountdown endDate={currentSeason.start_date} />
               </>
             ) : (
               <>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Ends In</div>
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Ends</div>
                 <SeasonCountdown endDate={currentSeason.end_date} />
               </>
             )}
