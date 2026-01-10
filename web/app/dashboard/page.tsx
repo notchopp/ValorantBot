@@ -63,17 +63,18 @@ export default async function DashboardPage() {
   console.log('Dashboard - User metadata:', JSON.stringify(user.user_metadata, null, 2))
   
   // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
-  let { data: userRecord, error: userRecordError } = await supabaseAdmin
+  const { data: userRecord, error: userRecordError } = await supabaseAdmin
     .from('users')
     .select('discord_user_id')
     .eq('auth_id', user.id)
-    .maybeSingle() as { data: { discord_user_id: string } | null, error: any }
+    .maybeSingle() as { data: { discord_user_id: string } | null, error: unknown }
   
   console.log('Dashboard - User record from users table:', userRecord)
   console.log('Dashboard - User record error:', userRecordError)
   
   // If no user record exists, try to auto-link from OAuth metadata
-  if (!userRecord) {
+  let finalUserRecord = userRecord
+  if (!finalUserRecord) {
     const identities = user.identities || []
     interface Identity {
       provider: string
@@ -101,7 +102,7 @@ export default async function DashboardPage() {
         .from('players')
         .select('discord_user_id')
         .eq('discord_user_id', discordUserIdFromAuth)
-        .maybeSingle() as { data: { discord_user_id: string } | null, error: any }
+        .maybeSingle() as { data: { discord_user_id: string } | null, error: unknown }
       
       console.log('Dashboard - Player found:', existingPlayer)
       console.log('Dashboard - Player error:', playerError)
@@ -125,14 +126,14 @@ export default async function DashboardPage() {
         console.log('Dashboard - Upsert error:', upsertError)
         
         if (newUserRecord) {
-          userRecord = newUserRecord as { discord_user_id: string }
+          finalUserRecord = newUserRecord as { discord_user_id: string }
         }
       }
     }
   }
   
   // If still no user record exists, show link message
-  if (!userRecord || !userRecord.discord_user_id) {
+  if (!finalUserRecord || !finalUserRecord.discord_user_id) {
     const discordUsername = user.user_metadata?.preferred_username || 
                             user.user_metadata?.global_name ||
                             user.user_metadata?.full_name || 
@@ -192,7 +193,7 @@ export default async function DashboardPage() {
   const { data: playerData } = await supabaseAdmin
     .from('players')
     .select('*')
-    .eq('discord_user_id', userRecord.discord_user_id)
+    .eq('discord_user_id', finalUserRecord.discord_user_id)
     .maybeSingle() as { data: PlayerData | null }
   
   if (!playerData) {
