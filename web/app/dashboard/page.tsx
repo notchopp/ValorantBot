@@ -95,6 +95,15 @@ export default async function DashboardPage() {
     redirect('/auth/login?step=claim')
   }
   
+  // Get user's accent color
+  const { data: userProfile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('accent_color')
+    .eq('discord_user_id', playerData.discord_user_id)
+    .maybeSingle() as { data: { accent_color?: string | null } | null }
+  
+  const userAccentColor = userProfile?.accent_color || '#ef4444'
+  
   const playerDataToUse: PlayerData = {
     id: playerData.id,
     discord_user_id: playerData.discord_user_id,
@@ -216,6 +225,7 @@ export default async function DashboardPage() {
     <DashboardContent 
       playerDataToUse={playerDataToUse}
       totalMatches={totalMatches}
+      userAccentColor={userAccentColor}
       wins={wins}
       losses={losses}
       winRate={winRate}
@@ -248,6 +258,7 @@ function DashboardContent({
   userProfile,
   kdRatio,
   mvpCount,
+  userAccentColor,
 }: {
   playerDataToUse: PlayerData
   totalMatches: number
@@ -263,11 +274,12 @@ function DashboardContent({
   userProfile?: { display_name?: string | null; bio?: string | null } | null
   kdRatio: string
   mvpCount: number
+  userAccentColor: string
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'
   
   return (
-    <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10">
+    <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10" style={{ '--user-accent-color': userAccentColor } as React.CSSProperties}>
       <div className="max-w-[1600px] mx-auto">
         {/* Live Header */}
         <div className="mb-8 md:mb-12 flex items-center justify-between">
@@ -289,7 +301,7 @@ function DashboardContent({
             </div>
             <div className="text-right hidden sm:block">
               <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Position</div>
-              <div className="text-2xl md:text-3xl font-black text-red-500">#{leaderboardPosition}</div>
+              <div className="text-2xl md:text-3xl font-black" style={{ color: userAccentColor }}>#{leaderboardPosition}</div>
             </div>
           </div>
         </div>
@@ -299,20 +311,20 @@ function DashboardContent({
           <div className="flex items-end justify-between mb-6">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Current MMR</div>
-              <div className="text-6xl md:text-8xl font-black text-red-500 tracking-tighter leading-none">
+              <div className="text-6xl md:text-8xl font-black tracking-tighter leading-none" style={{ color: userAccentColor }}>
                 {playerDataToUse.current_mmr}
               </div>
             </div>
             {netMMR !== 0 && (
-              <div className={`text-2xl md:text-3xl font-black ${netMMR > 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="text-2xl md:text-3xl font-black" style={{ color: netMMR > 0 ? '#22c55e' : userAccentColor }}>
                 {netMMR > 0 ? '+' : ''}{netMMR}
               </div>
             )}
           </div>
-          <MMRProgressBar currentMMR={playerDataToUse.current_mmr} />
+          <MMRProgressBar currentMMR={playerDataToUse.current_mmr} accentColor={userAccentColor} />
           <div className="mt-6 flex items-center justify-between text-sm">
             <span className="text-white/40">
-              Peak: <span className="text-red-500 font-black">{playerDataToUse.peak_mmr}</span>
+              Peak: <span className="font-black" style={{ color: userAccentColor }}>{playerDataToUse.peak_mmr}</span>
             </span>
             <span className="text-white/40">
               {playerDataToUse.current_mmr > 0 ? `${3000 - playerDataToUse.current_mmr} to X Rank` : 'Link Riot ID to start'}
@@ -330,7 +342,7 @@ function DashboardContent({
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Win Rate</div>
-            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${winRate >= 50 ? 'text-green-500' : winRate > 0 ? 'text-red-500' : 'text-white/40'}`}>
+            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: winRate >= 50 ? '#22c55e' : winRate > 0 ? userAccentColor : 'rgba(255, 255, 255, 0.4)' }}>
               {winRate}%
             </div>
             <div className="text-xs text-white/40">Last 10 matches</div>
@@ -338,7 +350,7 @@ function DashboardContent({
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">K/D Ratio</div>
-            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${parseFloat(kdRatio) >= 1.0 ? 'text-green-500' : parseFloat(kdRatio) > 0 ? 'text-red-500' : 'text-white/40'}`}>
+            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: parseFloat(kdRatio) >= 1.0 ? '#22c55e' : parseFloat(kdRatio) > 0 ? userAccentColor : 'rgba(255, 255, 255, 0.4)' }}>
               {kdRatio}
             </div>
             <div className="text-xs text-white/40">Overall stats</div>
@@ -346,7 +358,7 @@ function DashboardContent({
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">MVP Count</div>
-            <div className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter mb-1">{mvpCount}</div>
+            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: userAccentColor }}>{mvpCount}</div>
             <div className="text-xs text-white/40">Match MVPs</div>
           </div>
         </div>
@@ -470,7 +482,7 @@ function DashboardContent({
                   <div className="text-xs text-white/40 mb-2">Season Stats</div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-2xl font-black text-red-500">{totalMatches}</div>
+                      <div className="text-2xl font-black" style={{ color: userAccentColor }}>{totalMatches}</div>
                       <div className="text-xs text-white/40 mt-1">Matches</div>
                     </div>
                     <div>
