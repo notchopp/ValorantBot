@@ -120,7 +120,14 @@ ALTER TABLE comments
     FOREIGN KEY (author_id) REFERENCES players(id) ON DELETE CASCADE;
 
 -- Step 8: Drop the users table (no longer needed)
+-- Note: We already dropped the fk_discord_user constraint in Step 6
 DROP TABLE IF EXISTS users CASCADE;
+
+-- Step 8.5: Re-add the foreign key constraint for user_profiles
+-- This was dropped in Step 6 to allow dropping the unique constraint
+ALTER TABLE user_profiles
+    ADD CONSTRAINT user_profiles_discord_user_id_fkey 
+    FOREIGN KEY (discord_user_id) REFERENCES players(discord_user_id) ON DELETE CASCADE;
 
 -- Step 9: Update RLS policies that reference the old structure
 -- Drop old policies that used users table
