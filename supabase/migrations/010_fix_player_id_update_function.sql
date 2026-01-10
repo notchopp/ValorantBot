@@ -76,7 +76,16 @@ BEGIN
         COALESCE(old_player_record.claimed, false)
     );
     
-    -- Step 3: Update all foreign key references from old_id to new_id
+    -- Step 3: Update user_profiles first (it references players.discord_user_id, not id)
+    -- Since the new row already has the same discord_user_id, user_profiles should already reference it
+    -- But we need to ensure it exists and is updated before deleting the old row
+    INSERT INTO user_profiles (discord_user_id, display_name, updated_at)
+    VALUES (original_discord_user_id, p_display_name, NOW())
+    ON CONFLICT (discord_user_id) DO UPDATE
+    SET display_name = EXCLUDED.display_name,
+        updated_at = EXCLUDED.updated_at;
+    
+    -- Step 4: Update all foreign key references from old_id to new_id
     UPDATE matches SET host_id = p_new_auth_uid WHERE host_id = p_old_player_id;
     UPDATE match_player_stats SET player_id = p_new_auth_uid WHERE player_id = p_old_player_id;
     UPDATE rank_history SET player_id = p_new_auth_uid WHERE player_id = p_old_player_id;
@@ -84,15 +93,10 @@ BEGIN
     UPDATE activity_feed SET player_id = p_new_auth_uid WHERE player_id = p_old_player_id;
     UPDATE comments SET author_id = p_new_auth_uid WHERE author_id = p_old_player_id;
     
-    -- Step 4: Delete the old player row (foreign keys now point to new row)
+    -- Step 5: Now delete the old player row
+    -- At this point, user_profiles references the new row (same discord_user_id), and all other FKs point to new_id
+    -- The old row has a modified discord_user_id, so user_profiles shouldn't reference it
     DELETE FROM players WHERE id = p_old_player_id;
-    
-    -- Step 5: Update user_profiles if needed
-    INSERT INTO user_profiles (discord_user_id, display_name, updated_at)
-    VALUES (p_discord_user_id, p_display_name, NOW())
-    ON CONFLICT (discord_user_id) DO UPDATE
-    SET display_name = EXCLUDED.display_name,
-        updated_at = EXCLUDED.updated_at;
         
     -- Step 6: Set claimed = true if not already set
     UPDATE players SET claimed = true WHERE id = p_new_auth_uid AND (claimed IS NULL OR claimed = false);
