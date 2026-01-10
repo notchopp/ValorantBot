@@ -488,68 +488,107 @@ export default async function handler(
     });
 
     // Step 3: Create or update player in database
-    // Check if player exists to determine insert vs update
+    // Check if player exists (by discord_user_id) to determine insert vs update
     const { data: existingPlayer, error: checkError } = await supabase
       .from('players')
-      .select('id, discord_user_id')
+      .select('id, discord_user_id, discord_rank, current_mmr, peak_mmr')
       .eq('discord_user_id', userId)
-      .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully
+      .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully (returns null, no error if not found)
 
-    const playerExists = !!existingPlayer && !checkError;
-    
-    const playerData: any = {
-      discord_user_id: userId,
-      discord_username: username,
-      riot_name: riotName,
-      riot_tag: riotTag,
-      riot_puuid: puuid,
-      riot_region: accountRegion,
-      discord_rank: discordRank,
-      discord_rank_value: discordRankValue,
-      current_mmr: startingMMR,
-      peak_mmr: startingMMR,
-      verified_at: new Date().toISOString(),
-    };
+    // Player exists if we have data with an id (maybeSingle returns null if not found, no error)
+    const playerExists = !!existingPlayer?.id;
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // Real error occurred (not just "not found")
+      console.error('Error checking for existing player', { userId, error: checkError });
+      res.status(500).json({ success: false, error: 'Database error checking player' });
+      return;
+    }
 
     let player;
-    let upsertError;
+    let saveError;
 
-    if (playerExists) {
-      // Player exists - update without touching id
-      console.log('Updating existing player in database', { userId, playerId: existingPlayer.id });
+    if (playerExists && existingPlayer) {
+      // Player exists - only update rank/MMR and verification fields (don't touch id)
+      console.log('Updating existing player rank/MMR', { 
+        userId, 
+        playerId: existingPlayer.id, 
+        oldRank: existingPlayer.discord_rank, 
+        oldMMR: existingPlayer.current_mmr,
+        newRank: discordRank,
+        newMMR: startingMMR 
+      });
+      
+      const updateData = {
+        discord_username: username,
+        riot_name: riotName,
+        riot_tag: riotTag,
+        riot_puuid: puuid,
+        riot_region: accountRegion,
+        discord_rank: discordRank,
+        discord_rank_value: discordRankValue,
+        current_mmr: startingMMR,
+        peak_mmr: Math.max(existingPlayer.peak_mmr || existingPlayer.current_mmr || 0, startingMMR), // Preserve existing peak if higher
+        verified_at: new Date().toISOString(),
+      };
       
       const { data: updatedPlayer, error: updateError } = await supabase
         .from('players')
-        .update(playerData)
+        .update(updateData)
         .eq('discord_user_id', userId)
         .select()
         .single();
       
       player = updatedPlayer;
-      upsertError = updateError;
+      saveError = updateError;
     } else {
       // Player doesn't exist - insert with generated id (migration 008 changed id to auth UID without default)
-      playerData.id = randomUUID();
+      const insertData = {
+        id: randomUUID(), // Generate UUID for new players
+        discord_user_id: userId,
+        discord_username: username,
+        riot_name: riotName,
+        riot_tag: riotTag,
+        riot_puuid: puuid,
+        riot_region: accountRegion,
+        discord_rank: discordRank,
+        discord_rank_value: discordRankValue,
+        current_mmr: startingMMR,
+        peak_mmr: startingMMR,
+        verified_at: new Date().toISOString(),
+      };
       
-      console.log('Inserting new player to database', { userId, playerId: playerData.id });
+      console.log('Inserting new player to database', { userId, playerId: insertData.id });
       
       const { data: newPlayer, error: insertError } = await supabase
         .from('players')
-        .insert(playerData)
+        .insert(insertData)
         .select()
         .single();
       
       player = newPlayer;
-      upsertError = insertError;
+      saveError = insertError;
     }
 
-    if (upsertError || !player) {
-      console.error('Database error saving player', { userId, error: upsertError, playerExists, operation: playerExists ? 'update' : 'insert' });
+    if (saveError || !player) {
+      console.error('Database error saving player', { 
+        userId, 
+        error: saveError, 
+        playerExists: !!playerExists, 
+        operation: playerExists ? 'update' : 'insert',
+        checkError: checkError?.code,
+      });
       res.status(500).json({ success: false, error: 'Failed to save player data' });
       return;
     }
     
-    console.log('Player saved successfully', { userId, playerId: player.id, operation: playerExists ? 'updated' : 'inserted' });
+    console.log('Player saved successfully', { 
+      userId, 
+      playerId: player.id, 
+      operation: playerExists ? 'updated' : 'inserted',
+      rank: player.discord_rank,
+      mmr: player.current_mmr,
+    });
 
     // Step 4: Log rank history
     console.log('Logging rank history', {
