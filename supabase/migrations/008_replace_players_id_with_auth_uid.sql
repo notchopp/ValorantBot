@@ -67,11 +67,20 @@ FROM player_id_mapping pm
 WHERE c.author_id = pm.old_id;
 
 -- Step 6: Drop the old id column and rename auth_id to id
+-- First, ensure all players have a value in auth_id (use old id if no auth_id)
+-- This was already done in Step 2.5, but we verify here
+UPDATE players
+SET auth_id = COALESCE(auth_id, id)
+WHERE auth_id IS NULL;
+
+-- Now drop constraints and rename
 ALTER TABLE players DROP CONSTRAINT IF EXISTS players_pkey;
+ALTER TABLE players DROP CONSTRAINT IF EXISTS players_discord_user_id_key; -- Drop unique constraint temporarily
 ALTER TABLE players DROP COLUMN IF EXISTS id;
 ALTER TABLE players RENAME COLUMN auth_id TO id;
 ALTER TABLE players ALTER COLUMN id SET NOT NULL;
 ALTER TABLE players ADD PRIMARY KEY (id);
+ALTER TABLE players ADD CONSTRAINT players_discord_user_id_key UNIQUE (discord_user_id); -- Re-add unique constraint
 
 -- Step 7: Recreate all foreign key constraints
 ALTER TABLE matches 
