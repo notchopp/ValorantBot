@@ -488,15 +488,15 @@ export default async function handler(
     });
 
     // Step 3: Create or update player in database
-    // Check if player exists to determine if we need to generate id
-    const { data: existingPlayerData, error: checkError } = await supabase
+    // Check if player exists to determine insert vs update
+    const { data: existingPlayer, error: checkError } = await supabase
       .from('players')
-      .select('id')
+      .select('id, discord_user_id')
       .eq('discord_user_id', userId)
-      .maybeSingle(); // Use maybeSingle() instead of single() to handle "not found" gracefully
+      .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully
 
-    const isNewPlayer = !existingPlayerData || checkError?.code === 'PGRST116'; // PGRST116 = not found
-
+    const playerExists = !!existingPlayer && !checkError;
+    
     const playerData: any = {
       discord_user_id: userId,
       discord_username: username,
@@ -511,27 +511,45 @@ export default async function handler(
       verified_at: new Date().toISOString(),
     };
 
-    // Only generate id if player doesn't exist (migration 008 changed id to auth UID without default)
-    // Don't include id for existing players to avoid trying to update it
-    if (isNewPlayer) {
-      playerData.id = randomUUID();
-    }
-    
-    console.log('Upserting player to database', { userId, playerData: { ...playerData, id: playerData.id ? 'generated' : 'omitted' }, isNewPlayer });
+    let player;
+    let upsertError;
 
-    const { data: player, error: upsertError } = await supabase
-      .from('players')
-      .upsert(playerData, { onConflict: 'discord_user_id' })
-      .select()
-      .single();
+    if (playerExists) {
+      // Player exists - update without touching id
+      console.log('Updating existing player in database', { userId, playerId: existingPlayer.id });
+      
+      const { data: updatedPlayer, error: updateError } = await supabase
+        .from('players')
+        .update(playerData)
+        .eq('discord_user_id', userId)
+        .select()
+        .single();
+      
+      player = updatedPlayer;
+      upsertError = updateError;
+    } else {
+      // Player doesn't exist - insert with generated id (migration 008 changed id to auth UID without default)
+      playerData.id = randomUUID();
+      
+      console.log('Inserting new player to database', { userId, playerId: playerData.id });
+      
+      const { data: newPlayer, error: insertError } = await supabase
+        .from('players')
+        .insert(playerData)
+        .select()
+        .single();
+      
+      player = newPlayer;
+      upsertError = insertError;
+    }
 
     if (upsertError || !player) {
-      console.error('Database error upserting player', { userId, error: upsertError });
+      console.error('Database error saving player', { userId, error: upsertError, playerExists, operation: playerExists ? 'update' : 'insert' });
       res.status(500).json({ success: false, error: 'Failed to save player data' });
       return;
     }
     
-    console.log('Player upserted successfully', { userId, playerId: player.id });
+    console.log('Player saved successfully', { userId, playerId: player.id, operation: playerExists ? 'updated' : 'inserted' });
 
     // Step 4: Log rank history
     console.log('Logging rank history', {
