@@ -59,12 +59,18 @@ export default async function DashboardPage() {
   // Use admin client for data fetching (bypasses RLS)
   const supabaseAdmin = getSupabaseAdminClient()
   
+  console.log('Dashboard - Auth user ID:', user.id)
+  console.log('Dashboard - User metadata:', JSON.stringify(user.user_metadata, null, 2))
+  
   // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
-  let { data: userRecord } = await supabaseAdmin
+  let { data: userRecord, error: userRecordError } = await supabaseAdmin
     .from('users')
     .select('discord_user_id')
     .eq('auth_id', user.id)
-    .maybeSingle() as { data: { discord_user_id: string } | null }
+    .maybeSingle() as { data: { discord_user_id: string } | null, error: any }
+  
+  console.log('Dashboard - User record from users table:', userRecord)
+  console.log('Dashboard - User record error:', userRecordError)
   
   // If no user record exists, try to auto-link from OAuth metadata
   if (!userRecord) {
@@ -88,17 +94,22 @@ export default async function DashboardPage() {
                                   null
     
     if (discordUserIdFromAuth) {
+      console.log('Dashboard - Trying to auto-link with Discord ID:', discordUserIdFromAuth)
+      
       // Check if player exists with this Discord ID
-      const { data: existingPlayer } = await supabaseAdmin
+      const { data: existingPlayer, error: playerError } = await supabaseAdmin
         .from('players')
         .select('discord_user_id')
         .eq('discord_user_id', discordUserIdFromAuth)
-        .maybeSingle() as { data: { discord_user_id: string } | null }
+        .maybeSingle() as { data: { discord_user_id: string } | null, error: any }
+      
+      console.log('Dashboard - Player found:', existingPlayer)
+      console.log('Dashboard - Player error:', playerError)
       
       // If player exists, create/update users table entry using admin client
       if (existingPlayer) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: newUserRecord } = await (supabaseAdmin.from('users') as any)
+        const { data: newUserRecord, error: upsertError } = await (supabaseAdmin.from('users') as any)
           .upsert({
             auth_id: user.id,
             discord_user_id: discordUserIdFromAuth,
@@ -109,6 +120,9 @@ export default async function DashboardPage() {
           })
           .select('discord_user_id')
           .single()
+        
+        console.log('Dashboard - Upsert result:', newUserRecord)
+        console.log('Dashboard - Upsert error:', upsertError)
         
         if (newUserRecord) {
           userRecord = newUserRecord as { discord_user_id: string }

@@ -41,29 +41,36 @@ export async function GET(request: Request) {
         
         try {
           // Check if player exists with this Discord ID
-          const { data: existingPlayer } = await supabaseAdmin
+          const { data: existingPlayer, error: playerError } = await supabaseAdmin
             .from('players')
             .select('discord_user_id')
             .eq('discord_user_id', discordUserId)
             .maybeSingle()
+          
+          console.log('OAuth Callback - Discord User ID:', discordUserId)
+          console.log('OAuth Callback - Player found:', existingPlayer)
+          console.log('OAuth Callback - Player error:', playerError)
           
           // Only create/update users table entry if player exists
           // This ensures we only link authenticated web users who have used the bot
           if (existingPlayer) {
             // Upsert users table entry (create if doesn't exist, update if exists)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin.from('users') as any).upsert({
+            const { data: userResult, error: userError } = await (supabaseAdmin.from('users') as any).upsert({
               auth_id: user.id,
               discord_user_id: discordUserId,
               email: user.email || null,
               updated_at: new Date().toISOString(),
             }, {
               onConflict: 'auth_id'
-            })
+            }).select()
+            
+            console.log('OAuth Callback - User upsert result:', userResult)
+            console.log('OAuth Callback - User upsert error:', userError)
             
             // Also ensure user_profile exists (for customization)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin.from('user_profiles') as any).upsert({
+            const { data: profileResult, error: profileError } = await (supabaseAdmin.from('user_profiles') as any).upsert({
               discord_user_id: discordUserId,
               display_name: discordIdentity?.identity_data?.preferred_username || 
                            discordIdentity?.identity_data?.username ||
@@ -72,12 +79,19 @@ export async function GET(request: Request) {
               updated_at: new Date().toISOString(),
             }, {
               onConflict: 'discord_user_id'
-            })
+            }).select()
+            
+            console.log('OAuth Callback - Profile upsert result:', profileResult)
+            console.log('OAuth Callback - Profile upsert error:', profileError)
+          } else {
+            console.log('OAuth Callback - No player found for Discord ID:', discordUserId)
           }
         } catch (error) {
           // Log error but don't fail auth - user can still access dashboard
           console.error('Error linking user to Discord account:', error)
         }
+      } else {
+        console.log('OAuth Callback - No Discord user ID found in OAuth metadata')
       }
       
       // Redirect to production domain
