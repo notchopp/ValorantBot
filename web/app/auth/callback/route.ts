@@ -52,29 +52,27 @@ export async function GET(request: Request) {
           if (existingPlayer) {
             // Upsert users table entry (create if doesn't exist, update if exists)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin.from('users') as any)
-              .upsert({
-                auth_id: user.id,
-                discord_user_id: discordUserId,
-                email: user.email || null,
-                updated_at: new Date().toISOString(),
-              }, {
-                onConflict: 'auth_id'
-              })
+            await (supabaseAdmin.from('users') as any).upsert({
+              auth_id: user.id,
+              discord_user_id: discordUserId,
+              email: user.email || null,
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'auth_id'
+            })
             
             // Also ensure user_profile exists (for customization)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (supabaseAdmin.from('user_profiles') as any)
-              .upsert({
-                discord_user_id: discordUserId,
-                display_name: discordIdentity?.identity_data?.preferred_username || 
-                             discordIdentity?.identity_data?.username ||
-                             user.user_metadata?.preferred_username ||
-                             null,
-                updated_at: new Date().toISOString(),
-              }, {
-                onConflict: 'discord_user_id'
-              })
+            await (supabaseAdmin.from('user_profiles') as any).upsert({
+              discord_user_id: discordUserId,
+              display_name: discordIdentity?.identity_data?.preferred_username || 
+                           discordIdentity?.identity_data?.username ||
+                           user.user_metadata?.preferred_username ||
+                           null,
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'discord_user_id'
+            })
           }
         } catch (error) {
           // Log error but don't fail auth - user can still access dashboard
