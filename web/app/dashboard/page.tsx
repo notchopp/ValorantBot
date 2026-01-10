@@ -166,6 +166,8 @@ export default async function DashboardPage() {
             matchHistory={[]}
             rankProgression={[]}
             userProfile={null}
+            kdRatio="0.00"
+            mvpCount={0}
           />
         </div>
       </div>
@@ -259,6 +261,14 @@ export default async function DashboardPage() {
   const recentMatches = stats.slice(0, 10)
   const netMMR = recentMatches.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
   
+  // Calculate K/D ratio
+  const totalKills = stats.reduce((sum, s) => sum + (s.kills || 0), 0)
+  const totalDeaths = stats.reduce((sum, s) => sum + (s.deaths || 0), 0)
+  const kdRatio = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : '0.00'
+  
+  // Calculate MVP count
+  const mvpCount = stats.filter(s => s.mvp).length
+  
   // Get rank progression (rank_history) - use admin client
   const { data: rankHistory } = await supabaseAdmin
     .from('rank_history')
@@ -315,6 +325,8 @@ export default async function DashboardPage() {
       matchHistory={matchHistory}
       rankProgression={rankProgression}
       userProfile={userProfile}
+      kdRatio={kdRatio}
+      mvpCount={mvpCount}
     />
   )
 }
@@ -333,6 +345,8 @@ function DashboardContent({
   matchHistory,
   rankProgression,
   userProfile,
+  kdRatio,
+  mvpCount,
 }: {
   playerDataToUse: PlayerData
   totalMatches: number
@@ -346,6 +360,8 @@ function DashboardContent({
   matchHistory: MatchHistoryEntry[]
   rankProgression: RankProgressionEntry[]
   userProfile?: { display_name?: string | null; bio?: string | null } | null
+  kdRatio: string
+  mvpCount: number
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'
   
@@ -420,17 +436,17 @@ function DashboardContent({
           </div>
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season MMR</div>
-            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${netMMR >= 0 ? 'text-green-500' : netMMR < 0 ? 'text-red-500' : 'text-white/40'}`}>
-              {netMMR >= 0 && netMMR > 0 ? '+' : ''}{netMMR}
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">K/D Ratio</div>
+            <div className={`text-4xl md:text-5xl font-black tracking-tighter mb-1 ${parseFloat(kdRatio) >= 1.0 ? 'text-green-500' : parseFloat(kdRatio) > 0 ? 'text-red-500' : 'text-white/40'}`}>
+              {kdRatio}
             </div>
-            <div className="text-xs text-white/40">Net change</div>
+            <div className="text-xs text-white/40">Overall stats</div>
           </div>
           
           <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Leaderboard</div>
-            <div className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter mb-1">#{leaderboardPosition}</div>
-            <div className="text-xs text-white/40">Global rank</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">MVP Count</div>
+            <div className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter mb-1">{mvpCount}</div>
+            <div className="text-xs text-white/40">Match MVPs</div>
           </div>
         </div>
         
@@ -601,13 +617,13 @@ function DashboardContent({
                 </Link>
               )}
               <Link
-                href={`/profile/${playerDataToUse.discord_user_id}/edit`}
+                href={`/profile/${playerDataToUse.discord_user_id}`}
                 className="block p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.04] transition-all group"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-black text-white mb-1">Profile</div>
-                    <div className="text-xs text-white/40">Customize profile</div>
+                    <div className="text-xs text-white/40">View your profile</div>
                   </div>
                   <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

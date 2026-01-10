@@ -1,15 +1,35 @@
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
 import { Player, ActivityFeed as ActivityFeedType, Comment, RankHistory } from '@/lib/types'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function ProfilePage({ params }: { params: { userId: string } }) {
   // Use admin client for data fetching
   const supabaseAdmin = getSupabaseAdminClient()
+  const supabase = await createClient()
   const { userId } = params
+  
+  // Check if current user is viewing their own profile
+  const { data: { user } } = await supabase.auth.getUser()
+  let isOwnProfile = false
+  
+  if (user) {
+    // Check if this is the user's own profile
+    const { data: userRecord } = await supabaseAdmin
+      .from('users')
+      .select('discord_user_id')
+      .eq('auth_id', user.id)
+      .maybeSingle() as { data: { discord_user_id: string } | null }
+    
+    if (userRecord && userRecord.discord_user_id === userId) {
+      isOwnProfile = true
+    }
+  }
   
   // Get player by discord_user_id
   const { data: player } = await supabaseAdmin
@@ -131,6 +151,14 @@ export default async function ProfilePage({ params }: { params: { userId: string
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
                 #{leaderboardPosition} on Leaderboard
               </p>
+              {isOwnProfile && (
+                <Link
+                  href={`/profile/${userId}/edit`}
+                  className="mt-2 px-6 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm font-black uppercase tracking-wider text-red-500 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                >
+                  Edit Profile
+                </Link>
+              )}
             </div>
           </div>
           
