@@ -28,6 +28,8 @@ export async function GET(request: Request) {
           name?: string  // Discord username (may have #0 discriminator)
           full_name?: string  // Discord display name without discriminator
           preferred_username?: string
+          avatar_url?: string  // Discord avatar URL
+          picture?: string  // Alternative avatar field
         }
       }
       
@@ -40,6 +42,9 @@ export async function GET(request: Request) {
       const rawUsername = discordIdentity?.identity_data?.name || discordIdentity?.identity_data?.preferred_username || null
       const discordUsername = rawUsername ? rawUsername.replace(/#\d+$/, '') : null
       
+      // Extract Discord avatar URL
+      const discordAvatarUrl = discordIdentity?.identity_data?.avatar_url || discordIdentity?.identity_data?.picture || user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+      
       // Actor ID is the Supabase auth UID (user.id)
       const actorId = user.id
       
@@ -47,6 +52,7 @@ export async function GET(request: Request) {
       console.log('Auth UID (Supabase):', actorId)
       console.log('Discord User ID (provider_id):', discordUserId)
       console.log('Discord Username (stripped):', discordUsername)
+      console.log('Discord Avatar URL:', discordAvatarUrl)
       
       // Match players by Discord user ID (provider_id)
       if (discordUserId) {
@@ -61,9 +67,9 @@ export async function GET(request: Request) {
           // Find player by Discord user ID (provider_id)
           const { data: playerData, error: playerError } = await supabaseAdmin
             .from('players')
-            .select('id, discord_user_id, discord_username, current_mmr')
+            .select('id, discord_user_id, discord_username, current_mmr, discord_avatar_url')
             .eq('discord_user_id', discordUserId) // Match by Discord user ID
-            .maybeSingle() as { data: PlayerData | null; error: unknown }
+            .maybeSingle() as { data: PlayerData & { discord_avatar_url?: string | null } | null; error: unknown }
           
           const existingPlayer = playerData
           
@@ -84,12 +90,27 @@ export async function GET(request: Request) {
             
             const currentPlayerId = existingPlayer.id
             
+            // Update Discord avatar URL if available
+            if (discordAvatarUrl && discordAvatarUrl !== existingPlayer.discord_avatar_url) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { error: avatarError } = await (supabaseAdmin.from('players') as any)
+                .update({ discord_avatar_url: discordAvatarUrl })
+                .eq('discord_user_id', discordUserId)
+              
+              if (avatarError) {
+                console.error('Error updating avatar:', avatarError)
+              } else {
+                console.log('✓ Discord avatar URL updated')
+              }
+            }
+            
             // Only update if the id is different
             if (currentPlayerId && currentPlayerId !== actorId) {
               console.log('  → Player id needs to be updated from', currentPlayerId, 'to', actorId)
               
               // Use database function to atomically update id and all foreign keys
               // This function creates a new row, updates foreign keys, then deletes old row
+              // Note: We'll update avatar separately after the ID update
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: updateError } = await (supabaseAdmin.rpc as any)('update_player_id_with_auth_uid', {
                 p_old_player_id: currentPlayerId,
@@ -104,31 +125,55 @@ export async function GET(request: Request) {
                 // Don't fail completely - user can still access
               } else {
                 console.log('✓ Player id updated to auth.uid() (all foreign keys updated, claimed=true)')
+                
+                // Update avatar after ID update
+                if (discordAvatarUrl) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const { error: avatarUpdateError } = await (supabaseAdmin.from('players') as any)
+                    .update({ discord_avatar_url: discordAvatarUrl })
+                    .eq('id', actorId)
+                  
+                  if (avatarUpdateError) {
+                    console.error('Error updating avatar after ID change:', avatarUpdateError)
+                  }
+                }
               }
             } else if (currentPlayerId === actorId) {
               console.log('  ✓ Player id already matches auth.uid() - no update needed')
               
-              // Still set claimed = true if not already set
+              // Still set claimed = true if not already set and update avatar
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const updateData: { claimed?: boolean; discord_avatar_url?: string } = { claimed: true }
+              if (discordAvatarUrl) {
+                updateData.discord_avatar_url = discordAvatarUrl
+              }
+              
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: claimedError } = await (supabaseAdmin.from('players') as any)
-                .update({ claimed: true })
+                .update(updateData)
                 .eq('id', actorId)
               
               if (claimedError) {
-                console.error('Error setting claimed flag:', claimedError)
+                console.error('Error setting claimed flag/avatar:', claimedError)
               } else {
-                console.log('✓ Claimed flag set to true')
+                console.log('✓ Claimed flag set to true and avatar updated')
               }
             } else {
-              console.log('  ⚠ Could not determine current player id - will set claimed flag')
+              console.log('  ⚠ Could not determine current player id - will set claimed flag and avatar')
               // Try to update claimed flag even if we can't update the ID
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const updateData: { claimed?: boolean; discord_avatar_url?: string } = { claimed: true }
+              if (discordAvatarUrl) {
+                updateData.discord_avatar_url = discordAvatarUrl
+              }
+              
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: claimedError } = await (supabaseAdmin.from('players') as any)
-                .update({ claimed: true })
+                .update(updateData)
                 .eq('discord_user_id', discordUserId)
               
               if (claimedError) {
-                console.error('Error setting claimed flag:', claimedError)
+                console.error('Error setting claimed flag/avatar:', claimedError)
               }
             }
             

@@ -18,7 +18,7 @@ export default async function LeaderboardPage() {
     .order('current_mmr', { ascending: false })
     .limit(100)
   
-  const players = (leaderboard as Player[]) || []
+  const players = (leaderboard as (Player & { discord_avatar_url?: string | null })[]) || []
   
   // Calculate stats for each player (K/D, Win Rate, etc.) from match_player_stats
   interface MatchStatWithMatch {
@@ -167,6 +167,21 @@ export default async function LeaderboardPage() {
                           href={`/profile/${player.discord_user_id}`}
                           className="flex items-center gap-3 md:gap-4 group/link"
                         >
+                          {/* Avatar */}
+                          <div className="relative flex-shrink-0">
+                            {player.discord_avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={player.discord_avatar_url}
+                                alt={player.discord_username || 'Player'}
+                                className="w-10 h-10 rounded-full border border-white/10 group-hover/link:border-red-500/50 transition-colors"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-xs font-black group-hover/link:border-red-500/50 transition-colors">
+                                {(player.discord_username || 'U').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-black text-white tracking-tight truncate group-hover/link:text-red-500 transition-colors">
                               {player.discord_username || 'Unknown'}

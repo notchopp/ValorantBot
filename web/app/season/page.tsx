@@ -90,7 +90,7 @@ export default async function SeasonPage() {
     .order('current_mmr', { ascending: false })
     .limit(50)
   
-  const players = (leaderboard as Player[]) || []
+  const players = (leaderboard as (Player & { discord_avatar_url?: string | null })[]) || []
   
   // Calculate season stats for each player (matches, win rate, etc.)
   // Only calculate if season has started
@@ -133,17 +133,19 @@ export default async function SeasonPage() {
       
       return {
         ...player,
+        discord_avatar_url: player.discord_avatar_url,
         seasonMatches: totalMatches,
         seasonWins: wins,
         seasonWinRate: winRate,
         seasonNetMMR: netMMR,
-      }
+      } as typeof player & { seasonMatches: number; seasonWins: number; seasonWinRate: number; seasonNetMMR: number }
     })
   )
   
-  // Get top 10 for X rank
-  const top10 = playersWithStats.slice(0, 10)
-  const xWatch = playersWithStats.slice(10, 20)
+  // Get top 10 for X rank (only players with 3000+ MMR)
+  const xRankPlayers = playersWithStats.filter(p => p.current_mmr >= 3000)
+  const top10 = xRankPlayers.slice(0, 10)
+  const xWatch = playersWithStats.filter(p => p.current_mmr < 3000 && p.current_mmr >= 2000).slice(0, 10)
   
   // Get comments for season (use admin client for read access)
   const { data: comments } = await supabaseAdmin
@@ -236,6 +238,21 @@ export default async function SeasonPage() {
                     className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
                   >
                     <div className="text-xl font-black text-red-500 w-8">#{index + 1}</div>
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      {player.discord_avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={player.discord_avatar_url}
+                          alt={player.discord_username || 'Player'}
+                          className="w-10 h-10 rounded-full border border-white/10 group-hover:border-red-500/50 transition-colors"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-xs font-black group-hover:border-red-500/50 transition-colors">
+                          {(player.discord_username || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
                       <div className="text-xs text-white/40">
@@ -249,7 +266,10 @@ export default async function SeasonPage() {
                   </Link>
                 ))
               ) : (
-                <div className="text-center py-8 text-white/40 text-sm">No players yet</div>
+                <div className="text-center py-12 text-white/40">
+                  <p className="text-sm font-light mb-2">No one has hit X rank yet</p>
+                  <p className="text-xs text-white/30">Be the first to reach 3000+ MMR!</p>
+                </div>
               )}
             </div>
           </div>
@@ -272,13 +292,28 @@ export default async function SeasonPage() {
                     className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
                   >
                     <div className="text-base font-black text-white/40 w-8">#{index + 11}</div>
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      {player.discord_avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={player.discord_avatar_url}
+                          alt={player.discord_username || 'Player'}
+                          className="w-10 h-10 rounded-full border border-white/10 group-hover:border-red-500/50 transition-colors"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-xs font-black group-hover:border-red-500/50 transition-colors">
+                          {(player.discord_username || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
                       <div className="text-xs text-white/40">
                         {player.current_mmr} MMR
-                        {top10[9] && (
+                        {top10.length > 0 && top10[top10.length - 1] && (
                           <span className="ml-2 text-white/30">
-                            (-{top10[9].current_mmr - player.current_mmr} from #10)
+                            (-{top10[top10.length - 1].current_mmr - player.current_mmr} from #10)
                           </span>
                         )}
                       </div>

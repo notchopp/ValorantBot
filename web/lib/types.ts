@@ -2,6 +2,7 @@ export interface Player {
   id: string
   discord_user_id: string
   discord_username: string
+  discord_avatar_url?: string | null
   riot_name: string | null
   riot_tag: string | null
   riot_puuid: string | null

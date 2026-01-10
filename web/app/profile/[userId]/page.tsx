@@ -2,9 +2,8 @@ import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { RankBadge } from '@/components/RankBadge'
 import { MMRProgressBar } from '@/components/MMRProgressBar'
-import { ActivityFeed } from '@/components/ActivityFeed'
 import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
-import { Player, ActivityFeed as ActivityFeedType, Comment, RankHistory } from '@/lib/types'
+import { Player, Comment } from '@/lib/types'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -19,7 +18,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
     .from('players')
     .select('*')
     .eq('discord_user_id', userId)
-    .maybeSingle() as { data: Player | null }
+    .maybeSingle() as { data: (Player & { discord_avatar_url?: string | null }) | null }
   
   if (!player) {
     notFound()
@@ -52,7 +51,12 @@ export default async function ProfilePage({ params }: { params: { userId: string
     mvp: boolean
     mmr_after: number
     mmr_before: number
-    match?: { winner?: 'A' | 'B' }
+    created_at: string
+    match?: { 
+      winner?: 'A' | 'B'
+      map?: string | null
+      match_date?: string
+    }
   }
   
   const stats = (matchStats as MatchStatWithMatch[]) || []
@@ -75,28 +79,9 @@ export default async function ProfilePage({ params }: { params: { userId: string
   
   const mvpCount = stats.filter(s => s.mvp).length
   
-  // Get activity feed
-  const { data: activities } = await supabaseAdmin
-    .from('activity_feed')
-    .select('*, player:players(*)')
-    .eq('player_id', playerData.id)
-    .order('created_at', { ascending: false })
-    .limit(20)
   
-  const activityFeed = (activities as ActivityFeedType[]) || []
-  
-  // Get rank history
-  const { data: rankHistory } = await supabaseAdmin
-    .from('rank_history')
-    .select('*')
-    .eq('player_id', playerData.id)
-    .order('created_at', { ascending: false })
-    .limit(10)
-  
-  const history = (rankHistory as RankHistory[]) || []
-  
-  // Get comments for profile
-  const { data: comments } = await supabaseAdmin
+  // Get comments left on this profile by others
+  const { data: profileCommentsData } = await supabaseAdmin
     .from('comments')
     .select('*, author:players(*)')
     .eq('target_type', 'profile')
@@ -104,7 +89,45 @@ export default async function ProfilePage({ params }: { params: { userId: string
     .order('created_at', { ascending: false })
     .limit(50)
   
-  const profileComments = (comments as Comment[]) || []
+  const profileComments = (profileCommentsData as Comment[]) || []
+  
+  // Get comments left BY this user on OTHER people's profiles
+  interface UserComment {
+    id: string
+    content: string
+    created_at: string
+    target_player?: {
+      discord_user_id?: string
+      discord_username?: string | null
+    }
+  }
+  
+  const { data: userCommentsData } = await supabaseAdmin
+    .from('comments')
+    .select('id, content, created_at, target_id')
+    .eq('author_id', playerData.id)
+    .eq('target_type', 'profile')
+    .neq('target_id', playerData.id)  // Exclude comments on own profile
+    .order('created_at', { ascending: false })
+    .limit(20)
+  
+  // Get target player info for each comment
+  const userCommentsWithTargets = await Promise.all(
+    ((userCommentsData as { id: string; content: string; created_at: string; target_id: string }[]) || []).map(async (comment) => {
+      const { data: targetPlayer } = await supabaseAdmin
+        .from('players')
+        .select('discord_user_id, discord_username')
+        .eq('id', comment.target_id)
+        .maybeSingle() as { data: { discord_user_id: string; discord_username: string | null } | null }
+      
+      return {
+        ...comment,
+        target_player: targetPlayer || undefined
+      } as UserComment
+    })
+  )
+  
+  const userComments = userCommentsWithTargets
   
   // Get leaderboard position
   const { count: position } = await supabaseAdmin
@@ -114,44 +137,74 @@ export default async function ProfilePage({ params }: { params: { userId: string
   
   const leaderboardPosition = (position || 0) + 1
   
-  // Get user profile for display name
+  // Get user profile for display name and bio
   const { data: userProfile } = await supabaseAdmin
     .from('user_profiles')
-    .select('display_name')
+    .select('display_name, bio')
     .eq('discord_user_id', playerData.discord_user_id)
-    .maybeSingle() as { data: { display_name: string | null } | null }
+    .maybeSingle() as { data: { display_name: string | null; bio: string | null } | null }
   
   const displayName = userProfile?.display_name || playerData.discord_username || 'Player'
+  const userBio = userProfile?.bio || null
   
   return (
     <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10">
       <div className="max-w-[1400px] mx-auto">
-        {/* Profile Header */}
+        {/* Profile Header with Avatar */}
         <div className="mb-12 md:mb-20">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
             <div className="flex-1">
-              <div className="flex items-center gap-4 mb-2 md:mb-4">
-                <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tighter leading-[0.9]">
-                  {displayName}
-                </h1>
-                {isOwnProfile && (
-                  <Link
-                    href={`/profile/${userId}/edit`}
-                    className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/50 transition-all group"
-                    title="Edit Profile"
-                  >
-                    <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </Link>
-                )}
+              <div className="flex items-center gap-4 md:gap-6 mb-4 md:mb-6">
+                {/* Avatar */}
+                <div className="relative flex-shrink-0">
+                  {playerData.discord_avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={playerData.discord_avatar_url}
+                      alt={displayName}
+                      className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-white/10"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border-2 border-white/10 flex items-center justify-center text-white/60 text-2xl md:text-3xl font-black">
+                      {displayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Name and Edit */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-4 mb-2">
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tighter leading-[0.9]">
+                      {displayName}
+                    </h1>
+                    {isOwnProfile && (
+                      <Link
+                        href={`/profile/${userId}/edit`}
+                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/50 transition-all group"
+                        title="Edit Profile"
+                      >
+                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </Link>
+                    )}
+                  </div>
+                  {/* Valorant Info */}
+                  <p className="text-lg md:text-xl text-white/60 font-light">
+                    {playerData.riot_name && playerData.riot_tag 
+                      ? `${playerData.riot_name}#${playerData.riot_tag}`
+                      : 'No Riot account linked'
+                    }
+                  </p>
+                </div>
               </div>
-              <p className="text-lg md:text-xl text-white/60 font-light">
-                {playerData.riot_name && playerData.riot_tag 
-                  ? `${playerData.riot_name}#${playerData.riot_tag}`
-                  : 'No Riot account linked'
-                }
-              </p>
+              
+              {/* Bio */}
+              {userBio && (
+                <div className="glass rounded-2xl p-6 border border-white/5 mb-6">
+                  <p className="text-base md:text-lg text-white/80 font-light leading-relaxed">{userBio}</p>
+                </div>
+              )}
             </div>
             <div className="flex flex-col items-start md:items-end gap-3">
               <RankBadge mmr={playerData.current_mmr} size="xl" />
@@ -160,43 +213,6 @@ export default async function ProfilePage({ params }: { params: { userId: string
               </p>
             </div>
           </div>
-          
-          {/* Recent Comments Section */}
-          {profileComments.length > 0 && (
-            <div className="glass rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 border border-white/5 mb-8 md:mb-12">
-              <h2 className="text-xl md:text-2xl font-black text-white mb-4 md:mb-6 tracking-tighter uppercase">Recent Comments</h2>
-              <div className="space-y-3 md:space-y-4">
-                {profileComments.slice(0, 5).map((comment) => {
-                  const author = comment.author as { discord_username?: string | null; discord_user_id?: string } | undefined
-                  return (
-                    <div
-                      key={comment.id}
-                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black text-white">
-                            {author?.discord_username || 'Unknown'}
-                          </span>
-                          <span className="text-xs text-white/40">
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-white/80 font-light leading-relaxed">{comment.content}</p>
-                    </div>
-                  )
-                })}
-              </div>
-              {profileComments.length > 5 && (
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-white/40 font-light">
-                    Showing 5 of {profileComments.length} comments
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
           
           {/* MMR Progress */}
           <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5 mb-8 md:mb-12">
@@ -244,60 +260,113 @@ export default async function ProfilePage({ params }: { params: { userId: string
         
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-12 md:mb-20">
-          {/* Rank History */}
+          {/* Recent Games */}
           <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Rank Journey</h2>
-            {history.length > 0 ? (
-              <div className="space-y-4 md:space-y-6">
-                {history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-black text-white mb-2 tracking-tight">
-                        {entry.old_rank} → {entry.new_rank}
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Recent Games</h2>
+            {stats.length > 0 ? (
+              <div className="space-y-3 md:space-y-4 max-h-[600px] overflow-y-auto">
+                {stats.slice(0, 10).map((stat) => {
+                  const isWin = stat.match && stat.team ? stat.match.winner === stat.team : stat.mmr_after > stat.mmr_before
+                  const mmrChange = stat.mmr_after - stat.mmr_before
+                  return (
+                    <div
+                      key={stat.match?.match_date || stat.created_at}
+                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-red-500/30 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className={`text-sm font-black ${isWin ? 'text-green-500' : 'text-red-500'}`}>
+                          {isWin ? 'WIN' : 'LOSS'}
+                        </div>
+                        <div className={`text-sm font-black ${mmrChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
+                        </div>
                       </div>
-                      <div className="text-sm text-white/40 font-light">
-                        {new Date(entry.created_at).toLocaleDateString()}
+                      <div className="text-xs text-white/60 mb-1">
+                        {stat.match?.map || 'Unknown Map'} • {stat.match?.match_date ? new Date(stat.match.match_date).toLocaleDateString() : 'Unknown Date'}
+                      </div>
+                      <div className="text-xs text-white/40">
+                        {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="text-red-500 font-black">MVP</span>}
                       </div>
                     </div>
-                    <div className={`text-lg md:text-xl font-black tracking-tighter ml-4 ${
-                      entry.new_mmr > entry.old_mmr ? 'text-green-500' : 'text-red-500'
-                    }`}>
-                      {entry.new_mmr > entry.old_mmr ? '+' : ''}{entry.new_mmr - entry.old_mmr} MMR
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-12 text-white/40">
-                <p className="font-light">No rank history yet</p>
+                <p className="font-light">No recent games yet</p>
               </div>
             )}
           </div>
           
-          {/* Activity Feed */}
+          {/* Comments Left by User on Other Profiles */}
           <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Recent Activity</h2>
-            {activityFeed.length > 0 ? (
-              <ActivityFeed activities={activityFeed} limit={10} />
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Recent Comments</h2>
+            {userComments.length > 0 ? (
+              <div className="space-y-3 md:space-y-4 max-h-[600px] overflow-y-auto">
+                {userComments.map((comment) => {
+                  const targetPlayer = comment.target_player
+                  return (
+                    <Link
+                      key={comment.id}
+                      href={`/profile/${targetPlayer?.discord_user_id || ''}`}
+                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-white/40">
+                          On <span className="text-white/60 font-medium group-hover:text-red-500 transition-colors">{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
+                        </div>
+                        <span className="text-xs text-white/40">
+                          {new Date(comment.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-white/80 font-light leading-relaxed line-clamp-2">{comment.content}</p>
+                    </Link>
+                  )
+                })}
+              </div>
             ) : (
               <div className="text-center py-12 text-white/40">
-                <p className="font-light">No activity yet. Play some matches!</p>
+                <p className="font-light">No comments yet</p>
               </div>
             )}
           </div>
         </div>
         
-        {/* Comments */}
-        <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-          <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Comments</h2>
-          <CommentSectionWrapper
-            targetType="profile"
-            targetId={playerData.id}
-            comments={profileComments}
-          />
+        {/* Valorant Info & Comments on This Profile */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-12 md:mb-20">
+          {/* Valorant Info */}
+          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Valorant Info</h2>
+            <div className="space-y-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Riot ID</div>
+                <div className="text-lg font-black text-white">
+                  {playerData.riot_name && playerData.riot_tag 
+                    ? `${playerData.riot_name}#${playerData.riot_tag}`
+                    : 'Not linked'
+                  }
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Region</div>
+                <div className="text-lg font-black text-white">{playerData.riot_region || 'N/A'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
+                <div className="text-lg font-black text-white">{playerData.verified_at ? 'Yes' : 'No'}</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Comments on This Profile */}
+          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Comments on Profile</h2>
+            <CommentSectionWrapper
+              targetType="profile"
+              targetId={playerData.id}
+              comments={profileComments}
+            />
+          </div>
         </div>
       </div>
     </div>

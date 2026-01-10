@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Trophy, Users, User, LogOut, Menu, X
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { PlayerSearch } from "./PlayerSearch";
 
 const RED = "#ef4444";
 
@@ -89,7 +90,13 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
         </Link>
 
         {/* Tab Navigation - Desktop */}
-        <div className="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5 flex-1 max-w-3xl mx-4 md:mx-8">
+        <div className="hidden md:flex items-center gap-3 flex-1 max-w-4xl mx-4 md:mx-8">
+          {/* Search */}
+          <div className="flex-1 max-w-xs">
+            <PlayerSearch />
+          </div>
+          
+          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -115,6 +122,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
               </Link>
             );
           })}
+          </div>
         </div>
 
         {/* Right Actions */}
@@ -165,28 +173,35 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
                 </button>
               </div>
 
-              <div className="space-y-2 mb-8">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const Icon = tab.icon;
-                  const href = tab.id === "profile" && discordUserId ? `/profile/${discordUserId}` : tab.href;
-                  
-                  return (
-                    <Link
-                      key={tab.id}
-                      href={href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${
-                        isActive 
-                          ? "bg-red-500/10 border border-red-500/30 text-red-500" 
-                          : "text-white/40 hover:bg-white/5 hover:text-white/60"
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-xs font-black uppercase tracking-widest">{tab.label}</span>
-                    </Link>
-                  );
-                })}
+              <div className="space-y-4 mb-8">
+                {/* Search in Mobile */}
+                <div className="px-2">
+                  <PlayerSearch />
+                </div>
+                
+                <div className="space-y-2">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const Icon = tab.icon;
+                    const href = tab.id === "profile" && discordUserId ? `/profile/${discordUserId}` : tab.href;
+                    
+                    return (
+                      <Link
+                        key={tab.id}
+                        href={href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${
+                          isActive 
+                            ? "bg-red-500/10 border border-red-500/30 text-red-500" 
+                            : "text-white/40 hover:bg-white/5 hover:text-white/60"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs font-black uppercase tracking-widest">{tab.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="mt-auto pt-8 border-t border-white/5">
