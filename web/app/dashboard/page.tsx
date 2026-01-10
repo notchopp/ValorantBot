@@ -429,7 +429,7 @@ function DashboardContent({
                         <div className="text-sm font-black text-white">
                           {entry.old_rank || 'Unranked'} → {entry.new_rank}
                         </div>
-                        <div className={`text-xs font-black ${mmrChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="text-xs font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : userAccentColor }}>
                           {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
                         </div>
                       </div>
