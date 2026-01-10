@@ -14,117 +14,101 @@ export async function GET(request: Request) {
     if (!error && data.session) {
       const user = data.session.user
       
-      // Extract Discord user ID from OAuth metadata
+      // Extract Discord username (actor_name) from OAuth metadata
+      // Based on Supabase logs: actor_id = Supabase UID (user.id), actor_name = Discord username
       const identities = user.identities || []
       interface Identity {
         provider: string
         identity_data?: {
-          id?: string
-          preferred_username?: string
-          username?: string
+          name?: string  // This is actor_name - Discord username
         }
-        user_id?: string
       }
       
       const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
-      const discordUserId = discordIdentity?.identity_data?.id || 
-                            discordIdentity?.user_id ||
-                            user.user_metadata?.provider_user_id ||
-                            user.user_metadata?.provider_id || 
-                            user.user_metadata?.sub || 
-                            user.user_metadata?.discord_id ||
-                            null
       
-      const discordUsername = discordIdentity?.identity_data?.preferred_username ||
-                              discordIdentity?.identity_data?.username ||
-                              user.user_metadata?.preferred_username ||
-                              user.user_metadata?.username ||
-                              user.user_metadata?.global_name ||
-                              user.user_metadata?.full_name ||
-                              null
+      // Discord username (actor_name) - ONLY use actor_name, nothing else
+      const actorName = discordIdentity?.identity_data?.name || null
       
-      // If we have a Discord user ID, link auth UID to player record
-      if (discordUserId) {
-        console.log('=== OAuth Callback: User Data Extraction ===')
-        console.log('Supabase Auth ID (auth_id):', user.id)
-        console.log('Discord User ID (discord_user_id):', discordUserId)
-        console.log('Discord Username:', discordUsername)
-        console.log('User Email:', user.email)
-        console.log('---')
-        console.log('NOTE: auth_id is Supabase internal, discord_user_id is Discord snowflake')
-        console.log('---')
-        
+      // Actor ID is the Supabase auth UID (user.id)
+      const actorId = user.id
+      
+      console.log('=== OAuth Callback: User Data Extraction ===')
+      console.log('Actor ID (Supabase auth UID):', actorId)
+      console.log('Actor Name (Discord username):', actorName)
+      console.log('User Email:', user.email)
+      
+      // Match players by actor_name (Discord username) only
+      if (actorName) {
         const supabaseAdmin = getSupabaseAdminClient()
         
         try {
-          // Try to find player by Discord ID first
+          // Match player by Discord username (actor_name) only
           interface PlayerData {
+            id?: string
             discord_user_id: string
             discord_username: string | null
             current_mmr: number
           }
           
-          let existingPlayer: PlayerData | null = null
+          // Find player by Discord username (case-insensitive match)
           const { data: playerData, error: playerError } = await supabaseAdmin
             .from('players')
-            .select('discord_user_id, discord_username, current_mmr')
-            .eq('discord_user_id', discordUserId)
+            .select('id, discord_user_id, discord_username, current_mmr')
+            .ilike('discord_username', actorName) // Case-insensitive match using actor_name
             .maybeSingle() as { data: PlayerData | null; error: unknown }
-          existingPlayer = playerData
           
-          // If not found by ID, try matching by Discord username
-          // This matches the discord_username in players table to the display name from auth
-          if (!existingPlayer && discordUsername) {
-            console.log('Player not found by Discord ID, trying username match...')
-            console.log('Searching for discord_username matching:', discordUsername)
-            
-            const { data: playerByUsername } = await supabaseAdmin
-              .from('players')
-              .select('discord_user_id, discord_username, current_mmr')
-              .ilike('discord_username', discordUsername) // Case-insensitive match
-              .maybeSingle() as { data: PlayerData | null }
-            
-            if (playerByUsername) {
-              console.log('✓ Found player by Discord username match!')
-              console.log('  Player discord_username:', playerByUsername.discord_username)
-              console.log('  Player discord_user_id:', playerByUsername.discord_user_id)
-              console.log('  Auth display name:', discordUsername)
-              console.log('  → Linking to this player')
-              existingPlayer = playerByUsername
-            } else {
-              console.log('✗ No player found with discord_username matching:', discordUsername)
-            }
-          }
+          const existingPlayer = playerData
           
           if (playerError) {
             console.error('Error checking player:', playerError)
           }
           
-          // If player exists, update their id to be the auth UID
+          if (!existingPlayer) {
+            console.log('✗ No player found with discord_username matching:', actorName)
+            console.log('User needs to run /verify in Discord first to create player record')
+          }
+          
+          // If player exists, update their id to be the actor_id (Supabase auth UID)
           // This links the player record directly to the Supabase auth account
           if (existingPlayer) {
-            console.log('✓ Player found - linking auth UID to player record')
-            console.log('  Player username:', existingPlayer.discord_username)
+            console.log('✓ Player found by actor_name - updating id to actor_id')
+            console.log('  Player username (actor_name):', existingPlayer.discord_username)
             console.log('  Player Discord ID:', existingPlayer.discord_user_id)
-            console.log('  Auth UID:', user.id)
+            console.log('  Current player.id:', existingPlayer.id || 'unknown')
+            console.log('  New actor_id (auth.uid()):', actorId)
             
-            // Update player record to use auth UID as id
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { error: updateError } = await (supabaseAdmin.from('players') as any)
-              .update({ id: user.id })
-              .eq('discord_user_id', existingPlayer.discord_user_id)
+            const currentPlayerId = existingPlayer.id
             
-            if (updateError) {
-              console.error('✗ Failed to update player id:', updateError)
+            // Only update if the id is different
+            if (currentPlayerId && currentPlayerId !== actorId) {
+              console.log('  → Player id needs to be updated from', currentPlayerId, 'to', actorId)
+              
+              // Use database function to atomically update id and all foreign keys
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { error: updateError } = await (supabaseAdmin.rpc as any)('update_player_id_with_auth_uid', {
+                p_old_player_id: currentPlayerId,
+                p_new_auth_uid: actorId,
+                p_discord_user_id: existingPlayer.discord_user_id,
+                p_display_name: actorName || existingPlayer.discord_username
+              })
+              
+              if (updateError) {
+                console.error('✗ Failed to update player id:', updateError)
+                console.error('  This might be because foreign keys need to be updated manually')
+              } else {
+                console.log('✓ Player id updated to actor_id (all foreign keys updated)')
+              }
+            } else if (currentPlayerId === actorId) {
+              console.log('  ✓ Player id already matches actor_id - no update needed')
             } else {
-              console.log('✓ Player id updated to auth UID')
+              console.log('  ⚠ Could not determine current player id - skipping update')
             }
             
             // Create/update user_profile
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error: profileError } = await (supabaseAdmin.from('user_profiles') as any).upsert({
               discord_user_id: existingPlayer.discord_user_id,
-              display_name: discordUsername || existingPlayer.discord_username,
+              display_name: actorName || existingPlayer.discord_username,
               updated_at: new Date().toISOString(),
             }, {
               onConflict: 'discord_user_id'
@@ -146,8 +130,9 @@ export async function GET(request: Request) {
           // Don't fail - user can still access dashboard
         }
       } else {
-        console.error('No Discord user ID found in OAuth metadata')
+        console.error('No actor_name (Discord username) found in OAuth metadata')
         console.log('User metadata:', JSON.stringify(user.user_metadata, null, 2))
+        console.log('Identities:', JSON.stringify(identities, null, 2))
       }
       
       // Redirect to production domain
