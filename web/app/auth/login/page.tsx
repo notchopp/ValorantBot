@@ -1,38 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { ClaimForm } from '@/components/ClaimForm'
-import { LoginForm } from '@/components/LoginForm'
+import { RiotLoginForm } from '@/components/RiotLoginForm'
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; next?: string; step?: string }
-}) {
-  const supabase = await createClient()
-  
-  // Check if user is already logged in
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (user) {
-    // Check if user has claimed a profile
-    const { data: player } = await supabase
-      .from('players')
-      .select('id, riot_name, riot_tag')
-      .eq('id', user.id)
-      .maybeSingle()
-    
-    if (player) {
-      redirect('/dashboard')
-    }
-    // User is logged in but hasn't claimed a profile - show claim form
-  }
-  
-  const step = searchParams.step || (user ? 'claim' : 'login')
-  
+export default async function LoginPage() {
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white font-sans">
       <div className="min-h-screen flex">
-        {/* Left Side - Login/Claim Form */}
+        {/* Left Side - Login Form */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-md space-y-8">
             <div>
@@ -40,58 +12,55 @@ export default async function LoginPage({
                 <span className="text-red-500">#GRNDS</span>
               </h1>
               <p className="text-white/60">
-                {step === 'claim' 
-                  ? 'Claim your profile to view your stats'
-                  : 'Sign in to claim your profile'}
+                Enter your Valorant credentials to claim your profile and view your stats
               </p>
             </div>
 
-            {step === 'claim' ? (
-              <div>
-                <ClaimForm />
-                <div className="mt-6 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-                  <p className="text-sm text-yellow-500 font-medium">
-                    ⚠️ Warning: False claiming a profile that is not yours will result in a warning and permanent ban.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <LoginForm />
-            )}
-
-            {step === 'login' && (
-              <p className="text-sm text-white/40 text-center">
-                Don&apos;t have an account?{' '}
-                <a href="/auth/signup" className="text-red-500 hover:text-red-400">
-                  Sign up
-                </a>
-              </p>
-            )}
+            <RiotLoginForm />
           </div>
         </div>
 
         {/* Right Side - Info */}
         <div className="hidden lg:flex flex-1 bg-white/[0.02] border-l border-white/5 p-12">
           <div className="max-w-md space-y-8">
+            {/* System Explanation */}
             <div>
               <h2 className="text-3xl font-black mb-4">How It Works</h2>
-              <p className="text-white/60 leading-relaxed">
-                #GRNDS is a custom ranked system for Valorant. Enter your Riot name and tag to claim your profile and view your stats, MMR, and competitive history.
+              <p className="text-white/60 leading-relaxed mb-6">
+                #GRNDS is a custom ranked system for Valorant. View your stats, MMR, rank progression, and competitive history all in one place.
               </p>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                  <h3 className="font-black text-red-500 mb-2">Real MMR Tracking</h3>
+                  <p className="text-sm text-white/60">Track your MMR changes, rank ups, and competitive performance over time</p>
+                </div>
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                  <h3 className="font-black text-red-500 mb-2">Match History</h3>
+                  <p className="text-sm text-white/60">View detailed match statistics, K/D ratios, and MVP performances</p>
+                </div>
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                  <h3 className="font-black text-red-500 mb-2">Leaderboards</h3>
+                  <p className="text-sm text-white/60">See where you rank among all players in the system</p>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                <h3 className="font-black text-red-500 mb-2">1. Sign In</h3>
-                <p className="text-sm text-white/60">Create an account or sign in with email</p>
-              </div>
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                <h3 className="font-black text-red-500 mb-2">2. Claim Profile</h3>
-                <p className="text-sm text-white/60">Enter your Riot name and tag to claim your profile</p>
-              </div>
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                <h3 className="font-black text-red-500 mb-2">3. View Dashboard</h3>
-                <p className="text-sm text-white/60">See your stats, MMR, rank, and match history</p>
+            {/* Claim System Explanation */}
+            <div className="pt-8 border-t border-white/5">
+              <h2 className="text-3xl font-black mb-4">Claiming Your Profile</h2>
+              <p className="text-white/60 leading-relaxed mb-4">
+                Enter your Riot name and tag to claim your profile. Once claimed, you&apos;ll have access to your personal dashboard with all your stats and competitive data.
+              </p>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+                  <p className="text-sm text-yellow-500 font-medium">
+                    ⚠️ Important: False claiming a profile that is not yours will result in a warning and permanent ban.
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                  <h3 className="font-black text-red-500 mb-2 text-sm">Profile Lock</h3>
+                  <p className="text-xs text-white/60">Once a profile is claimed, it cannot be claimed by anyone else. Make sure you enter your correct Riot credentials.</p>
+                </div>
               </div>
             </div>
 

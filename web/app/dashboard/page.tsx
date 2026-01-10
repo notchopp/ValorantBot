@@ -49,14 +49,14 @@ export const revalidate = 0
 export default async function DashboardPage() {
   const supabase = await createClient()
   
-  // Check if user is authenticated
+  // Check if user has an anonymous session
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
   if (authError || !user) {
     redirect('/auth/login')
   }
   
-  // Check if user has claimed a profile
+  // Get player data for this user (anonymous session)
   const supabaseAdmin = getSupabaseAdminClient()
   interface PlayerCheckRow {
     id: string
@@ -64,11 +64,12 @@ export default async function DashboardPage() {
     riot_name: string | null
     riot_tag: string | null
     current_mmr: number
+    claimed: boolean
   }
   
   const { data: player, error: playerError } = await supabaseAdmin
     .from('players')
-    .select('id, discord_username, riot_name, riot_tag, current_mmr')
+    .select('id, discord_username, riot_name, riot_tag, current_mmr, claimed')
     .eq('id', user.id)
     .maybeSingle() as { data: PlayerCheckRow | null; error: unknown }
   
@@ -76,9 +77,9 @@ export default async function DashboardPage() {
     console.error('Error checking player:', playerError)
   }
   
-  // If no player found or player.id doesn't match user.id, redirect to claim
-  if (!player || player.id !== user.id) {
-    redirect('/auth/login?step=claim')
+  // If no player found, not claimed, or player.id doesn't match user.id, redirect to login
+  if (!player || !player.claimed || player.id !== user.id) {
+    redirect('/auth/login')
   }
   
   console.log('Dashboard - Auth user ID:', user.id)

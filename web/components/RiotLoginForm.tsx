@@ -3,13 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export function ClaimForm() {
+export function RiotLoginForm() {
   const router = useRouter()
   const [riotName, setRiotName] = useState('')
   const [riotTag, setRiotTag] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,7 +16,7 @@ export function ClaimForm() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/claim', {
+      const response = await fetch('/api/auth/riot-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,12 +35,9 @@ export function ClaimForm() {
         return
       }
 
-      setSuccess(true)
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        router.push('/dashboard')
-        router.refresh()
-      }, 1500)
+      // Success - redirect to dashboard
+      router.push('/dashboard')
+      router.refresh()
     } catch {
       setError('Network error. Please try again.')
       setLoading(false)
@@ -53,12 +49,6 @@ export function ClaimForm() {
       {error && (
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
           {error}
-        </div>
-      )}
-      
-      {success && (
-        <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-500 text-sm">
-          Profile claimed successfully! Redirecting...
         </div>
       )}
 
@@ -73,7 +63,7 @@ export function ClaimForm() {
             value={riotName}
             onChange={(e) => setRiotName(e.target.value)}
             required
-            disabled={loading || success}
+            disabled={loading}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-red-500/50 focus:bg-white/10 transition-all disabled:opacity-50"
             placeholder="Your Riot username"
           />
@@ -89,7 +79,7 @@ export function ClaimForm() {
             value={riotTag}
             onChange={(e) => setRiotTag(e.target.value)}
             required
-            disabled={loading || success}
+            disabled={loading}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-red-500/50 focus:bg-white/10 transition-all disabled:opacity-50"
             placeholder="Your Riot tag (without #)"
           />
@@ -98,10 +88,10 @@ export function ClaimForm() {
 
       <button
         type="submit"
-        disabled={loading || success || !riotName.trim() || !riotTag.trim()}
+        disabled={loading || !riotName.trim() || !riotTag.trim()}
         className="w-full px-6 py-4 bg-red-500 hover:bg-red-600 disabled:bg-white/10 disabled:text-white/40 disabled:cursor-not-allowed text-white font-black uppercase tracking-wider rounded-xl transition-all"
       >
-        {loading ? 'Claiming...' : success ? 'Claimed!' : 'Claim Profile'}
+        {loading ? 'Claiming Profile...' : 'Claim Profile'}
       </button>
 
       <p className="text-xs text-white/40 text-center">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { CursorReactiveBackground } from "@/components/CursorReactiveBackground";
 import { GRNDSTopNavWrapper } from "@/components/GRNDSTopNavWrapper";
+import { ConditionalMain } from "@/components/ConditionalMain";
 
 export const metadata: Metadata = {
   title: "GRNDS Hub - Competitive Dashboard",
@@ -18,9 +19,9 @@ export default function RootLayout({
       <body className="antialiased font-sans tracking-tight" suppressHydrationWarning>
         <CursorReactiveBackground />
         <GRNDSTopNavWrapper />
-        <main className="relative z-10 pt-20 md:pt-24 min-h-screen">
+        <ConditionalMain>
           {children}
-        </main>
+        </ConditionalMain>
       </body>
     </html>
   );
