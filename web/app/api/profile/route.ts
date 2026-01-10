@@ -60,13 +60,14 @@ export async function POST(request: Request) {
     // Verify user owns this profile (use admin client for this check)
     const supabaseAdmin = getSupabaseAdminClient()
     
-    const { data: userRecord } = await supabaseAdmin
-      .from('users')
-      .select('discord_user_id')
-      .eq('auth_id', user.id)
-      .maybeSingle() as { data: { discord_user_id: string } | null }
+    // Check if player exists with this auth UID and matches the discord_user_id
+    const { data: player } = await supabaseAdmin
+      .from('players')
+      .select('id, discord_user_id')
+      .eq('id', user.id)
+      .maybeSingle() as { data: { id: string; discord_user_id: string } | null }
     
-    if (!userRecord || userRecord.discord_user_id !== discord_user_id) {
+    if (!player || player.discord_user_id !== discord_user_id) {
       return NextResponse.json(
         { error: 'You can only edit your own profile' },
         { status: 403 }

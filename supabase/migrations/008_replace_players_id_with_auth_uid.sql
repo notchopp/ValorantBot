@@ -1,0 +1,148 @@
+-- Migration 008: Replace players.id with Supabase auth UID and remove users table
+-- This simplifies the data model by using auth.uid() directly as the primary key
+
+-- Step 1: Add auth_id column to players table (temporary, will become the new id)
+ALTER TABLE players ADD COLUMN IF NOT EXISTS auth_id UUID UNIQUE;
+
+-- Step 2: Migrate existing data from users table to players table
+-- Link players to their auth accounts
+UPDATE players p
+SET auth_id = u.auth_id
+FROM users u
+WHERE p.discord_user_id = u.discord_user_id
+AND u.auth_id IS NOT NULL;
+
+-- Step 3: Drop all foreign key constraints that reference players(id)
+ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_host_id_fkey;
+ALTER TABLE match_player_stats DROP CONSTRAINT IF EXISTS match_player_stats_player_id_fkey;
+ALTER TABLE match_player_stats DROP CONSTRAINT IF EXISTS match_player_stats_match_id_fkey;
+ALTER TABLE rank_history DROP CONSTRAINT IF EXISTS rank_history_player_id_fkey;
+ALTER TABLE rank_history DROP CONSTRAINT IF EXISTS rank_history_match_id_fkey;
+ALTER TABLE queue DROP CONSTRAINT IF EXISTS queue_player_id_fkey;
+ALTER TABLE activity_feed DROP CONSTRAINT IF EXISTS activity_feed_player_id_fkey;
+ALTER TABLE comments DROP CONSTRAINT IF EXISTS comments_author_id_fkey;
+
+-- Step 4: Create a mapping table to track old_id -> new_id during migration
+CREATE TEMP TABLE player_id_mapping AS
+SELECT 
+    id as old_id,
+    COALESCE(auth_id, id) as new_id
+FROM players;
+
+-- Step 5: Update all foreign key references to use auth_id (or keep old id if no auth_id)
+UPDATE matches m
+SET host_id = pm.new_id
+FROM player_id_mapping pm
+WHERE m.host_id = pm.old_id;
+
+UPDATE match_player_stats mps
+SET player_id = pm.new_id
+FROM player_id_mapping pm
+WHERE mps.player_id = pm.old_id;
+
+UPDATE rank_history rh
+SET player_id = pm.new_id
+FROM player_id_mapping pm
+WHERE rh.player_id = pm.old_id;
+
+UPDATE queue q
+SET player_id = pm.new_id
+FROM player_id_mapping pm
+WHERE q.player_id = pm.old_id;
+
+UPDATE activity_feed af
+SET player_id = pm.new_id
+FROM player_id_mapping pm
+WHERE af.player_id = pm.old_id;
+
+UPDATE comments c
+SET author_id = pm.new_id
+FROM player_id_mapping pm
+WHERE c.author_id = pm.old_id;
+
+-- Step 6: Drop the old id column and rename auth_id to id
+ALTER TABLE players DROP CONSTRAINT IF EXISTS players_pkey;
+ALTER TABLE players DROP COLUMN IF EXISTS id;
+ALTER TABLE players RENAME COLUMN auth_id TO id;
+ALTER TABLE players ALTER COLUMN id SET NOT NULL;
+ALTER TABLE players ADD PRIMARY KEY (id);
+
+-- Step 7: Recreate all foreign key constraints
+ALTER TABLE matches 
+    ADD CONSTRAINT matches_host_id_fkey 
+    FOREIGN KEY (host_id) REFERENCES players(id) ON DELETE SET NULL;
+
+ALTER TABLE match_player_stats 
+    ADD CONSTRAINT match_player_stats_player_id_fkey 
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+
+ALTER TABLE match_player_stats 
+    ADD CONSTRAINT match_player_stats_match_id_fkey 
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE;
+
+ALTER TABLE rank_history 
+    ADD CONSTRAINT rank_history_player_id_fkey 
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+
+ALTER TABLE rank_history 
+    ADD CONSTRAINT rank_history_match_id_fkey 
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE SET NULL;
+
+ALTER TABLE queue 
+    ADD CONSTRAINT queue_player_id_fkey 
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+
+ALTER TABLE activity_feed 
+    ADD CONSTRAINT activity_feed_player_id_fkey 
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+
+ALTER TABLE comments 
+    ADD CONSTRAINT comments_author_id_fkey 
+    FOREIGN KEY (author_id) REFERENCES players(id) ON DELETE CASCADE;
+
+-- Step 8: Drop the users table (no longer needed)
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Step 9: Update RLS policies that reference the old structure
+-- Drop old policies that used users table
+DROP POLICY IF EXISTS "Users can view their own data" ON players;
+DROP POLICY IF EXISTS "Users can update their own data" ON players;
+
+-- Create new RLS policies using auth.uid() directly
+CREATE POLICY "Users can view their own player data"
+    ON players FOR SELECT
+    USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own player data"
+    ON players FOR UPDATE
+    USING (auth.uid() = id);
+
+-- Update comments RLS policies
+DROP POLICY IF EXISTS "Users can view comments" ON comments;
+DROP POLICY IF EXISTS "Users can create comments" ON comments;
+
+CREATE POLICY "Users can view comments"
+    ON comments FOR SELECT
+    USING (true); -- Public read access
+
+CREATE POLICY "Users can create comments"
+    ON comments FOR INSERT
+    WITH CHECK (auth.uid() = author_id);
+
+-- Update activity_feed RLS policies
+DROP POLICY IF EXISTS "Users can view activity feed" ON activity_feed;
+CREATE POLICY "Users can view activity feed"
+    ON activity_feed FOR SELECT
+    USING (true); -- Public read access
+
+-- Step 10: Add index on id for performance
+CREATE INDEX IF NOT EXISTS idx_players_id ON players(id);
+
+-- Step 11: Update comments to use auth.uid() directly in RLS
+-- The RLS policies above already handle this, but ensure triggers work correctly
+DROP TRIGGER IF EXISTS check_comment_author ON comments;
+DROP FUNCTION IF EXISTS check_comment_author();
+
+-- Comments
+COMMENT ON COLUMN players.id IS 'Supabase auth.uid() - primary key linking auth to player data';
+COMMENT ON TABLE players IS 'Player data - id is now the Supabase auth UID directly';

@@ -15,22 +15,11 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
     redirect('/auth/login')
   }
   
-  // Get user's discord_user_id
-  const { data: userRecord } = await supabase
-    .from('users')
-    .select('discord_user_id')
-    .eq('auth_id', user.id)
-    .maybeSingle()
-  
-  if (!userRecord) {
-    redirect('/dashboard')
-  }
-  
-  // Get player data
+  // Get player data directly by id (which is now the auth UID)
   const { data: player } = await supabase
     .from('players')
     .select('*')
-    .eq('discord_user_id', userRecord.discord_user_id)
+    .eq('id', user.id)
     .maybeSingle()
   
   if (!player) {
@@ -41,7 +30,7 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
   let { data: userProfile } = await supabase
     .from('user_profiles')
     .select('*')
-    .eq('discord_user_id', userRecord.discord_user_id)
+    .eq('discord_user_id', player.discord_user_id)
     .maybeSingle()
   
   // If no profile exists, create one
@@ -49,7 +38,7 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
     const { data: newProfile } = await supabase
       .from('user_profiles')
       .insert({
-        discord_user_id: userRecord.discord_user_id,
+        discord_user_id: player.discord_user_id,
         display_name: player.discord_username,
       })
       .select()
@@ -79,7 +68,7 @@ export default async function ProfileEditPage({ params: _params }: { params: { u
             favorite_agent: userProfile?.favorite_agent || '',
             favorite_map: userProfile?.favorite_map || '',
           }}
-          discordUserId={userRecord.discord_user_id}
+          discordUserId={player.discord_user_id}
         />
       </div>
     </div>

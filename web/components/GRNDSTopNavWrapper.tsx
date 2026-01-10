@@ -11,15 +11,15 @@ export async function GRNDSTopNavWrapper() {
   if (user) {
     const supabaseAdmin = getSupabaseAdminClient()
     
-    // Try to get discord_user_id from users table
-    const { data: userRecord } = await supabaseAdmin
-      .from('users')
+    // Get player data directly by id (which is now the auth UID)
+    const { data: player } = await supabaseAdmin
+      .from('players')
       .select('discord_user_id')
-      .eq('auth_id', user.id)
+      .eq('id', user.id)
       .maybeSingle() as { data: { discord_user_id: string } | null }
     
-    if (userRecord) {
-      discordUserId = userRecord.discord_user_id
+    if (player) {
+      discordUserId = player.discord_user_id
     }
   }
   

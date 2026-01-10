@@ -60,85 +60,16 @@ export default async function DashboardPage() {
   const supabaseAdmin = getSupabaseAdminClient()
   
   console.log('Dashboard - Auth user ID:', user.id)
-  console.log('Dashboard - User metadata:', JSON.stringify(user.user_metadata, null, 2))
   
-  // Step 1: Check users table for auth_id -> discord_user_id mapping (use admin client)
-  const { data: userRecord, error: userRecordError } = await supabaseAdmin
-    .from('users')
-    .select('discord_user_id, pending_discord_link')
-    .eq('auth_id', user.id)
-    .maybeSingle() as { data: { discord_user_id: string | null; pending_discord_link?: boolean } | null, error: unknown }
+  // Query player directly by id (which is now the auth UID)
+  const { data: playerData } = await supabaseAdmin
+    .from('players')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle() as { data: PlayerData | null }
   
-  console.log('Dashboard - User record from users table:', userRecord)
-  console.log('Dashboard - User record error:', userRecordError)
-  
-  // Check if user is in pending state (signed in before running /verify)
-  if (userRecord && userRecord.pending_discord_link === true) {
-    console.log('Dashboard - User is in pending state, needs to run /verify in Discord')
-  }
-  
-  // If no user record exists, try to auto-link from OAuth metadata
-  let finalUserRecord = userRecord
-  if (!finalUserRecord) {
-    const identities = user.identities || []
-    interface Identity {
-      provider: string
-      identity_data?: {
-        id?: string
-        preferred_username?: string
-        username?: string
-      }
-      user_id?: string
-    }
-    const discordIdentity = identities.find((id: Identity) => id.provider === 'discord') as Identity | undefined
-    const discordUserIdFromAuth = discordIdentity?.identity_data?.id || 
-                                  discordIdentity?.user_id ||
-                                  user.user_metadata?.provider_user_id ||
-                                  user.user_metadata?.provider_id || 
-                                  user.user_metadata?.sub || 
-                                  user.user_metadata?.discord_id ||
-                                  null
-    
-    if (discordUserIdFromAuth) {
-      console.log('Dashboard - Trying to auto-link with Discord ID:', discordUserIdFromAuth)
-      
-      // Check if player exists with this Discord ID
-      const { data: existingPlayer, error: playerError } = await supabaseAdmin
-        .from('players')
-        .select('discord_user_id')
-        .eq('discord_user_id', discordUserIdFromAuth)
-        .maybeSingle() as { data: { discord_user_id: string } | null, error: unknown }
-      
-      console.log('Dashboard - Player found:', existingPlayer)
-      console.log('Dashboard - Player error:', playerError)
-      
-      // If player exists, create/update users table entry using admin client
-      if (existingPlayer) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: newUserRecord, error: upsertError } = await (supabaseAdmin.from('users') as any)
-          .upsert({
-            auth_id: user.id,
-            discord_user_id: discordUserIdFromAuth,
-            email: user.email || null,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'auth_id'
-          })
-          .select('discord_user_id')
-          .single()
-        
-        console.log('Dashboard - Upsert result:', newUserRecord)
-        console.log('Dashboard - Upsert error:', upsertError)
-        
-        if (newUserRecord) {
-          finalUserRecord = newUserRecord as { discord_user_id: string }
-        }
-      }
-    }
-  }
-  
-  // If still no user record exists, show link message
-  if (!finalUserRecord || !finalUserRecord.discord_user_id) {
+  // If no player found, show link message
+  if (!playerData) {
     const discordUsername = user.user_metadata?.preferred_username || 
                             user.user_metadata?.global_name ||
                             user.user_metadata?.full_name || 
@@ -194,13 +125,7 @@ export default async function DashboardPage() {
     )
   }
   
-  // Step 2: Get player data using discord_user_id from users table (use admin client)
-  const { data: playerData } = await supabaseAdmin
-    .from('players')
-    .select('*')
-    .eq('discord_user_id', finalUserRecord.discord_user_id)
-    .maybeSingle() as { data: PlayerData | null }
-  
+  // Player data already fetched above
   if (!playerData) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 relative z-10">

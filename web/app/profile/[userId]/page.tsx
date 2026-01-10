@@ -14,23 +14,6 @@ export default async function ProfilePage({ params }: { params: { userId: string
   const supabase = await createClient()
   const { userId } = params
   
-  // Check if current user is viewing their own profile
-  const { data: { user } } = await supabase.auth.getUser()
-  let isOwnProfile = false
-  
-  if (user) {
-    // Check if this is the user's own profile
-    const { data: userRecord } = await supabaseAdmin
-      .from('users')
-      .select('discord_user_id')
-      .eq('auth_id', user.id)
-      .maybeSingle() as { data: { discord_user_id: string } | null }
-    
-    if (userRecord && userRecord.discord_user_id === userId) {
-      isOwnProfile = true
-    }
-  }
-  
   // Get player by discord_user_id
   const { data: player } = await supabaseAdmin
     .from('players')
@@ -43,6 +26,17 @@ export default async function ProfilePage({ params }: { params: { userId: string
   }
   
   const playerData = player as Player
+  
+  // Check if current user is viewing their own profile
+  const { data: { user } } = await supabase.auth.getUser()
+  let isOwnProfile = false
+  
+  if (user) {
+    // Check if this is the user's own profile by comparing player.id with auth.uid()
+    if (playerData.id === user.id) {
+      isOwnProfile = true
+    }
+  }
   
   // Get player's match stats
   const { data: matchStats } = await supabaseAdmin

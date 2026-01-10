@@ -23,23 +23,11 @@ export function ProfileNav() {
         return
       }
 
-      // Get user record to find discord_user_id
-      const { data: userRecord } = await supabase
-        .from('users')
-        .select('discord_user_id')
-        .eq('auth_id', user.id)
-        .maybeSingle()
-
-      if (!userRecord) {
-        setLoading(false)
-        return
-      }
-
-      // Get player data
+      // Get player data directly by id (which is now the auth UID)
       const { data: player } = await supabase
         .from('players')
         .select('discord_username, discord_user_id')
-        .eq('discord_user_id', userRecord.discord_user_id)
+        .eq('id', user.id)
         .maybeSingle()
 
       if (!player) {

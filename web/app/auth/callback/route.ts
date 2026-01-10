@@ -43,7 +43,7 @@ export async function GET(request: Request) {
                               user.user_metadata?.full_name ||
                               null
       
-      // If we have a Discord user ID, automatically create/update users table entry
+      // If we have a Discord user ID, link auth UID to player record
       if (discordUserId) {
         console.log('=== OAuth Callback: User Data Extraction ===')
         console.log('Supabase Auth ID (auth_id):', user.id)
@@ -100,51 +100,30 @@ export async function GET(request: Request) {
             console.error('Error checking player:', playerError)
           }
           
-          // Determine which Discord ID to use for linking
-          const discordIdToLink = existingPlayer?.discord_user_id || discordUserId
-          
-          // SOLUTION FOR ALL 3 PROBLEMS:
-          // Always create users table entry, even if player doesn't exist yet
-          // Use pending_discord_link flag to track users waiting for /verify
-          
-          const isPending = !existingPlayer
-          
-          if (isPending) {
-            console.log('Player not found - creating pending user record')
-            console.log('User will see "Link Discord Account" message until they run /verify')
-          } else if (existingPlayer) {
-            console.log('✓ Player found - linking immediately')
+          // If player exists, update their id to be the auth UID
+          // This links the player record directly to the Supabase auth account
+          if (existingPlayer) {
+            console.log('✓ Player found - linking auth UID to player record')
             console.log('  Player username:', existingPlayer.discord_username)
             console.log('  Player Discord ID:', existingPlayer.discord_user_id)
-          }
-          
-          // Upsert users table entry (always succeeds now)
-          // Use the discord_user_id from the player record if found, otherwise use OAuth value
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: userError } = await (supabaseAdmin.from('users') as any).upsert({
-            auth_id: user.id,
-            discord_user_id: isPending ? null : discordIdToLink, // Use matched player's Discord ID
-            email: user.email || null,
-            pending_discord_link: isPending,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'auth_id'
-          })
-          
-          if (userError) {
-            console.error('✗ Failed to create user record:', userError)
-            console.error('This should not happen with new schema - check migrations')
-          } else {
-            console.log('✓ User record created/updated')
-            console.log('  auth_id (Supabase):', user.id)
-            console.log('  discord_user_id (Player link):', isPending ? 'null (pending)' : discordIdToLink)
-          }
-          
-          // Create user_profile if player exists
-          if (!isPending && existingPlayer) {
+            console.log('  Auth UID:', user.id)
+            
+            // Update player record to use auth UID as id
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error: updateError } = await (supabaseAdmin.from('players') as any)
+              .update({ id: user.id })
+              .eq('discord_user_id', existingPlayer.discord_user_id)
+            
+            if (updateError) {
+              console.error('✗ Failed to update player id:', updateError)
+            } else {
+              console.log('✓ Player id updated to auth UID')
+            }
+            
+            // Create/update user_profile
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error: profileError } = await (supabaseAdmin.from('user_profiles') as any).upsert({
-              discord_user_id: discordIdToLink, // Use the correct Discord ID
+              discord_user_id: existingPlayer.discord_user_id,
               display_name: discordUsername || existingPlayer.discord_username,
               updated_at: new Date().toISOString(),
             }, {
@@ -156,6 +135,9 @@ export async function GET(request: Request) {
             } else {
               console.log('✓ User profile created/updated')
             }
+          } else {
+            console.log('Player not found - user needs to run /verify in Discord first')
+            console.log('User will see "Link Discord Account" message until they run /verify')
           }
           
           console.log('=== OAuth Callback Complete ===')
