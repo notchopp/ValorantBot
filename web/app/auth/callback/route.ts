@@ -109,7 +109,7 @@ export async function GET(request: Request) {
               console.log('  → Player id needs to be updated from', currentPlayerId, 'to', actorId)
               
               // Use database function to atomically update id and all foreign keys
-              // This function uses a temporary UUID to safely update the primary key
+              // This function creates a new row, updates foreign keys, then deletes old row
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const { error: updateError } = await (supabaseAdmin.rpc as any)('update_player_id_with_auth_uid', {
                 p_old_player_id: currentPlayerId,
@@ -120,12 +120,25 @@ export async function GET(request: Request) {
               
               if (updateError) {
                 console.error('✗ Failed to update player id:', updateError)
-                console.error('  This might be because foreign keys need to be updated manually')
+                console.error('  Error details:', JSON.stringify(updateError, null, 2))
+                // Don't fail completely - user can still access
               } else {
-                console.log('✓ Player id updated to actor_id (all foreign keys updated)')
+                console.log('✓ Player id updated to actor_id (all foreign keys updated, claimed=true)')
               }
             } else if (currentPlayerId === actorId) {
               console.log('  ✓ Player id already matches actor_id - no update needed')
+              
+              // Still set claimed = true if not already set
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { error: claimedError } = await (supabaseAdmin.from('players') as any)
+                .update({ claimed: true })
+                .eq('id', actorId)
+              
+              if (claimedError) {
+                console.error('Error setting claimed flag:', claimedError)
+              } else {
+                console.log('✓ Claimed flag set to true')
+              }
             } else {
               console.log('  ⚠ Could not determine current player id - skipping update')
             }
