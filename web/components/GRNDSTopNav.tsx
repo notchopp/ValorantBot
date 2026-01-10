@@ -142,7 +142,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
             className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 rounded-xl bg-white/5 border border-white/5 transition-all group"
             style={{ '--accent-color': accentColor } as React.CSSProperties}
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/40 transition-colors" style={{ '--accent-color': accentColor } as React.CSSProperties} />
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/40 group-hover:text-[var(--accent-color)] transition-colors" />
             <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest text-white/40 group-hover:text-red-400 transition-colors">
               Sign Out
             </span>
