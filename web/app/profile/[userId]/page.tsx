@@ -152,7 +152,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
   return (
     <>
       <ProfileAccentColor accentColor={profileAccentColor} />
-      <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10" style={{ '--profile-accent': profileAccentColor } as React.CSSProperties}>
+      <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10" style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}>
         <div className="max-w-[1400px] mx-auto">
         {/* Profile Header with Avatar */}
         <div className="mb-12 md:mb-20">
