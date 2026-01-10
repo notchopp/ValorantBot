@@ -58,11 +58,19 @@ export async function GET(request: Request) {
         
         try {
           // Try to find player by Discord ID first
-          let { data: existingPlayer, error: playerError } = await supabaseAdmin
+          interface PlayerData {
+            discord_user_id: string
+            discord_username: string | null
+            current_mmr: number
+          }
+          
+          let existingPlayer: PlayerData | null = null
+          const { data: playerData, error: playerError } = await supabaseAdmin
             .from('players')
             .select('discord_user_id, discord_username, current_mmr')
             .eq('discord_user_id', discordUserId)
-            .maybeSingle()
+            .maybeSingle() as { data: PlayerData | null; error: unknown }
+          existingPlayer = playerData
           
           // If not found by ID, try matching by Discord username
           // This matches the discord_username in players table to the display name from auth
@@ -74,7 +82,7 @@ export async function GET(request: Request) {
               .from('players')
               .select('discord_user_id, discord_username, current_mmr')
               .ilike('discord_username', discordUsername) // Case-insensitive match
-              .maybeSingle()
+              .maybeSingle() as { data: PlayerData | null }
             
             if (playerByUsername) {
               console.log('✓ Found player by Discord username match!')
@@ -104,7 +112,7 @@ export async function GET(request: Request) {
           if (isPending) {
             console.log('Player not found - creating pending user record')
             console.log('User will see "Link Discord Account" message until they run /verify')
-          } else {
+          } else if (existingPlayer) {
             console.log('✓ Player found - linking immediately')
             console.log('  Player username:', existingPlayer.discord_username)
             console.log('  Player Discord ID:', existingPlayer.discord_user_id)
@@ -113,7 +121,7 @@ export async function GET(request: Request) {
           // Upsert users table entry (always succeeds now)
           // Use the discord_user_id from the player record if found, otherwise use OAuth value
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: userResult, error: userError } = await (supabaseAdmin.from('users') as any).upsert({
+          const { error: userError } = await (supabaseAdmin.from('users') as any).upsert({
             auth_id: user.id,
             discord_user_id: isPending ? null : discordIdToLink, // Use matched player's Discord ID
             email: user.email || null,
@@ -121,7 +129,7 @@ export async function GET(request: Request) {
             updated_at: new Date().toISOString(),
           }, {
             onConflict: 'auth_id'
-          }).select()
+          })
           
           if (userError) {
             console.error('✗ Failed to create user record:', userError)
@@ -133,7 +141,7 @@ export async function GET(request: Request) {
           }
           
           // Create user_profile if player exists
-          if (!isPending) {
+          if (!isPending && existingPlayer) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error: profileError } = await (supabaseAdmin.from('user_profiles') as any).upsert({
               discord_user_id: discordIdToLink, // Use the correct Discord ID
