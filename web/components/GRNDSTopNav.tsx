@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PlayerSearch } from "./PlayerSearch";
+import { useAccentColor } from "@/lib/AccentColorContext";
 
 const RED = "#ef4444";
 
@@ -41,6 +42,7 @@ const tabs: TabItem[] = [
 export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { accentColor } = useAccentColor();
 
   // Determine active tab based on pathname
   const getActiveTab = (): Tab => {
@@ -69,9 +71,10 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
         {/* Mobile Menu Button */}
         <button 
           onClick={() => setMobileMenuOpen(true)}
-          className="md:hidden p-2 rounded-xl bg-white/5 border border-white/5 hover:border-red-500/30 transition-all"
+          className="md:hidden p-2 rounded-xl bg-white/5 border border-white/5 transition-all"
+          style={{ '--accent-color': accentColor } as React.CSSProperties}
         >
-          <Menu className="w-5 h-5 text-white/60" />
+          <Menu className="w-5 h-5 text-white/60 hover:text-[var(--accent-color)] transition-colors" />
         </button>
 
         {/* Logo & Brand */}
@@ -80,8 +83,8 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
             whileHover={{ scale: 1.05 }}
             className="relative cursor-pointer"
           >
-            <div className="text-2xl sm:text-3xl font-black text-red-500 tracking-tighter">G</div>
-            <div className="absolute inset-0 blur-xl rounded-full -z-10" style={{ backgroundColor: `${RED}20` }} />
+            <div className="text-2xl sm:text-3xl font-black tracking-tighter" style={{ color: accentColor }}>G</div>
+            <div className="absolute inset-0 blur-xl rounded-full -z-10" style={{ backgroundColor: `${accentColor}20` }} />
           </motion.div>
           <div className="hidden sm:flex flex-col">
             <span className="text-xs sm:text-sm font-black tracking-tighter text-red-500 uppercase leading-none">GRNDS</span>
@@ -111,12 +114,16 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 bg-red-500/10 border border-red-500/30 rounded-xl"
+                    className="absolute inset-0 rounded-xl"
+                    style={{ 
+                      backgroundColor: `${accentColor}1a`,
+                      border: `1px solid ${accentColor}4d`
+                    }}
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                <Icon className={`w-3.5 h-3.5 relative z-10 transition-colors ${isActive ? "text-red-500" : "text-white/40 group-hover:text-white/60"}`} />
-                <span className={`text-[9px] font-black uppercase tracking-widest relative z-10 transition-colors ${isActive ? "text-red-500" : "text-white/40 group-hover:text-white/60"}`}>
+                <Icon className={`w-3.5 h-3.5 relative z-10 transition-colors ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined} />
+                <span className={`text-[9px] font-black uppercase tracking-widest relative z-10 transition-colors ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined}>
                   {tab.label}
                 </span>
               </Link>
@@ -132,9 +139,10 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
           <motion.button
             onClick={handleSignOut}
             whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 rounded-xl bg-white/5 border border-white/5 hover:border-red-500/50 hover:bg-red-500/5 transition-all group"
+            className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 rounded-xl bg-white/5 border border-white/5 transition-all group"
+            style={{ '--accent-color': accentColor } as React.CSSProperties}
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/40 group-hover:text-red-400 transition-colors" />
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/40 transition-colors" style={{ '--accent-color': accentColor } as React.CSSProperties} />
             <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest text-white/40 group-hover:text-red-400 transition-colors">
               Sign Out
             </span>
@@ -162,8 +170,8 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
             >
               <div className="flex items-center justify-between mb-12">
                 <div className="flex items-center gap-3">
-                  <div className="text-2xl font-black text-red-500 tracking-tighter">G</div>
-                  <span className="text-sm font-black tracking-tighter text-white uppercase">GRNDS</span>
+                  <div className="text-2xl font-black tracking-tighter" style={{ color: accentColor }}>G</div>
+                  <span className="text-sm font-black tracking-tighter text-red-500 uppercase">GRNDS</span>
                 </div>
                 <button 
                   onClick={() => setMobileMenuOpen(false)} 
@@ -192,9 +200,14 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${
                           isActive 
-                            ? "bg-red-500/10 border border-red-500/30 text-red-500" 
+                            ? "" 
                             : "text-white/40 hover:bg-white/5 hover:text-white/60"
                         }`}
+                        style={isActive ? { 
+                          backgroundColor: `${accentColor}1a`,
+                          border: `1px solid ${accentColor}4d`,
+                          color: accentColor
+                        } : undefined}
                       >
                         <Icon className="w-5 h-5" />
                         <span className="text-xs font-black uppercase tracking-widest">{tab.label}</span>

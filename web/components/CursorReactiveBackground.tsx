@@ -2,8 +2,10 @@
 
 import { useEffect } from 'react'
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { useAccentColor } from '@/lib/AccentColorContext'
 
 export function CursorReactiveBackground() {
+  const { accentColor } = useAccentColor()
   const mouseX = useMotionValue(0)
   const mouseY = useMotionValue(0)
 
@@ -44,22 +46,22 @@ export function CursorReactiveBackground() {
         }}
         className="absolute inset-0 z-10 hidden md:block"
       >
-        {/* Red Hexagonal Grid Lines */}
+        {/* Accent Color Hexagonal Grid Lines */}
         <div 
           className="absolute inset-0 opacity-[0.6]" 
           style={{ 
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23dc2626' fill-opacity='0.6'%3E%3Cpath d='M10 0h40L50 10H20L10 0zm10 20h40l-10 10H20L10 20zm0 40h40l-10 10H20L10 40zM-10 40h40l-10 10H-10L-20 40z'/%3E%3Cpath d='M60 0h40L90 10H60L50 0zm0 20h40l-10 10H60L50 20zm0 40h40l-10 10H60L50 40z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='${encodeURIComponent(accentColor.replace('#', '%23'))}' fill-opacity='0.6'%3E%3Cpath d='M10 0h40L50 10H20L10 0zm10 20h40l-10 10H20L10 20zm0 40h40l-10 10H20L10 40zM-10 40h40l-10 10H-10L-20 40z'/%3E%3Cpath d='M60 0h40L90 10H60L50 0zm0 20h40l-10 10H60L50 20zm0 40h40l-10 10H60L50 40z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
             backgroundSize: '80px 80px'
           }}
         />
         
-        {/* Dynamic spotlight glow following cursor - Red primary */}
+        {/* Dynamic spotlight glow following cursor - Accent color */}
         <motion.div 
           style={{ 
             left: spotlightX,
             top: spotlightY,
             transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, rgba(220, 38, 38, 0.12) 0%, rgba(220, 38, 38, 0.06) 40%, transparent 70%)',
+            background: `radial-gradient(circle, ${accentColor}1f 0%, ${accentColor}0f 40%, transparent 70%)`,
           }}
           className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
         />
