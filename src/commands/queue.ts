@@ -439,6 +439,22 @@ async function handleJoin(
   const queue = await queueService.getStatus();
   const queueSize = queue.players.length;
 
+  // Ping @everyone when first person joins the queue (only once, not spam)
+  if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
+    const playerRank = dbPlayer.discord_rank || 'Unranked';
+    try {
+      await (interaction.channel as any).send({
+        content: `@everyone **${playerRank}** joined the queue.`,
+      });
+    } catch (error) {
+      // Non-critical - continue even if ping fails (e.g., missing permissions)
+      console.warn('Could not send queue ping message', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // Update persistent queue message if it exists
   const { persistentQueueService } = services;
   if (persistentQueueService) {
@@ -1074,6 +1090,22 @@ async function handleJoinButton(
     // Get updated queue status
     const queue = await queueService.getStatus();
     const queueSize = queue.players.length;
+
+    // Ping @everyone when first person joins the queue (only once, not spam)
+    if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
+      const playerRank = dbPlayer.discord_rank || 'Unranked';
+      try {
+        await interaction.channel.send({
+          content: `@everyone **${playerRank}** joined the queue.`,
+        });
+      } catch (error) {
+        // Non-critical - continue even if ping fails (e.g., missing permissions)
+        console.warn('Could not send queue ping message', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     // Check if queue is full (async)
     if (await queueService.isFull()) {
