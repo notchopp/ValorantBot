@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<!-- 
+    #GRNDS Profile Card Template
+    Optimized for Puppeteer screenshot rendering
+    
+    Usage with Puppeteer:
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1200, height: 800 });
+    await page.goto('file:///path/to/rank-profile.html');
+    await page.evaluate(() => {
+        // Inject data here
+    });
+    const screenshot = await page.screenshot({ type: 'png' });
+    await browser.close();
+    
+    Data injection points (use data attributes):
+    - Player name: [data-player-name]
+    - Discord ID: [data-discord-id]
+    - Avatar: [data-avatar] (set img src or use fallback)
+    - Game type: [data-game-type] (optional, hidden if not set)
+    - Rank: [data-rank-icon], [data-rank-name], [data-rank-mmr]
+    - Stats: [data-stat="wins"], [data-stat="losses"], etc.
+    - Progress: [data-progress-section], [data-progress-text], [data-progress-fill]
+    - Roles: [data-role-list] (inject role items)
+    - Recent games: [data-games-list] (inject game items)
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>#GRNDS Profile</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 1200px;
+            height: 800px;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            background: #000000;
+            color: #ffffff;
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subliminal #GRNDS watermark */
+        body::before {
+            content: '#GRNDS';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 180px;
+            font-weight: 900;
+            color: rgba(220, 20, 60, 0.03);
+            letter-spacing: 20px;
+            pointer-events: none;
+            z-index: 0;
+            user-select: none;
+        }
+
+        /* Subtle red accent pattern */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 15% 30%, rgba(220, 20, 60, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 85% 70%, rgba(220, 20, 60, 0.04) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header Section */
+        .header {
+            background: rgba(10, 10, 10, 0.95);
+            border: 2px solid rgba(220, 20, 60, 0.3);
+            border-radius: 16px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(220, 20, 60, 0.05);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, rgba(220, 20, 60, 0.6) 50%, transparent 100%);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 2px solid #DC143C;
+            background: #1a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: bold;
+            position: relative;
+            box-shadow: 0 0 15px rgba(220, 20, 60, 0.4), inset 0 0 20px rgba(220, 20, 60, 0.1);
+            overflow: hidden;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .avatar-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #DC143C;
+        }
+
+        .avatar-badge {
+            position: absolute;
+            bottom: -3px;
+            right: -3px;
+            background: #DC143C;
+            color: #fff;
+            border-radius: 50%;
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            border: 2px solid #000;
+            box-shadow: 0 0 10px rgba(220, 20, 60, 0.6);
+        }
+
+        .player-details h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .player-details .uid {
+            color: #666;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .rank-display {
+            text-align: right;
+        }
+
+        .rank-icon {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 8px;
+            background: linear-gradient(135deg, #1a0a0a 0%, #2a0a0a 100%);
+            border: 2px solid #DC143C;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            font-weight: bold;
+            color: #DC143C;
+            box-shadow: 0 0 20px rgba(220, 20, 60, 0.3), inset 0 0 20px rgba(220, 20, 60, 0.1);
+        }
+
+        .rank-name {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #DC143C;
+            letter-spacing: 1px;
+        }
+
+        .rank-mmr {
+            font-size: 16px;
+            color: #888;
+            font-weight: 500;
+        }
+
+        .game-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(220, 20, 60, 0.15);
+            border: 1px solid rgba(220, 20, 60, 0.3);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #DC143C;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .card {
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid rgba(220, 20, 60, 0.2);
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(220, 20, 60, 0.03);
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(220, 20, 60, 0.4) 50%, transparent 100%);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: #DC143C;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 14px 10px;
+            background: rgba(220, 20, 60, 0.04);
+            border-radius: 8px;
+            border: 1px solid rgba(220, 20, 60, 0.1);
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #DC143C;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* Role Performance */
+        .role-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .role-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            background: rgba(220, 20, 60, 0.04);
+            border-radius: 8px;
+            border-left: 3px solid #DC143C;
+        }
+
+        .role-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #fff;
+        }
+
+        .role-stats {
+            color: #888;
+            font-size: 13px;
+        }
+
+        /* Recent Games */
+        .games-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .game-item {
+            display: grid;
+            grid-template-columns: 50px 1fr auto auto;
+            gap: 14px;
+            align-items: center;
+            padding: 14px;
+            background: rgba(220, 20, 60, 0.04);
+            border-radius: 8px;
+            border-left: 3px solid transparent;
+        }
+
+        .game-item.win {
+            border-left-color: #00ff88;
+            background: rgba(0, 255, 136, 0.06);
+        }
+
+        .game-item.loss {
+            border-left-color: #DC143C;
+            background: rgba(220, 20, 60, 0.06);
+        }
+
+        .game-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background: rgba(220, 20, 60, 0.1);
+            border: 1px solid rgba(220, 20, 60, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #DC143C;
+        }
+
+        .game-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .game-info {
+            flex: 1;
+        }
+
+        .game-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .game-meta {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .game-result {
+            text-align: right;
+        }
+
+        .result-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .result-badge.win {
+            background: rgba(0, 255, 136, 0.15);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .result-badge.loss {
+            background: rgba(220, 20, 60, 0.15);
+            color: #DC143C;
+            border: 1px solid rgba(220, 20, 60, 0.3);
+        }
+
+        .mmr-change {
+            font-size: 13px;
+            font-weight: 600;
+            min-width: 70px;
+            text-align: right;
+        }
+
+        .mmr-change.positive {
+            color: #00ff88;
+        }
+
+        .mmr-change.negative {
+            color: #DC143C;
+        }
+
+        /* Full Width Card */
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Progress Bar */
+        .progress-section {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(220, 20, 60, 0.15);
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(220, 20, 60, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #DC143C 0%, #8B0000 100%);
+            border-radius: 8px;
+        }
+
+        /* Divider */
+        .divider {
+            margin: 18px 0;
+            padding-top: 18px;
+            border-top: 1px solid rgba(220, 20, 60, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <div class="header-top">
+                <div class="player-info">
+                    <div class="avatar" data-avatar>
+                        <div class="avatar-fallback"></div>
+                        <div class="avatar-badge" data-avatar-badge style="display: none;"></div>
+                    </div>
+                    <div class="player-details">
+                        <h1 data-player-name></h1>
+                        <div class="uid" data-discord-id></div>
+                        <div class="game-badge" data-game-type style="display: none;"></div>
+                    </div>
+                </div>
+                <div class="rank-display">
+                    <div class="rank-icon" data-rank-icon></div>
+                    <div class="rank-name" data-rank-name></div>
+                    <div class="rank-mmr" data-rank-mmr></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-grid">
+            <!-- Overall Stats -->
+            <div class="card">
+                <div class="card-title">Overall Stats</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="wins">0</div>
+                        <div class="stat-label">Wins</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="losses">0</div>
+                        <div class="stat-label">Losses</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="winrate">0%</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="kills">0</div>
+                        <div class="stat-label">Kills</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="deaths">0</div>
+                        <div class="stat-label">Deaths</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" data-stat="kd">0.00</div>
+                        <div class="stat-label">K/D Ratio</div>
+                    </div>
+                </div>
+                <div class="progress-section" data-progress-section style="display: none;">
+                    <div class="progress-label">
+                        <span>Progress to Next Rank</span>
+                        <span data-progress-text></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" data-progress-fill style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Performance -->
+            <div class="card">
+                <div class="card-title">Game Performance</div>
+                <div class="role-list" data-role-list>
+                    <!-- Roles will be injected here -->
+                </div>
+                <div class="divider">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" data-stat="mvp">0</div>
+                            <div class="stat-label">MVP</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" data-stat="svp">0</div>
+                            <div class="stat-label">SVP</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" data-stat="games">0</div>
+                            <div class="stat-label">Games</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Games -->
+            <div class="card full-width">
+                <div class="card-title">Recent Games</div>
+                <div class="games-list" data-games-list>
+                    <!-- Games will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

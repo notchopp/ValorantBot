@@ -132,12 +132,12 @@ export class RankService {
   }
 
   private mapMarvelRankToDiscord(stats: { rank?: unknown; tier?: unknown; [key: string]: unknown }): { rank: string; rankValue: number; mmr: number } | null {
-    const rank = typeof stats.rank === 'string' ? stats.rank.trim() : '';
+    const rank = this.extractRankFromStats(stats);
     if (!rank) {
       return null;
     }
 
-    const tierValue = this.parseTierValue(stats.tier, rank);
+    const tierValue = this.parseTierValue(this.extractTierFromStats(stats), rank);
     const normalized = rank.toLowerCase();
 
     const discordRank = this.mapMarvelTierToDiscordRank(normalized, tierValue);
@@ -173,6 +173,111 @@ export class RankService {
       return Number.isNaN(parsed) ? 0 : parsed;
     }
     return 0;
+  }
+
+  private extractRankFromStats(stats: Record<string, unknown>): string | null {
+    const directRank = this.normalizeRankValue(stats.rank);
+    if (directRank) return directRank;
+
+    const candidateKeys = [
+      'rank',
+      'rank_name',
+      'current_rank',
+      'competitive_rank',
+      'ranked_rank',
+      'tier_name',
+      'division',
+      'tier',
+    ];
+
+    const candidateValue = this.findValueByKeys(stats, candidateKeys, 4);
+    const candidate = this.normalizeRankValue(candidateValue);
+    return candidate ? candidate : null;
+  }
+
+  private extractTierFromStats(stats: Record<string, unknown>): unknown {
+    const candidateKeys = [
+      'tier',
+      'rank_tier',
+      'tier_value',
+      'division',
+      'rank_division',
+    ];
+    return this.findValueByKeys(stats, candidateKeys, 4);
+  }
+
+  private normalizeRankValue(value: unknown): string | null {
+    if (!value) return null;
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const normalized = this.normalizeRankValue(entry);
+        if (normalized) return normalized;
+      }
+      return null;
+    }
+    if (typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const candidates = [
+        record.name,
+        record.rank,
+        record.rank_name,
+        record.tier_name,
+        record.tier,
+        record.division,
+        record.title,
+        record.current,
+      ];
+      for (const candidate of candidates) {
+        const normalized = this.normalizeRankValue(candidate);
+        if (normalized) return normalized;
+      }
+    }
+    return null;
+  }
+
+  private findValueByKeys(obj: Record<string, unknown>, keys: string[], maxDepth: number): unknown {
+    const queue: Array<{ value: unknown; depth: number }> = [{ value: obj, depth: 0 }];
+
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current) continue;
+      const { value, depth } = current;
+      if (!value || typeof value !== 'object') continue;
+
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          queue.push({ value: entry, depth: depth + 1 });
+        }
+        continue;
+      }
+
+      const record = value as Record<string, unknown>;
+      for (const key of keys) {
+        if (key in record && record[key] !== undefined && record[key] !== null) {
+          return record[key];
+        }
+      }
+
+      if (depth >= maxDepth) continue;
+
+      for (const nested of Object.values(record)) {
+        if (!nested) continue;
+        if (Array.isArray(nested)) {
+          for (const entry of nested) {
+            queue.push({ value: entry, depth: depth + 1 });
+          }
+          continue;
+        }
+        if (typeof nested === 'object') {
+          queue.push({ value: nested, depth: depth + 1 });
+        }
+      }
+    }
+
+    return undefined;
   }
 
   private mapMarvelTierToDiscordRank(rank: string, tier: number): string | null {

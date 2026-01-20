@@ -7,6 +7,7 @@ import {
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
 import { RankCardService } from '../services/RankCardService';
+import { RankProfileImageService } from '../services/RankProfileImageService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
@@ -24,6 +25,7 @@ export async function execute(
     databaseService: DatabaseService;
     rankCalculationService: RankCalculationService;
     rankCardService?: RankCardService;
+    rankProfileImageService?: RankProfileImageService;
   }
 ) {
   // Defer IMMEDIATELY before any async operations
@@ -53,6 +55,9 @@ export async function execute(
       });
       return;
     }
+
+  const matchSummary = await databaseService.getPlayerMatchSummary(userId);
+  const summaryStats = matchSummary?.stats || getEmptyMatchStats();
 
   // Create embed
   const embed = new EmbedBuilder()
@@ -142,9 +147,36 @@ export async function execute(
   }
 
   const attachments: AttachmentBuilder[] = [];
-  const { rankCardService } = services;
+  const { rankCardService, rankProfileImageService } = services;
 
-  if (rankCardService) {
+  if (rankProfileImageService) {
+    try {
+      const profileBuffer = await rankProfileImageService.renderProfile({
+        playerName: interaction.user.username,
+        discordId: interaction.user.id,
+        avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+        gameLabel: 'Combined',
+        rankName: progression.currentRank,
+        rankMMR: progression.currentMMR,
+        stats: summaryStats,
+        progress: progression.nextRank
+          ? {
+              percent: progression.progressToNext,
+              text: `${progression.currentMMR} / ${progression.nextRankMMR} MMR`,
+            }
+          : undefined,
+        recentGames: matchSummary?.recentGames,
+      });
+      const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+      attachments.push(attachment);
+      embed.setImage('attachment://rank-profile.png');
+    } catch (error) {
+      console.warn('Failed to generate rank profile image', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else if (rankCardService) {
     try {
       const cardBuffer = await rankCardService.createRankCard({
         username: interaction.user.username,
@@ -235,4 +267,18 @@ function createProgressBar(percentage: number, length: number = 10): string {
   const filled = Math.round((percentage / 100) * length);
   const empty = length - filled;
   return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
+function getEmptyMatchStats() {
+  return {
+    wins: 0,
+    losses: 0,
+    winrate: '0%',
+    kills: 0,
+    deaths: 0,
+    kd: '0.00',
+    mvp: 0,
+    svp: 0,
+    games: 0,
+  };
 }

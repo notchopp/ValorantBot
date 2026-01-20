@@ -8,9 +8,8 @@ import {
 import { DatabaseService } from '../services/DatabaseService';
 import { PlayerService } from '../services/PlayerService';
 import { VercelAPIService } from '../services/VercelAPIService';
-import { MarvelRivalsAPIService } from '../services/MarvelRivalsAPIService';
-import { RankService } from '../services/RankService';
 import { RankCardService } from '../services/RankCardService';
+import { RankProfileImageService } from '../services/RankProfileImageService';
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -32,9 +31,8 @@ export async function execute(
     databaseService: DatabaseService;
     playerService: PlayerService;
     vercelAPI: VercelAPIService;
-    marvelRivalsAPI?: MarvelRivalsAPIService;
-    rankService?: RankService;
     rankCardService?: RankCardService;
+    rankProfileImageService?: RankProfileImageService;
     roleUpdateService: any; // RoleUpdateService
   }
 ) {
@@ -57,7 +55,7 @@ export async function execute(
   }
 
   try {
-    const { databaseService, vercelAPI, roleUpdateService, marvelRivalsAPI, rankService, rankCardService } = services;
+    const { databaseService, vercelAPI, roleUpdateService, rankCardService, rankProfileImageService } = services;
 
     console.log('Verify command started', { userId, username });
 
@@ -85,46 +83,23 @@ export async function execute(
         return;
       }
 
-      if (!marvelRivalsAPI || !rankService) {
-        await interaction.editReply('❌ Marvel Rivals API service is not available.');
+      if (!vercelAPI) {
+        await interaction.editReply('❌ Vercel API service is not available.');
         return;
       }
 
-      const stats = await marvelRivalsAPI.getPlayerStats(existingPlayer.marvel_rivals_uid);
-      if (!stats) {
-        await interaction.editReply('❌ Could not fetch Marvel Rivals stats. Please try again later.');
-        return;
-      }
-
-      const mapped = rankService.getMarvelRivalsDiscordRank(stats);
-      if (!mapped) {
-        await interaction.editReply('❌ Could not parse Marvel Rivals rank from API response.');
-        return;
-      }
-
-      const updateSuccess = await databaseService.updatePlayerRank(
+      const verifyResult = await vercelAPI.verifyMarvelRivals({
         userId,
-        mapped.rank,
-        mapped.rankValue,
-        mapped.mmr,
-        'marvel_rivals'
-      );
+        username,
+        marvelRivalsUid: existingPlayer.marvel_rivals_uid,
+        marvelRivalsUsername: existingPlayer.marvel_rivals_username || undefined,
+      });
 
-      if (!updateSuccess) {
-        await interaction.editReply('❌ Failed to save Marvel Rivals rank. Please try again later.');
-        return;
-      }
-
-      const playerAfter = await databaseService.getPlayer(userId);
-      if (playerAfter) {
-        await databaseService.logRankChange(
-          playerAfter.id,
-          existingPlayer.marvel_rivals_rank || 'Unranked',
-          mapped.rank,
-          existingPlayer.marvel_rivals_mmr || 0,
-          mapped.mmr,
-          'verification'
+      if (!verifyResult.success) {
+        await interaction.editReply(
+          `❌ ${verifyResult.error || 'Failed to verify Marvel Rivals account. Please try again later.'}`
         );
+        return;
       }
 
       if (interaction.guild && roleUpdateService) {
@@ -144,12 +119,12 @@ export async function execute(
           },
           {
             name: 'Discord Rank',
-            value: `**${mapped.rank}**`,
+            value: `**${verifyResult.marvelRivalsRank || verifyResult.discordRank || 'Unranked'}**`,
             inline: true,
           },
           {
             name: 'Starting MMR',
-            value: `**${mapped.mmr}**`,
+            value: `**${verifyResult.startingMMR || 0}**`,
             inline: true,
           }
         )
@@ -158,19 +133,44 @@ export async function execute(
         });
 
       const attachments: AttachmentBuilder[] = [];
+      const matchSummary = await databaseService.getPlayerMatchSummary(userId, {
+        matchTypes: ['marvel_rivals'],
+      });
+      const summaryStats = matchSummary?.stats || getEmptyMatchStats();
 
-      if (rankCardService) {
+      if (rankProfileImageService) {
+        try {
+          const profileBuffer = await rankProfileImageService.renderProfile({
+            playerName: interaction.user.username,
+            discordId: interaction.user.id,
+            avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+            gameLabel: 'Marvel Rivals',
+            rankName: verifyResult.discordRank || verifyResult.marvelRivalsRank || 'Unranked',
+            rankMMR: verifyResult.startingMMR || 0,
+            stats: summaryStats,
+            recentGames: matchSummary?.recentGames,
+          });
+          const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+          attachments.push(attachment);
+          embed.setImage('attachment://rank-profile.png');
+        } catch (error) {
+          console.warn('Failed to generate Marvel Rivals rank card', {
+            userId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      } else if (rankCardService) {
         try {
           const cardBuffer = await rankCardService.createRankCard({
             username: interaction.user.username,
             avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
             game: 'marvel_rivals',
-            discordRank: mapped.rank,
-            discordMMR: mapped.mmr,
+            discordRank: verifyResult.discordRank || verifyResult.marvelRivalsRank || 'Unranked',
+            discordMMR: verifyResult.startingMMR || 0,
             valorantRank: existingPlayer.valorant_rank || existingPlayer.discord_rank || 'Unranked',
             valorantMMR: existingPlayer.valorant_mmr || existingPlayer.current_mmr || 0,
-            marvelRank: mapped.rank,
-            marvelMMR: mapped.mmr,
+            marvelRank: verifyResult.marvelRivalsRank || verifyResult.discordRank || 'Unranked',
+            marvelMMR: verifyResult.startingMMR || 0,
           });
           const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
           attachments.push(attachment);
@@ -347,8 +347,33 @@ export async function execute(
     }
 
     const attachments: AttachmentBuilder[] = [];
+    const matchSummary = await databaseService.getPlayerMatchSummary(userId, {
+      matchTypes: ['valorant', 'custom'],
+    });
+    const summaryStats = matchSummary?.stats || getEmptyMatchStats();
 
-    if (rankCardService && verifyResult.discordRank && verifyResult.startingMMR !== undefined) {
+    if (rankProfileImageService && verifyResult.discordRank && verifyResult.startingMMR !== undefined) {
+      try {
+        const profileBuffer = await rankProfileImageService.renderProfile({
+          playerName: interaction.user.username,
+          discordId: interaction.user.id,
+          avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+          gameLabel: 'Valorant',
+          rankName: verifyResult.discordRank,
+          rankMMR: verifyResult.startingMMR,
+          stats: summaryStats,
+          recentGames: matchSummary?.recentGames,
+        });
+        const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+        attachments.push(attachment);
+        embed.setImage('attachment://rank-profile.png');
+      } catch (error) {
+        console.warn('Failed to generate Valorant rank profile', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else if (rankCardService && verifyResult.discordRank && verifyResult.startingMMR !== undefined) {
       try {
         const cardBuffer = await rankCardService.createRankCard({
           username: interaction.user.username,
@@ -384,5 +409,19 @@ export async function execute(
       content: '❌ An error occurred during verification. Please try again later.',
     });
   }
+}
+
+function getEmptyMatchStats() {
+  return {
+    wins: 0,
+    losses: 0,
+    winrate: '0%',
+    kills: 0,
+    deaths: 0,
+    kd: '0.00',
+    mvp: 0,
+    svp: 0,
+    games: 0,
+  };
 }
 

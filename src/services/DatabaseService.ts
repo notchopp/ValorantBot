@@ -1005,6 +1005,131 @@ export class DatabaseService {
   }
 
   /**
+   * Get recent match summary stats for profile cards
+   */
+  async getPlayerMatchSummary(
+    discordUserId: string,
+    options: {
+      limit?: number;
+      recentLimit?: number;
+      matchTypes?: string[];
+    } = {}
+  ): Promise<{
+    stats: {
+      wins: number;
+      losses: number;
+      winrate: string;
+      kills: number;
+      deaths: number;
+      kd: string;
+      mvp: number;
+      svp: number;
+      games: number;
+    };
+    recentGames: Array<{
+      title: string;
+      meta: string;
+      result: 'win' | 'loss';
+      mmrChange: string;
+    }>;
+  } | null> {
+    try {
+      const supabase = this.getSupabase();
+      const player = await this.getPlayer(discordUserId);
+      if (!player) {
+        return null;
+      }
+
+      const limit = options.limit ?? 25;
+      const recentLimit = options.recentLimit ?? 5;
+
+      let query = supabase
+        .from('match_player_stats')
+        .select(`
+          mmr_before,
+          mmr_after,
+          team,
+          kills,
+          deaths,
+          assists,
+          mvp,
+          matches!inner(
+            match_id,
+            match_date,
+            map,
+            winner,
+            status,
+            match_type
+          )
+        `)
+        .eq('player_id', player.id)
+        .eq('matches.status', 'completed')
+        .order('matches(match_date)', { ascending: false })
+        .limit(limit);
+
+      if (options.matchTypes && options.matchTypes.length > 0) {
+        query = query.in('matches.match_type', options.matchTypes);
+      }
+
+      const { data, error } = await query;
+
+      if (error || !data) {
+        console.error('Error getting match summary', {
+          discordUserId,
+          error,
+        });
+        return null;
+      }
+
+      const totalGames = data.length;
+      const wins = data.filter((stat: any) => stat.matches.winner === stat.team).length;
+      const losses = totalGames - wins;
+      const kills = data.reduce((sum: number, stat: any) => sum + (stat.kills || 0), 0);
+      const deaths = data.reduce((sum: number, stat: any) => sum + (stat.deaths || 0), 0);
+      const mvp = data.filter((stat: any) => stat.mvp).length;
+      const kdValue = deaths > 0 ? kills / deaths : kills;
+
+      const stats = {
+        wins,
+        losses,
+        winrate: totalGames > 0 ? `${((wins / totalGames) * 100).toFixed(1)}%` : '0%',
+        kills,
+        deaths,
+        kd: kdValue.toFixed(2),
+        mvp,
+        svp: 0,
+        games: totalGames,
+      };
+
+      const recentGames = data.slice(0, recentLimit).map((stat: any) => {
+        const won = stat.matches.winner === stat.team;
+        const result = (won ? 'win' : 'loss') as 'win' | 'loss';
+        const mmrChange = (stat.mmr_after || 0) - (stat.mmr_before || 0);
+        const date = new Date(stat.matches.match_date);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const meta = `${dateStr} • K/D/A ${stat.kills}/${stat.deaths}/${stat.assists}`;
+        return {
+          title: stat.matches.map,
+          meta,
+          result,
+          mmrChange: `${mmrChange >= 0 ? '+' : ''}${mmrChange}`,
+        };
+      });
+
+      return {
+        stats,
+        recentGames,
+      };
+    } catch (error) {
+      console.error('Error getting match summary', {
+        discordUserId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Helper: Get rank value from rank name
    */
   private getRankValue(rank: string): number {

@@ -16,6 +16,7 @@ import { VoiceChannelService } from './services/VoiceChannelService';
 import { VercelAPIService } from './services/VercelAPIService';
 import { SkillGapAnalyzer } from './services/SkillGapAnalyzer';
 import { RankCardService } from './services/RankCardService';
+import { RankProfileImageService } from './services/RankProfileImageService';
 import { HostTimeoutService } from './services/HostTimeoutService';
 import { AutoMatchDetectionService } from './services/AutoMatchDetectionService';
 import { DiscordLogger } from './services/DiscordLogger';
@@ -80,6 +81,7 @@ const roleUpdateService = new RoleUpdateService(databaseService, appConfig);
 const voiceChannelService = new VoiceChannelService();
 const skillGapAnalyzer = new SkillGapAnalyzer(databaseService);
 const rankCardService = new RankCardService();
+const rankProfileImageService = new RankProfileImageService();
 // Initialize Vercel API Service
 const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
 
@@ -109,6 +111,7 @@ let services: any = {
   vercelAPI,
   skillGapAnalyzer,
   rankCardService,
+  rankProfileImageService,
   config: appConfig,
 };
 

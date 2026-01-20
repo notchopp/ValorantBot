@@ -26,6 +26,23 @@ export interface VerifyAccountResponse {
   error?: string;
 }
 
+export interface VerifyMarvelRivalsRequest {
+  userId: string;
+  username: string;
+  marvelRivalsUid: string;
+  marvelRivalsUsername?: string;
+}
+
+export interface VerifyMarvelRivalsResponse {
+  success: boolean;
+  discordRank?: string;
+  discordRankValue?: number;
+  startingMMR?: number;
+  marvelRivalsRank?: string;
+  message?: string;
+  error?: string;
+}
+
 export interface CalculateRankRequest {
   matchId: string;
 }
@@ -155,6 +172,56 @@ export class VercelAPIService {
       return {
         success: false,
         error: error.message || 'Failed to verify account',
+      };
+    }
+  }
+
+  /**
+   * Verify Marvel Rivals account and get initial rank placement
+   */
+  async verifyMarvelRivals(request: VerifyMarvelRivalsRequest): Promise<VerifyMarvelRivalsResponse> {
+    if (!this.baseURL) {
+      console.error('verifyMarvelRivals called but VERCEL_API_URL is not set');
+      return {
+        success: false,
+        error: 'Vercel API URL not configured. Please set VERCEL_API_URL in Fly.io secrets.',
+      };
+    }
+
+    console.log('Calling Vercel verify-marvel-rivals API', {
+      url: `${this.baseURL}/api/verify-marvel-rivals`,
+      userId: request.userId,
+      marvelRivalsUid: request.marvelRivalsUid,
+    });
+
+    try {
+      const response = await this.api.post<VerifyMarvelRivalsResponse>(
+        '/api/verify-marvel-rivals',
+        request
+      );
+      console.log('Vercel verify-marvel-rivals API success', {
+        userId: request.userId,
+        success: response.data.success,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error calling verify-marvel-rivals API', {
+        userId: request.userId,
+        marvelRivalsUid: request.marvelRivalsUid,
+        url: `${this.baseURL}/api/verify-marvel-rivals`,
+        error: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        error: error.message || 'Failed to verify Marvel Rivals account',
       };
     }
   }
