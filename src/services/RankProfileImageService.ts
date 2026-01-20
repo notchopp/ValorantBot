@@ -150,7 +150,8 @@ export class RankProfileImageService {
         }
       }, data);
 
-      return await page.screenshot({ type: 'png' }) as Buffer;
+      const screenshot = await page.screenshot({ type: 'png' });
+      return Buffer.isBuffer(screenshot) ? screenshot : Buffer.from(screenshot);
     } finally {
       await browser.close();
     }
