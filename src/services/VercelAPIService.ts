@@ -46,6 +46,7 @@ export interface CalculateRankResponse {
 
 export interface ProcessQueueRequest {
   balancingMode?: 'auto' | 'captain';
+  game?: 'valorant' | 'marvel_rivals';
 }
 
 export interface ProcessQueueResponse {
@@ -223,6 +224,7 @@ export class VercelAPIService {
     console.log('Calling Vercel process-queue API', {
       url: `${this.baseURL}/api/process-queue`,
       balancingMode: request.balancingMode || 'auto',
+      game: request.game || 'valorant',
     });
 
     try {

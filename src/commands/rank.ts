@@ -2,9 +2,11 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  AttachmentBuilder,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
+import { RankCardService } from '../services/RankCardService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
 
 export const data = new SlashCommandBuilder()
@@ -21,6 +23,7 @@ export async function execute(
   services: {
     databaseService: DatabaseService;
     rankCalculationService: RankCalculationService;
+    rankCardService?: RankCardService;
   }
 ) {
   // Defer IMMEDIATELY before any async operations
@@ -36,7 +39,7 @@ export async function execute(
     const player = await databaseService.getPlayer(userId);
     if (!player) {
       await safeEditReply(interaction, {
-        content: '❌ You are not verified. Use `/verify` to link your Riot ID and get placed.',
+        content: '❌ You are not verified. Use `/verify` to link your account and get placed.',
       });
       return;
     }
@@ -53,21 +56,45 @@ export async function execute(
 
   // Create embed
   const embed = new EmbedBuilder()
-    .setTitle(`${interaction.user.username}'s Rank`)
+    .setTitle(`${interaction.user.username}'s Ranks`)
     .setColor(getRankColor(progression.currentRank))
     .setThumbnail(interaction.user.displayAvatarURL())
     .addFields(
       {
-        name: 'Current Rank',
+        name: 'Discord Role',
         value: `**${progression.currentRank}**`,
         inline: true,
       },
       {
-        name: 'MMR',
+        name: 'Discord MMR',
         value: `**${progression.currentMMR}**`,
         inline: true,
       }
     );
+
+  const valorantRank = player.valorant_rank || player.discord_rank || 'Unranked';
+  const valorantMMR = player.valorant_mmr || player.current_mmr || 0;
+  const marvelRank = player.marvel_rivals_rank || 'Unranked';
+  const marvelMMR = player.marvel_rivals_mmr || 0;
+
+  embed.addFields(
+    {
+      name: 'Valorant',
+      value: `**${valorantRank}** (${valorantMMR} MMR)`,
+      inline: true,
+    },
+    {
+      name: 'Marvel Rivals',
+      value: `**${marvelRank}** (${marvelMMR} MMR)`,
+      inline: true,
+    }
+  );
+
+  embed.addFields({
+    name: 'Game Settings',
+    value: `Preferred: **${(player.preferred_game || 'valorant').replace('_', ' ')}** | Primary: **${(player.primary_game || 'valorant').replace('_', ' ')}** | Mode: **${player.role_mode || 'highest'}**`,
+    inline: false,
+  });
 
   // Add progression info if not at max rank
   if (progression.nextRank) {
@@ -114,7 +141,34 @@ export async function execute(
     });
   }
 
-    await safeEditReply(interaction, { embeds: [embed] });
+  const attachments: AttachmentBuilder[] = [];
+  const { rankCardService } = services;
+
+  if (rankCardService) {
+    try {
+      const cardBuffer = await rankCardService.createRankCard({
+        username: interaction.user.username,
+        avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+        game: 'combined',
+        discordRank: progression.currentRank,
+        discordMMR: progression.currentMMR,
+        valorantRank,
+        valorantMMR,
+        marvelRank,
+        marvelMMR,
+      });
+      const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
+      attachments.push(attachment);
+      embed.setImage('attachment://rank-card.png');
+    } catch (error) {
+      console.warn('Failed to generate rank card image', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  await safeEditReply(interaction, { embeds: [embed], files: attachments });
   } catch (error: any) {
     // Handle already acknowledged errors - don't try to reply again
     if (error?.code === 40060) {

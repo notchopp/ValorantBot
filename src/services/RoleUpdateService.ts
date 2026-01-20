@@ -9,9 +9,10 @@ import { Config } from '../config/config';
 export class RoleUpdateService {
   // Standard rank names used across the bot
   private static readonly RANK_NAMES = ['grnds', 'breakpoint', 'challenger', 'x'];
+  private dbService: DatabaseService;
 
-  constructor(_dbService: DatabaseService, _config: Config) {
-    // Services stored for future use (logging, config access)
+  constructor(dbService: DatabaseService, _config: Config) {
+    this.dbService = dbService;
   }
 
   /**
@@ -103,6 +104,55 @@ export class RoleUpdateService {
       });
       return { success: false, message: 'Failed to update role' };
     }
+  }
+
+  /**
+   * Update Discord role using the player's computed Discord rank from database
+   * Useful for multi-game role modes (highest/primary)
+   */
+  async updatePlayerRoleFromDatabase(
+    userId: string,
+    guild: Guild
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const player = await this.dbService.getPlayer(userId);
+      if (!player || !player.discord_rank) {
+        return { success: false, message: 'Player not found or unranked' };
+      }
+
+      const member = await guild.members.fetch(userId);
+      const currentRank = this.getCurrentRankFromMember(member) || 'Unranked';
+      return await this.updatePlayerRole(userId, currentRank, player.discord_rank, guild);
+    } catch (error) {
+      console.error('Error updating role from database', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, message: 'Failed to update role from database' };
+    }
+  }
+
+  /**
+   * Get the member's current rank role name (best-effort)
+   */
+  private getCurrentRankFromMember(member: GuildMember): string | null {
+    const rankRoles = member.roles.cache.filter((role: Role) => {
+      if (!role?.name) return false;
+      const roleNameLower = role.name.toLowerCase();
+      return RoleUpdateService.RANK_NAMES.some((rn) => roleNameLower.includes(rn));
+    });
+
+    if (rankRoles.size === 0) {
+      return null;
+    }
+
+    let bestRole: Role | null = null;
+    for (const role of rankRoles.values()) {
+      if (!bestRole || role.position > bestRole.position) {
+        bestRole = role;
+      }
+    }
+    return bestRole ? bestRole.name : null;
   }
 
   /**

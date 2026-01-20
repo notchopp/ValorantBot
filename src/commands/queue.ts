@@ -18,6 +18,7 @@ import { VercelAPIService } from '../services/VercelAPIService';
 import { ValorantAPIService } from '../services/ValorantAPIService';
 import { SkillGapAnalyzer } from '../services/SkillGapAnalyzer';
 import { Config } from '../config/config';
+import { DatabasePlayer } from '../database/supabase';
 
 // Constants
 const DISCORD_ERROR_UNKNOWN_INTERACTION = 10062;
@@ -34,7 +35,19 @@ export const data = new SlashCommandBuilder()
     subcommand.setName('stop').setDescription('Stop the current queue session')
   )
   .addSubcommand((subcommand: any) =>
-    subcommand.setName('join').setDescription('Join the queue')
+    subcommand
+      .setName('join')
+      .setDescription('Join the queue')
+      .addStringOption((option: any) =>
+        option
+          .setName('game')
+          .setDescription('Choose which game queue to join')
+          .addChoices(
+            { name: 'Valorant', value: 'valorant' },
+            { name: 'Marvel Rivals', value: 'marvel_rivals' }
+          )
+          .setRequired(false)
+      )
   )
   .addSubcommand((subcommand: any) =>
     subcommand.setName('leave').setDescription('Leave the queue')
@@ -72,6 +85,37 @@ export async function execute(
   } else if (subcommand === 'status') {
     await handleStatus(interaction, services);
   }
+}
+
+function normalizeGameSelection(game?: string | null): 'valorant' | 'marvel_rivals' {
+  if (game === 'marvel_rivals') {
+    return 'marvel_rivals';
+  }
+  return 'valorant';
+}
+
+function formatGameLabel(game: 'valorant' | 'marvel_rivals'): string {
+  return game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
+}
+
+async function getActiveQueueGame(databaseService: DatabaseService): Promise<'valorant' | 'marvel_rivals' | null> {
+  const queuePlayers = await databaseService.getQueuePlayersWithData();
+  if (!queuePlayers.length) return null;
+  const preferred = queuePlayers[0].preferred_game;
+  return preferred === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
+}
+
+function getRankDisplayForGame(player: DatabasePlayer, game: 'valorant' | 'marvel_rivals'): { rank: string; mmr: number } {
+  if (game === 'marvel_rivals') {
+    return {
+      rank: player.marvel_rivals_rank || 'Unranked',
+      mmr: player.marvel_rivals_mmr || 0,
+    };
+  }
+  return {
+    rank: player.valorant_rank || player.discord_rank || 'Unranked',
+    mmr: player.valorant_mmr || player.current_mmr || 0,
+  };
 }
 
 async function handleStart(
@@ -352,31 +396,80 @@ async function handleJoin(
 
     // Get player from database
     const dbPlayer = await databaseService.getPlayer(userId);
-
-    // VALIDATION 1: Must have linked Riot ID
-    if (!dbPlayer?.riot_name || !dbPlayer?.riot_tag || !dbPlayer?.riot_puuid) {
+    if (!dbPlayer) {
       await interaction.editReply({
-        content:
-          ' You must link your Riot ID before joining queue.\n\n' +
-          'Use `/riot link` to link your account, then `/verify` to get placed.',
+        content: ' You must verify first using `/verify` before joining queue.',
       });
       return;
     }
 
-    // VALIDATION 2: Must be verified (have Discord rank)
-    if (!dbPlayer.discord_rank || dbPlayer.discord_rank === 'Unranked') {
+    const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
+    const queueGame = await getActiveQueueGame(databaseService);
+
+    if (queueGame && queueGame !== selectedGame) {
       await interaction.editReply({
-        content:
-          ' You must complete verification before joining queue.\n\n' +
-          'Use `/verify` to get your initial Discord rank placement.',
+        content: ` A ${formatGameLabel(queueGame)} queue is already active. Please join that queue or wait for it to finish.`,
       });
       return;
+    }
+
+    if (dbPlayer.preferred_game !== selectedGame) {
+      await databaseService.setPlayerPreferredGame(userId, selectedGame);
+    }
+
+    if (selectedGame === 'valorant') {
+      // VALIDATION 1: Must have linked Riot ID
+      if (!dbPlayer.riot_name || !dbPlayer.riot_tag || !dbPlayer.riot_puuid) {
+        await interaction.editReply({
+          content:
+            ' You must link your Riot ID before joining queue.\n\n' +
+            'Use `/riot link` to link your account, then `/verify` to get placed.',
+        });
+        return;
+      }
+
+      // VALIDATION 2: Must be verified for Valorant
+      const valorantRank = dbPlayer.valorant_rank || dbPlayer.discord_rank;
+      if (!valorantRank || valorantRank === 'Unranked') {
+        await interaction.editReply({
+          content:
+            ' You must complete Valorant verification before joining queue.\n\n' +
+            'Use `/verify game:valorant` to get your initial placement.',
+        });
+        return;
+      }
+    } else {
+      // VALIDATION 1: Must have linked Marvel Rivals account
+      if (!dbPlayer.marvel_rivals_uid || !dbPlayer.marvel_rivals_username) {
+        await interaction.editReply({
+          content:
+            ' You must link your Marvel Rivals account before joining queue.\n\n' +
+            'Use `/marvel link` to link your account, then `/verify game:marvel_rivals` to get placed.',
+        });
+        return;
+      }
+
+      // VALIDATION 2: Must be verified for Marvel Rivals
+      if (!dbPlayer.marvel_rivals_rank || dbPlayer.marvel_rivals_rank === 'Unranked') {
+        await interaction.editReply({
+          content:
+            ' You must complete Marvel Rivals verification before joining queue.\n\n' +
+            'Use `/verify game:marvel_rivals` to get your initial placement.',
+        });
+        return;
+      }
     }
 
     // VALIDATION 3: Check Valorant activity (not super strict)
     try {
-      if (valorantAPI) {
-        const account = await valorantAPI.getAccount(dbPlayer.riot_name, dbPlayer.riot_tag);
+      if (selectedGame === 'valorant' && valorantAPI) {
+        const riotName = dbPlayer.riot_name;
+        const riotTag = dbPlayer.riot_tag;
+        if (!riotName || !riotTag) {
+          await interaction.editReply(' Riot ID is missing. Please relink your account.');
+          return;
+        }
+        const account = await valorantAPI.getAccount(riotName, riotTag);
 
         // Check account level (minimum 20)
         if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
@@ -392,8 +485,8 @@ async function handleJoin(
         // Optional: Check recent match activity (past 30 days)
         const matches = await valorantAPI.getMatches(
           dbPlayer.riot_region || config.valorantAPI.defaultRegion,
-          dbPlayer.riot_name,
-          dbPlayer.riot_tag,
+          riotName,
+          riotTag,
           'competitive'
         );
 
@@ -419,7 +512,7 @@ async function handleJoin(
   // Try to fetch rank from API or Discord roles
   if (interaction.member && interaction.guild) {
     const member = await interaction.guild.members.fetch(userId);
-    const rankData = await rankService.getPlayerRank(member, userId);
+    const rankData = await rankService.getPlayerRank(member, userId, selectedGame);
     
     if (rankData) {
       player.rank = rankData.rank;
@@ -441,7 +534,7 @@ async function handleJoin(
 
   // Ping @everyone when first person joins the queue (only once, not spam)
   if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
-    const playerRank = dbPlayer.discord_rank || 'Unranked';
+    const playerRank = getRankDisplayForGame(dbPlayer, selectedGame).rank;
     try {
       await (interaction.channel as any).send({
         content: `@everyone **${playerRank}** joined the queue.`,
@@ -506,10 +599,12 @@ async function handleJoin(
         queueSize: queueSize,
         hasVercelAPI: !!vercelAPI,
         balancingMode: config.teamBalancing.defaultMode,
+        game: selectedGame,
       });
 
       const processResult = await vercelAPI.processQueue({
         balancingMode: config.teamBalancing.defaultMode,
+        game: selectedGame,
       });
 
       if (!processResult.success || !processResult.match) {
@@ -702,14 +797,32 @@ async function handleStatus(
     });
 
   if (queue.players.length > 0) {
+    const activeGame = await getActiveQueueGame(databaseService);
+    if (activeGame) {
+      embed.addFields({
+        name: 'Game',
+        value: formatGameLabel(activeGame),
+        inline: true,
+      });
+    }
+
     // Fetch player data from database to get custom ranks and MMR
     const playersWithRanks = await Promise.all(
       queue.players.map(async (p) => {
         const dbPlayer = await databaseService.getPlayer(p.userId);
+        if (!dbPlayer) {
+          return {
+            ...p,
+            discordRank: 'Unranked',
+            currentMMR: 0,
+          };
+        }
+        const game = activeGame || 'valorant';
+        const display = getRankDisplayForGame(dbPlayer, game);
         return {
           ...p,
-          discordRank: dbPlayer?.discord_rank || 'Unranked',
-          currentMMR: dbPlayer?.current_mmr || 0,
+          discordRank: display.rank,
+          currentMMR: display.mmr,
         };
       })
     );
@@ -943,14 +1056,10 @@ async function handleJoinButton(
 
     // Get player from database
     const dbPlayer = await databaseService.getPlayer(userId);
-
-    // VALIDATION 1: Must have linked Riot ID
-    if (!dbPlayer?.riot_name || !dbPlayer?.riot_tag || !dbPlayer?.riot_puuid) {
+    if (!dbPlayer) {
       try {
         await interaction.followUp({
-          content:
-            ' You must link your Riot ID before joining queue.\n\n' +
-            'Use `/riot link` to link your account, then `/verify` to get placed.',
+          content: ' You must verify first using `/verify` before joining queue.',
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
@@ -961,13 +1070,13 @@ async function handleJoinButton(
       return;
     }
 
-    // VALIDATION 2: Must be verified (have Discord rank)
-    if (!dbPlayer.discord_rank || dbPlayer.discord_rank === 'Unranked') {
+    const selectedGame = dbPlayer.preferred_game === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
+    const queueGame = await getActiveQueueGame(databaseService);
+
+    if (queueGame && queueGame !== selectedGame) {
       try {
         await interaction.followUp({
-          content:
-            ' You must complete verification before joining queue.\n\n' +
-            'Use `/verify` to get your initial Discord rank placement.',
+          content: ` A ${formatGameLabel(queueGame)} queue is already active. Please join that queue or wait for it to finish.`,
           flags: MessageFlags.Ephemeral,
         });
       } catch (error: any) {
@@ -976,12 +1085,98 @@ async function handleJoinButton(
         }
       }
       return;
+    }
+
+    if (selectedGame === 'valorant') {
+      // VALIDATION 1: Must have linked Riot ID
+      if (!dbPlayer.riot_name || !dbPlayer.riot_tag || !dbPlayer.riot_puuid) {
+        try {
+          await interaction.followUp({
+            content:
+              ' You must link your Riot ID before joining queue.\n\n' +
+              'Use `/riot link` to link your account, then `/verify` to get placed.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error: any) {
+          if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+            console.error('Error sending follow-up message', { userId, error: error.message });
+          }
+        }
+        return;
+      }
+
+      // VALIDATION 2: Must be verified for Valorant
+      const valorantRank = dbPlayer.valorant_rank || dbPlayer.discord_rank;
+      if (!valorantRank || valorantRank === 'Unranked') {
+        try {
+          await interaction.followUp({
+            content:
+              ' You must complete Valorant verification before joining queue.\n\n' +
+              'Use `/verify game:valorant` to get your initial placement.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error: any) {
+          if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+            console.error('Error sending follow-up message', { userId, error: error.message });
+          }
+        }
+        return;
+      }
+    } else {
+      // VALIDATION 1: Must have linked Marvel Rivals account
+      if (!dbPlayer.marvel_rivals_uid || !dbPlayer.marvel_rivals_username) {
+        try {
+          await interaction.followUp({
+            content:
+              ' You must link your Marvel Rivals account before joining queue.\n\n' +
+              'Use `/marvel link` to link your account, then `/verify game:marvel_rivals` to get placed.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error: any) {
+          if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+            console.error('Error sending follow-up message', { userId, error: error.message });
+          }
+        }
+        return;
+      }
+
+      // VALIDATION 2: Must be verified for Marvel Rivals
+      if (!dbPlayer.marvel_rivals_rank || dbPlayer.marvel_rivals_rank === 'Unranked') {
+        try {
+          await interaction.followUp({
+            content:
+              ' You must complete Marvel Rivals verification before joining queue.\n\n' +
+              'Use `/verify game:marvel_rivals` to get your initial placement.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error: any) {
+          if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+            console.error('Error sending follow-up message', { userId, error: error.message });
+          }
+        }
+        return;
+      }
     }
 
     // VALIDATION 3: Check Valorant activity (not super strict)
     try {
-      if (valorantAPI) {
-        const account = await valorantAPI.getAccount(dbPlayer.riot_name, dbPlayer.riot_tag);
+      if (selectedGame === 'valorant' && valorantAPI) {
+        const riotName = dbPlayer.riot_name;
+        const riotTag = dbPlayer.riot_tag;
+        if (!riotName || !riotTag) {
+          try {
+            await interaction.followUp({
+              content: ' Riot ID is missing. Please relink your account.',
+              flags: MessageFlags.Ephemeral,
+            });
+          } catch (error: any) {
+            if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+              console.error('Error sending follow-up message', { userId, error: error.message });
+            }
+          }
+          return;
+        }
+        const account = await valorantAPI.getAccount(riotName, riotTag);
 
         // Check account level (minimum 20)
         if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
@@ -1007,8 +1202,8 @@ async function handleJoinButton(
         // Optional: Check recent match activity (past 30 days)
         const matches = await valorantAPI.getMatches(
           dbPlayer.riot_region || config.valorantAPI.defaultRegion,
-          dbPlayer.riot_name,
-          dbPlayer.riot_tag,
+          riotName,
+          riotTag,
           'competitive'
         );
 
@@ -1040,7 +1235,7 @@ async function handleJoinButton(
     // Try to fetch rank from API or Discord roles
     if (interaction.member && interaction.guild) {
       const member = await interaction.guild.members.fetch(userId);
-      const rankData = await rankService.getPlayerRank(member, userId);
+      const rankData = await rankService.getPlayerRank(member, userId, selectedGame);
       
       if (rankData) {
         player.rank = rankData.rank;
@@ -1093,7 +1288,7 @@ async function handleJoinButton(
 
     // Ping @everyone when first person joins the queue (only once, not spam)
     if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
-      const playerRank = dbPlayer.discord_rank || 'Unranked';
+      const playerRank = getRankDisplayForGame(dbPlayer, selectedGame).rank;
       try {
         await interaction.channel.send({
           content: `@everyone **${playerRank}** joined the queue.`,
@@ -1170,10 +1365,12 @@ async function handleJoinButton(
         queueSize,
         hasVercelAPI: !!vercelAPI,
         balancingMode: config.teamBalancing.defaultMode,
+        game: selectedGame,
       });
 
       const processResult = await vercelAPI.processQueue({
         balancingMode: config.teamBalancing.defaultMode,
+        game: selectedGame,
       });
 
       if (!processResult.success || !processResult.match) {
@@ -1289,14 +1486,24 @@ async function handleJoinButton(
         }
       }
     } else {
+      const activeGame = queueGame || selectedGame;
+
       // Fetch player data from database to get custom ranks and MMR for display
       const playersWithRanks = await Promise.all(
         queue.players.map(async (p) => {
           const dbPlayer = await databaseService.getPlayer(p.userId);
+          if (!dbPlayer) {
+            return {
+              ...p,
+              discordRank: 'Unranked',
+              currentMMR: 0,
+            };
+          }
+          const display = getRankDisplayForGame(dbPlayer, activeGame);
           return {
             ...p,
-            discordRank: dbPlayer?.discord_rank || 'Unranked',
-            currentMMR: dbPlayer?.current_mmr || 0,
+            discordRank: display.rank,
+            currentMMR: display.mmr,
           };
         })
       );
@@ -1314,6 +1521,11 @@ async function handleJoinButton(
         .addFields({
           name: 'Status',
           value: queue.isLocked ? ' Locked' : ' Open',
+          inline: true,
+        })
+        .addFields({
+          name: 'Game',
+          value: formatGameLabel(activeGame),
           inline: true,
         });
 
@@ -1457,15 +1669,33 @@ async function handleLeaveButton(
           inline: true,
         });
 
+      const activeGame = await getActiveQueueGame(databaseService);
+      if (activeGame) {
+        updatedEmbed.addFields({
+          name: 'Game',
+          value: formatGameLabel(activeGame),
+          inline: true,
+        });
+      }
+
       if (queueSize > 0) {
         // Fetch player data from database to get custom ranks and MMR for display
         const playersWithRanks = await Promise.all(
           queue.players.map(async (p) => {
             const dbPlayer = await databaseService.getPlayer(p.userId);
+            if (!dbPlayer) {
+              return {
+                ...p,
+                discordRank: 'Unranked',
+                currentMMR: 0,
+              };
+            }
+            const game = activeGame || 'valorant';
+            const display = getRankDisplayForGame(dbPlayer, game);
             return {
               ...p,
-              discordRank: dbPlayer?.discord_rank || 'Unranked',
-              currentMMR: dbPlayer?.current_mmr || 0,
+              discordRank: display.rank,
+              currentMMR: display.mmr,
             };
           })
         );

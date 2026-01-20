@@ -3,12 +3,29 @@ export interface Player {
   username: string;
   rank?: string;
   rankValue?: number;
+  preferredGame?: 'valorant' | 'marvel_rivals';
+  primaryGame?: 'valorant' | 'marvel_rivals';
+  roleMode?: 'highest' | 'primary';
   // Riot ID for API lookups
   riotId?: {
     name: string;
     tag: string;
     region?: string;
+    puuid?: string;
   };
+  // Marvel Rivals ID for API lookups
+  marvelRivalsId?: {
+    uid: string;
+    username: string;
+  };
+  valorantRank?: string;
+  valorantRankValue?: number;
+  valorantMMR?: number;
+  valorantPeakMMR?: number;
+  marvelRivalsRank?: string;
+  marvelRivalsRankValue?: number;
+  marvelRivalsMMR?: number;
+  marvelRivalsPeakMMR?: number;
   stats: PlayerStats;
 }
 

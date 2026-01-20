@@ -9,6 +9,14 @@ export interface Config {
     defaultRegion: string;
     apiKey?: string;
   };
+  marvelRivalsAPI: {
+    enabled: boolean;
+    apiKey?: string;
+  };
+  games: {
+    supported: Array<'valorant' | 'marvel_rivals'>;
+    default: 'valorant';
+  };
   queue: {
     maxPlayers: number;
     minPlayers: number;
@@ -38,6 +46,14 @@ export const defaultConfig: Config = {
     enabled: process.env.VALORANT_API_ENABLED !== 'false',
     defaultRegion: process.env.VALORANT_DEFAULT_REGION || 'na',
     apiKey: process.env.VALORANT_API_KEY,
+  },
+  marvelRivalsAPI: {
+    enabled: process.env.MARVEL_RIVALS_API_ENABLED !== 'false',
+    apiKey: process.env.MARVEL_RIVALS_API_KEY,
+  },
+  games: {
+    supported: ['valorant', 'marvel_rivals'],
+    default: 'valorant',
   },
   queue: {
     maxPlayers: 10,

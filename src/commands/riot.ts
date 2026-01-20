@@ -373,6 +373,16 @@ async function handleRefresh(
     return;
   }
 
+  if (databaseService && refreshResult.discordRank && refreshResult.discordRankValue !== undefined && refreshResult.newMMR !== undefined) {
+    await databaseService.updatePlayerRank(
+      userId,
+      refreshResult.discordRank,
+      refreshResult.discordRankValue,
+      refreshResult.newMMR,
+      'valorant'
+    );
+  }
+
   // Update Discord role if rank changed
   if (refreshResult.discordRank && refreshResult.oldRank && interaction.guild && roleUpdateService) {
     try {

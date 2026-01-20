@@ -31,6 +31,19 @@ export interface DatabasePlayer {
   riot_tag?: string | null;
   riot_puuid?: string | null;
   riot_region?: string | null;
+  marvel_rivals_uid?: string | null;
+  marvel_rivals_username?: string | null;
+  preferred_game?: 'valorant' | 'marvel_rivals';
+  primary_game?: 'valorant' | 'marvel_rivals';
+  role_mode?: 'highest' | 'primary';
+  valorant_rank?: string | null;
+  valorant_rank_value?: number | null;
+  valorant_mmr?: number | null;
+  valorant_peak_mmr?: number | null;
+  marvel_rivals_rank?: string | null;
+  marvel_rivals_rank_value?: number | null;
+  marvel_rivals_mmr?: number | null;
+  marvel_rivals_peak_mmr?: number | null;
   discord_rank: string;
   discord_rank_value: number;
   discord_mmr: number;
@@ -44,7 +57,7 @@ export interface DatabasePlayer {
 export interface DatabaseMatch {
   id: string;
   match_id: string;
-  match_type: 'custom' | 'valorant';
+  match_type: 'custom' | 'valorant' | 'marvel_rivals';
   match_date: string;
   map?: string | null;
   host_id?: string | null;

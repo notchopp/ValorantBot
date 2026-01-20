@@ -1,18 +1,26 @@
 import { Player, createPlayer, PlayerStats } from '../models/Player';
 import { Config } from '../config/config';
 import { ValorantAPIService, ValorantMMR } from './ValorantAPIService';
+import { MarvelRivalsAPIService, MarvelRivalsStats } from './MarvelRivalsAPIService';
 import { DatabaseService } from './DatabaseService';
 
 export class PlayerService {
   private players: Map<string, Player> = new Map(); // Cache for quick access
   private config: Config;
   private valorantAPI?: ValorantAPIService;
+  private marvelRivalsAPI?: MarvelRivalsAPIService;
   private dbService: DatabaseService;
 
-  constructor(config: Config, valorantAPI?: ValorantAPIService, dbService?: DatabaseService) {
+  constructor(
+    config: Config,
+    valorantAPI?: ValorantAPIService,
+    dbService?: DatabaseService,
+    marvelRivalsAPI?: MarvelRivalsAPIService
+  ) {
     this.config = config;
     this.valorantAPI = valorantAPI;
     this.dbService = dbService || new DatabaseService();
+    this.marvelRivalsAPI = marvelRivalsAPI;
   }
 
   async getOrCreatePlayer(userId: string, username: string): Promise<Player> {
@@ -86,35 +94,63 @@ export class PlayerService {
    * Fetch and update player rank from Valorant API
    * Requires Riot ID to be linked
    */
-  async fetchRankFromAPI(userId: string): Promise<{ success: boolean; rank?: string; rankValue?: number; message?: string }> {
+  async fetchRankFromAPI(
+    userId: string,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<{ success: boolean; rank?: string; rankValue?: number; message?: string }> {
     const player = this.players.get(userId);
     if (!player) {
       return { success: false, message: 'Player not found' };
     }
 
-    if (!player.riotId) {
-      return { success: false, message: 'No Riot ID linked. Use /riot link to link your account.' };
+    if (game === 'marvel_rivals') {
+      if (!player.marvelRivalsId) {
+        return { success: false, message: 'No Marvel Rivals account linked. Use /marvel link to link your account.' };
+      }
+      if (!this.marvelRivalsAPI) {
+        return { success: false, message: 'Marvel Rivals API service not available' };
+      }
+    } else {
+      if (!player.riotId) {
+        return { success: false, message: 'No Riot ID linked. Use /riot link to link your account.' };
+      }
+      if (!this.valorantAPI) {
+        return { success: false, message: 'Valorant API service not available' };
+      }
     }
 
-    if (!this.valorantAPI) {
-      return { success: false, message: 'Valorant API service not available' };
-    }
-
-    // Default region if not set (can be improved with region detection)
-    const region = player.riotId.region || 'na';
-    
     try {
-      const mmr = await this.valorantAPI.getMMR(
+      if (game === 'marvel_rivals') {
+        const stats = await this.marvelRivalsAPI!.getPlayerStats(player.marvelRivalsId!.uid);
+        if (!stats) {
+          return { success: false, message: 'Could not fetch rank from Marvel Rivals API.' };
+        }
+        const rankInfo = this.extractMarvelRank(stats);
+        if (!rankInfo.rank) {
+          return { success: false, message: 'Could not parse Marvel Rivals rank.' };
+        }
+        player.marvelRivalsRank = rankInfo.rank;
+        player.marvelRivalsRankValue = rankInfo.rankValue;
+        return {
+          success: true,
+          rank: rankInfo.rank,
+          rankValue: rankInfo.rankValue,
+        };
+      }
+
+      // Default region if not set (can be improved with region detection)
+      const region = player.riotId!.region || 'na';
+      const mmr = await this.valorantAPI!.getMMR(
         region,
-        player.riotId.name,
-        player.riotId.tag
+        player.riotId!.name,
+        player.riotId!.tag
       );
 
       if (!mmr) {
         return { success: false, message: 'Could not fetch rank from API. Check your Riot ID.' };
       }
 
-      const rankValue = this.valorantAPI.getRankValueFromMMR(mmr);
+      const rankValue = this.valorantAPI!.getRankValueFromMMR(mmr);
       player.rank = mmr.currenttierpatched;
       player.rankValue = rankValue;
 
@@ -140,6 +176,20 @@ export class PlayerService {
     player.rank = mmr.currenttierpatched;
     player.rankValue = this.valorantAPI.getRankValueFromMMR(mmr);
     return true;
+  }
+
+  private extractMarvelRank(stats: MarvelRivalsStats): { rank?: string; rankValue: number } {
+    const rank = typeof stats.rank === 'string'
+      ? stats.rank
+      : typeof (stats as any)?.data?.rank === 'string'
+        ? (stats as any).data.rank
+        : undefined;
+    if (!rank) {
+      return { rank: undefined, rankValue: 0 };
+    }
+    const normalized = rank.trim();
+    const rankValue = normalized ? 1 : 0;
+    return { rank: normalized, rankValue };
   }
 
   updatePlayerStats(userId: string, updates: Partial<PlayerStats>): boolean {

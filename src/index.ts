@@ -7,6 +7,7 @@ import { MatchService } from './services/MatchService';
 import { RankService } from './services/RankService';
 import { RiotIDService } from './services/RiotIDService';
 import { ValorantAPIService } from './services/ValorantAPIService';
+import { MarvelRivalsAPIService } from './services/MarvelRivalsAPIService';
 import { DatabaseService } from './services/DatabaseService';
 import { RankCalculationService } from './services/RankCalculationService';
 import { CustomRankService } from './services/CustomRankService';
@@ -14,6 +15,7 @@ import { RoleUpdateService } from './services/RoleUpdateService';
 import { VoiceChannelService } from './services/VoiceChannelService';
 import { VercelAPIService } from './services/VercelAPIService';
 import { SkillGapAnalyzer } from './services/SkillGapAnalyzer';
+import { RankCardService } from './services/RankCardService';
 import { HostTimeoutService } from './services/HostTimeoutService';
 import { AutoMatchDetectionService } from './services/AutoMatchDetectionService';
 import { DiscordLogger } from './services/DiscordLogger';
@@ -62,16 +64,22 @@ const valorantAPI = appConfig.valorantAPI.enabled
   ? new ValorantAPIService(appConfig.valorantAPI.apiKey)
   : undefined;
 
+// Initialize Marvel Rivals API service
+const marvelRivalsAPI = appConfig.marvelRivalsAPI.enabled
+  ? new MarvelRivalsAPIService(appConfig.marvelRivalsAPI.apiKey)
+  : undefined;
+
 // Initialize core services
-const playerService = new PlayerService(appConfig, valorantAPI, databaseService);
+const playerService = new PlayerService(appConfig, valorantAPI, databaseService, marvelRivalsAPI);
 const queueService = new QueueService(appConfig, databaseService, playerService);
 const matchService = new MatchService(appConfig);
-const rankService = new RankService(appConfig, playerService, valorantAPI);
+const rankService = new RankService(appConfig, playerService, valorantAPI, marvelRivalsAPI);
 const riotIDService = new RiotIDService(playerService, databaseService);
 const rankCalculationService = new RankCalculationService(databaseService, customRankService);
 const roleUpdateService = new RoleUpdateService(databaseService, appConfig);
 const voiceChannelService = new VoiceChannelService();
 const skillGapAnalyzer = new SkillGapAnalyzer(databaseService);
+const rankCardService = new RankCardService();
 // Initialize Vercel API Service
 const vercelAPI = new VercelAPIService(process.env.VERCEL_API_URL);
 
@@ -92,6 +100,7 @@ let services: any = {
   rankService,
   riotIDService,
   valorantAPI,
+  marvelRivalsAPI,
   databaseService,
   rankCalculationService,
   customRankService,
@@ -99,6 +108,7 @@ let services: any = {
   voiceChannelService,
   vercelAPI,
   skillGapAnalyzer,
+  rankCardService,
   config: appConfig,
 };
 

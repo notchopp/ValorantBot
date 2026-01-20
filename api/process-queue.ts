@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 interface ProcessQueueRequest {
   queueId?: string; // Optional queue identifier
   balancingMode?: 'auto' | 'captain';
+  game?: 'valorant' | 'marvel_rivals';
   webhookUrl?: string; // Fly.io webhook endpoint
 }
 
@@ -94,9 +95,9 @@ export default async function handler(
   }
 
   try {
-    const { balancingMode = 'auto' } = req.body as ProcessQueueRequest;
+    const { balancingMode = 'auto', game = 'valorant' } = req.body as ProcessQueueRequest;
 
-    console.log('Processing queue', { balancingMode });
+    console.log('Processing queue', { balancingMode, game });
 
     // Get all queued players
     const { data: queueEntries, error: queueError } = await supabase
@@ -119,7 +120,7 @@ export default async function handler(
     const playerIds = queueEntries.map(q => q.player_id);
     const { data: players, error: playersError } = await supabase
       .from('players')
-      .select('id, discord_user_id, current_mmr')
+      .select('id, discord_user_id, current_mmr, valorant_mmr, marvel_rivals_mmr, preferred_game')
       .in('id', playerIds);
 
     if (playersError || !players || players.length !== 10) {
@@ -128,10 +129,18 @@ export default async function handler(
       return;
     }
 
+    const invalidGame = players.find((p) => p.preferred_game && p.preferred_game !== game);
+    if (invalidGame) {
+      res.status(400).json({ success: false, error: 'Queue players are not all in the same game queue' });
+      return;
+    }
+
     // Balance teams
     const playersWithMMR = players.map(p => ({
       userId: p.discord_user_id,
-      mmr: p.current_mmr || 0,
+      mmr: game === 'marvel_rivals'
+        ? (p.marvel_rivals_mmr || 0)
+        : (p.valorant_mmr || p.current_mmr || 0),
     }));
 
     const { teamA, teamB } = balanceTeamsAuto(playersWithMMR);
@@ -146,6 +155,7 @@ export default async function handler(
     const matchId = `match-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Create match in database
+    const matchType = game === 'marvel_rivals' ? 'marvel_rivals' : 'custom';
     const { data: match, error: matchError } = await supabase
       .from('matches')
       .insert({
@@ -156,7 +166,7 @@ export default async function handler(
         host_confirmed: false,
         team_a: teamA,
         team_b: teamB,
-        match_type: 'custom',
+        match_type: matchType,
         status: 'pending',
       })
       .select()

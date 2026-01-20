@@ -165,11 +165,23 @@ export class PersistentQueueService {
       const players = await this.databaseService.getQueuePlayersWithData();
       
       if (players.length > 0) {
+        const activeGame = players[0].preferred_game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
+        embed.addFields({
+          name: 'Game',
+          value: activeGame,
+          inline: true,
+        });
+
         const playerList = players
           .slice(0, 10) // Show first 10 players
           .map((p, index) => {
-            const rank = p.discord_rank !== 'Unranked' ? p.discord_rank : 'Unranked';
-            const mmr = p.current_mmr || 0;
+            const isMarvel = p.preferred_game === 'marvel_rivals';
+            const rank = isMarvel
+              ? (p.marvel_rivals_rank || 'Unranked')
+              : (p.valorant_rank || p.discord_rank || 'Unranked');
+            const mmr = isMarvel
+              ? (p.marvel_rivals_mmr || 0)
+              : (p.valorant_mmr || p.current_mmr || 0);
             return `${index + 1}. <@${p.discord_user_id}> - ${rank} (${mmr} MMR)`;
           })
           .join('\n');

@@ -165,6 +165,64 @@ export class DatabaseService {
   }
 
   /**
+   * Update player's Marvel Rivals account info
+   */
+  async updatePlayerMarvelRivalsID(
+    discordUserId: string,
+    uid: string,
+    username: string
+  ): Promise<boolean> {
+    const supabase = this.getSupabase();
+
+    const existingPlayer = await this.getPlayer(discordUserId);
+    if (!existingPlayer) {
+      const { error: createError } = await supabase
+        .from('players')
+        .insert({
+          id: randomUUID(),
+          discord_user_id: discordUserId,
+          discord_username: 'Unknown',
+          discord_rank: 'Unranked',
+          discord_rank_value: 0,
+          discord_mmr: 0,
+          current_mmr: 0,
+          peak_mmr: 0,
+        });
+
+      if (createError) {
+        console.error('Error creating player for Marvel Rivals update:', {
+          discordUserId,
+          error: createError.message,
+          code: createError.code,
+          details: createError.details,
+        });
+        return false;
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({
+        marvel_rivals_uid: uid,
+        marvel_rivals_username: username,
+        verified_at: new Date().toISOString(),
+      })
+      .eq('discord_user_id', discordUserId);
+
+    if (updateError) {
+      console.error('Error updating player Marvel Rivals ID:', {
+        discordUserId,
+        error: updateError.message,
+        code: updateError.code,
+        details: updateError.details,
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Unlink/clear Riot ID from a player in the database
    */
   async unlinkPlayerRiotID(discordUserId: string): Promise<boolean> {
@@ -184,28 +242,107 @@ export class DatabaseService {
   }
 
   /**
+   * Unlink/clear Marvel Rivals account from a player in the database
+   */
+  async unlinkPlayerMarvelRivalsID(discordUserId: string): Promise<boolean> {
+    const supabase = this.getSupabase();
+    const { error } = await supabase
+      .from('players')
+      .update({
+        marvel_rivals_uid: null,
+        marvel_rivals_username: null,
+      })
+      .eq('discord_user_id', discordUserId);
+
+    return !error;
+  }
+
+  /**
+   * Set player's preferred game
+   */
+  async setPlayerPreferredGame(discordUserId: string, game: 'valorant' | 'marvel_rivals'): Promise<boolean> {
+    const supabase = this.getSupabase();
+    const { error } = await supabase
+      .from('players')
+      .update({ preferred_game: game })
+      .eq('discord_user_id', discordUserId);
+    return !error;
+  }
+
+  /**
+   * Set player's primary game for role assignment
+   */
+  async setPlayerPrimaryGame(discordUserId: string, game: 'valorant' | 'marvel_rivals'): Promise<boolean> {
+    const supabase = this.getSupabase();
+    const { error } = await supabase
+      .from('players')
+      .update({ primary_game: game })
+      .eq('discord_user_id', discordUserId);
+    return !error;
+  }
+
+  /**
+   * Set player's role mode (highest or primary)
+   */
+  async setPlayerRoleMode(discordUserId: string, mode: 'highest' | 'primary'): Promise<boolean> {
+    const supabase = this.getSupabase();
+    const { error } = await supabase
+      .from('players')
+      .update({ role_mode: mode })
+      .eq('discord_user_id', discordUserId);
+    return !error;
+  }
+
+  /**
+   * Get player by Marvel Rivals UID
+   */
+  async getPlayerByMarvelRivalsUID(uid: string): Promise<DatabasePlayer | null> {
+    const supabase = this.getSupabase();
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .eq('marvel_rivals_uid', uid)
+      .single();
+
+    if (error || !data) return null;
+    return data;
+  }
+
+  /**
    * Update player's Discord rank and MMR
    */
   async updatePlayerRank(
     discordUserId: string,
     rank: string,
     rankValue: number,
-    mmr: number
+    mmr: number,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
   ): Promise<boolean> {
     const supabase = this.getSupabase();
 
     const player = await this.getPlayer(discordUserId);
     if (!player) return false;
 
-    const updateData: any = {
-      discord_rank: rank,
-      discord_rank_value: rankValue,
-      current_mmr: mmr,
-    };
+    const updateData: any = this.getGameRankUpdate(game, rank, rankValue, mmr);
 
-    // Update peak MMR if higher
-    if (mmr > player.peak_mmr) {
-      updateData.peak_mmr = mmr;
+    // Update peak MMR if higher (game-specific)
+    if (game === 'valorant') {
+      const currentPeak = player.valorant_peak_mmr || 0;
+      if (mmr > currentPeak) {
+        updateData.valorant_peak_mmr = mmr;
+      }
+    } else {
+      const currentPeak = player.marvel_rivals_peak_mmr || 0;
+      if (mmr > currentPeak) {
+        updateData.marvel_rivals_peak_mmr = mmr;
+      }
+    }
+
+    const combinedUpdate = this.getCombinedRankUpdate(player, updateData);
+    Object.assign(updateData, combinedUpdate);
+
+    if (updateData.current_mmr > player.peak_mmr) {
+      updateData.peak_mmr = updateData.current_mmr;
     }
 
     const { error } = await supabase
@@ -219,7 +356,11 @@ export class DatabaseService {
   /**
    * Update player MMR (used after matches)
    */
-  async updatePlayerMMR(discordUserId: string, newMMR: number): Promise<boolean> {
+  async updatePlayerMMR(
+    discordUserId: string,
+    newMMR: number,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<boolean> {
     const supabase = this.getSupabase();
 
     const player = await this.getPlayer(discordUserId);
@@ -228,22 +369,40 @@ export class DatabaseService {
     // Determine rank from MMR
     const rankThreshold = await this.getRankForMMR(newMMR);
     
-    const updateData: any = {
-      current_mmr: newMMR,
-    };
+    const updateData: any = this.getGameRankUpdate(game, rankThreshold?.rank || 'Unranked', this.getRankValue(rankThreshold?.rank || 'Unranked'), newMMR);
 
     if (rankThreshold) {
-      updateData.discord_rank = rankThreshold.rank;
-      updateData.discord_rank_value = this.getRankValue(rankThreshold.rank);
+      const gameUpdate = this.getGameRankUpdate(
+        game,
+        rankThreshold.rank,
+        this.getRankValue(rankThreshold.rank),
+        newMMR
+      );
+      Object.assign(updateData, gameUpdate);
     }
 
     // Update peak MMR if higher
-    if (newMMR > player.peak_mmr) {
-      updateData.peak_mmr = newMMR;
+    if (game === 'valorant') {
+      const currentPeak = player.valorant_peak_mmr || 0;
+      if (newMMR > currentPeak) {
+        updateData.valorant_peak_mmr = newMMR;
+      }
+    } else {
+      const currentPeak = player.marvel_rivals_peak_mmr || 0;
+      if (newMMR > currentPeak) {
+        updateData.marvel_rivals_peak_mmr = newMMR;
+      }
+    }
+
+    const combinedUpdate = this.getCombinedRankUpdate(player, updateData);
+    Object.assign(updateData, combinedUpdate);
+
+    if (updateData.current_mmr > player.peak_mmr) {
+      updateData.peak_mmr = updateData.current_mmr;
     }
 
     // Check if rank changed
-    const rankChanged = rankThreshold && player.discord_rank !== rankThreshold.rank;
+    const rankChanged = rankThreshold && player.discord_rank !== updateData.discord_rank;
 
     const { error } = await supabase
       .from('players')
@@ -255,9 +414,9 @@ export class DatabaseService {
       await this.logRankChange(
         player.id,
         player.discord_rank,
-        rankThreshold!.rank,
+        updateData.discord_rank,
         player.current_mmr,
-        newMMR,
+        updateData.current_mmr,
         'match'
       );
     }
@@ -343,12 +502,30 @@ export class DatabaseService {
     const player = createPlayer(dbPlayer.discord_user_id, dbPlayer.discord_username);
     player.rank = dbPlayer.discord_rank !== 'Unranked' ? dbPlayer.discord_rank : undefined;
     player.rankValue = dbPlayer.discord_rank_value > 0 ? dbPlayer.discord_rank_value : undefined;
+    player.preferredGame = dbPlayer.preferred_game || 'valorant';
+    player.primaryGame = dbPlayer.primary_game || 'valorant';
+    player.roleMode = dbPlayer.role_mode || 'highest';
+    player.valorantRank = dbPlayer.valorant_rank || dbPlayer.discord_rank || undefined;
+    player.valorantRankValue = dbPlayer.valorant_rank_value || dbPlayer.discord_rank_value || undefined;
+    player.valorantMMR = dbPlayer.valorant_mmr || dbPlayer.current_mmr || undefined;
+    player.valorantPeakMMR = dbPlayer.valorant_peak_mmr || dbPlayer.peak_mmr || undefined;
+    player.marvelRivalsRank = dbPlayer.marvel_rivals_rank || undefined;
+    player.marvelRivalsRankValue = dbPlayer.marvel_rivals_rank_value || undefined;
+    player.marvelRivalsMMR = dbPlayer.marvel_rivals_mmr || undefined;
+    player.marvelRivalsPeakMMR = dbPlayer.marvel_rivals_peak_mmr || undefined;
     
     if (dbPlayer.riot_name && dbPlayer.riot_tag) {
       player.riotId = {
         name: dbPlayer.riot_name,
         tag: dbPlayer.riot_tag,
         region: dbPlayer.riot_region || undefined,
+        puuid: dbPlayer.riot_puuid || undefined,
+      };
+    }
+    if (dbPlayer.marvel_rivals_uid && dbPlayer.marvel_rivals_username) {
+      player.marvelRivalsId = {
+        uid: dbPlayer.marvel_rivals_uid,
+        username: dbPlayer.marvel_rivals_username,
       };
     }
 
@@ -732,7 +909,7 @@ export class DatabaseService {
       // Get player data for all queued players
       const { data: players, error: playersError } = await supabase
         .from('players')
-        .select('id, discord_user_id, discord_username, discord_rank, discord_rank_value, current_mmr, peak_mmr')
+        .select('*')
         .in('id', playerIds);
 
       if (playersError) {
@@ -833,16 +1010,92 @@ export class DatabaseService {
   private getRankValue(rank: string): number {
     const rankMap: Record<string, number> = {
       'Unranked': 0,
-      'Iron': 1,
-      'Bronze': 2,
-      'Silver': 3,
-      'Gold': 4,
-      'Platinum': 5,
-      'Diamond': 6,
-      'Ascendant': 7,
-      'Immortal': 8,
-      'Radiant': 9,
+      'GRNDS I': 1,
+      'GRNDS II': 2,
+      'GRNDS III': 3,
+      'GRNDS IV': 4,
+      'GRNDS V': 5,
+      'BREAKPOINT I': 6,
+      'BREAKPOINT II': 7,
+      'BREAKPOINT III': 8,
+      'BREAKPOINT IV': 9,
+      'BREAKPOINT V': 10,
+      'CHALLENGER I': 11,
+      'CHALLENGER II': 12,
+      'CHALLENGER III': 13,
+      'CHALLENGER IV': 14,
+      'CHALLENGER V': 15,
+      'X': 16,
     };
     return rankMap[rank] || 0;
+  }
+
+  private getGameRankUpdate(
+    game: 'valorant' | 'marvel_rivals',
+    rank: string,
+    rankValue: number,
+    mmr: number
+  ): Record<string, unknown> {
+    if (game === 'marvel_rivals') {
+      return {
+        marvel_rivals_rank: rank,
+        marvel_rivals_rank_value: rankValue,
+        marvel_rivals_mmr: mmr,
+      };
+    }
+    return {
+      valorant_rank: rank,
+      valorant_rank_value: rankValue,
+      valorant_mmr: mmr,
+      discord_rank: rank,
+      discord_rank_value: rankValue,
+      current_mmr: mmr,
+    };
+  }
+
+  private getCombinedRankUpdate(
+    player: DatabasePlayer,
+    updates: Record<string, unknown>
+  ): Record<string, unknown> {
+    const merged = { ...player, ...updates } as DatabasePlayer;
+
+    const valorantRank = merged.valorant_rank || merged.discord_rank || 'Unranked';
+    const valorantRankValue = merged.valorant_rank_value ?? merged.discord_rank_value ?? this.getRankValue(valorantRank);
+    const valorantMMR = merged.valorant_mmr ?? merged.current_mmr ?? 0;
+
+    const marvelRank = merged.marvel_rivals_rank || 'Unranked';
+    const marvelRankValue = merged.marvel_rivals_rank_value ?? this.getRankValue(marvelRank);
+    const marvelMMR = merged.marvel_rivals_mmr ?? 0;
+
+    const roleMode = merged.role_mode || 'highest';
+    const primaryGame = merged.primary_game || 'valorant';
+
+    let discordRank = valorantRank;
+    let discordRankValue = valorantRankValue;
+    let currentMMR = valorantMMR;
+
+    if (roleMode === 'primary') {
+      if (primaryGame === 'marvel_rivals') {
+        discordRank = marvelRank;
+        discordRankValue = marvelRankValue;
+        currentMMR = marvelMMR;
+      }
+    } else {
+      if (marvelRankValue > valorantRankValue) {
+        discordRank = marvelRank;
+        discordRankValue = marvelRankValue;
+        currentMMR = marvelMMR;
+      } else if (marvelRankValue === valorantRankValue && marvelMMR > valorantMMR) {
+        discordRank = marvelRank;
+        discordRankValue = marvelRankValue;
+        currentMMR = marvelMMR;
+      }
+    }
+
+    return {
+      discord_rank: discordRank,
+      discord_rank_value: discordRankValue,
+      current_mmr: currentMMR,
+    };
   }
 }
