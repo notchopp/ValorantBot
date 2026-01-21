@@ -186,14 +186,14 @@ async function getPlayerMatchHistory(
         deaths,
         assists,
         mvp,
-      matches!inner(
-        match_id,
-        match_date,
-        map,
-        winner,
-        status
-        match_type
-      )
+        matches!inner(
+          match_id,
+          match_date,
+          map,
+          winner,
+          status,
+          match_type
+        )
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
