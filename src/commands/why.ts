@@ -5,10 +5,14 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { GAME_CHOICES, resolveGameForPlayer, formatGameName, getMatchTypesForGame } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('why')
-  .setDescription('Get AI-powered analysis of why you might be losing or stuck at your rank');
+  .setDescription('Get AI-powered analysis of why you might be losing or stuck at your rank')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game to analyze').addChoices(...GAME_CHOICES)
+  );
 
 interface PerformanceAnalysis {
   recentWinRate: number;
@@ -84,6 +88,7 @@ export async function execute(
       return;
     }
 
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
     // Check if player has enough games by counting matches
     const supabaseCheck = databaseService.supabase;
     if (!supabaseCheck) {
@@ -94,7 +99,8 @@ export async function execute(
     const { count: matchCount } = await supabaseCheck
       .from('match_player_stats')
       .select('*', { count: 'exact', head: true })
-      .eq('player_id', player.id);
+      .eq('player_id', player.id)
+      .in('matches.match_type', getMatchTypesForGame(selectedGame));
     
     if (!matchCount || matchCount < 5) {
       await interaction.editReply(
@@ -104,7 +110,7 @@ export async function execute(
     }
 
     // Get recent match data for analysis
-    const analysis = await analyzePerformance(databaseService, player.id, userId);
+    const analysis = await analyzePerformance(databaseService, player.id, userId, selectedGame);
 
     if (!analysis) {
       await interaction.editReply(
@@ -118,7 +124,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`🧠 Performance Analysis for ${interaction.user.username}`)
+      .setTitle(`🧠 ${formatGameName(selectedGame)} Performance Analysis for ${interaction.user.username}`)
       .setColor(getAnalysisColor(analysis))
       .setThumbnail(interaction.user.displayAvatarURL())
       .setDescription(insights.summary);
@@ -197,7 +203,8 @@ export async function execute(
 async function analyzePerformance(
   databaseService: DatabaseService,
   playerId: string,
-  _userId: string
+  _userId: string,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<PerformanceAnalysis | null> {
   try {
     const supabase = databaseService.supabase;
@@ -224,6 +231,7 @@ async function analyzePerformance(
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
+      .in('matches.match_type', getMatchTypesForGame(game))
       .order('matches(match_date)', { ascending: false })
       .limit(20);
 

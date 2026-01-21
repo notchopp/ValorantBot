@@ -7,11 +7,24 @@ export interface Player {
   riot_tag: string | null
   riot_puuid: string | null
   riot_region: string
+  preferred_game: 'valorant' | 'marvel_rivals'
+  primary_game: 'valorant' | 'marvel_rivals'
+  role_mode: 'highest' | 'primary'
   discord_rank: string
   discord_rank_value: number
   discord_mmr: number
   current_mmr: number
   peak_mmr: number
+  valorant_rank: string | null
+  valorant_rank_value: number | null
+  valorant_mmr: number | null
+  valorant_peak_mmr: number | null
+  marvel_rivals_uid: string | null
+  marvel_rivals_username: string | null
+  marvel_rivals_rank: string | null
+  marvel_rivals_rank_value: number | null
+  marvel_rivals_mmr: number | null
+  marvel_rivals_peak_mmr: number | null
   verified_at: string | null
   created_at: string
   updated_at: string
@@ -54,7 +67,7 @@ export interface Comment {
 export interface Match {
   id: string
   match_id: string
-  match_type: 'custom' | 'valorant'
+  match_type: 'custom' | 'valorant' | 'marvel_rivals'
   match_date: string
   map: string | null
   host_id: string | null
@@ -109,40 +122,36 @@ export interface RankThreshold {
 // Helper function to get rank info from MMR
 export function getRankFromMMR(mmr: number): { rank: string; tier: string; color: string } {
   if (mmr >= 3000) return { rank: 'X', tier: '', color: '#ffffff' }
-  if (mmr >= 2800) return { rank: 'CHALLENGER', tier: 'V', color: '#ff0000' }
-  if (mmr >= 2600) return { rank: 'CHALLENGER', tier: 'IV', color: '#ff0000' }
-  if (mmr >= 2400) return { rank: 'CHALLENGER', tier: 'III', color: '#ff0000' }
-  if (mmr >= 2200) return { rank: 'CHALLENGER', tier: 'II', color: '#ff0000' }
-  if (mmr >= 2000) return { rank: 'CHALLENGER', tier: 'I', color: '#ff0000' }
-  if (mmr >= 1800) return { rank: 'BREAKPOINT', tier: 'V', color: '#000000' }
-  if (mmr >= 1600) return { rank: 'BREAKPOINT', tier: 'IV', color: '#000000' }
-  if (mmr >= 1400) return { rank: 'BREAKPOINT', tier: 'III', color: '#000000' }
-  if (mmr >= 1200) return { rank: 'BREAKPOINT', tier: 'II', color: '#000000' }
-  if (mmr >= 1000) return { rank: 'BREAKPOINT', tier: 'I', color: '#000000' }
-  if (mmr >= 800) return { rank: 'GRNDS', tier: 'V', color: '#ff8c00' }
-  if (mmr >= 600) return { rank: 'GRNDS', tier: 'IV', color: '#ff8c00' }
-  if (mmr >= 400) return { rank: 'GRNDS', tier: 'III', color: '#ff8c00' }
-  if (mmr >= 200) return { rank: 'GRNDS', tier: 'II', color: '#ff8c00' }
+  if (mmr >= 2600) return { rank: 'CHALLENGER', tier: 'III', color: '#ff0000' }
+  if (mmr >= 2500) return { rank: 'CHALLENGER', tier: 'II', color: '#ff0000' }
+  if (mmr >= 2400) return { rank: 'CHALLENGER', tier: 'I', color: '#ff0000' }
+  if (mmr >= 2300) return { rank: 'BREAKPOINT', tier: 'V', color: '#000000' }
+  if (mmr >= 2100) return { rank: 'BREAKPOINT', tier: 'IV', color: '#000000' }
+  if (mmr >= 1900) return { rank: 'BREAKPOINT', tier: 'III', color: '#000000' }
+  if (mmr >= 1700) return { rank: 'BREAKPOINT', tier: 'II', color: '#000000' }
+  if (mmr >= 1500) return { rank: 'BREAKPOINT', tier: 'I', color: '#000000' }
+  if (mmr >= 1200) return { rank: 'GRNDS', tier: 'V', color: '#ff8c00' }
+  if (mmr >= 900) return { rank: 'GRNDS', tier: 'IV', color: '#ff8c00' }
+  if (mmr >= 600) return { rank: 'GRNDS', tier: 'III', color: '#ff8c00' }
+  if (mmr >= 300) return { rank: 'GRNDS', tier: 'II', color: '#ff8c00' }
   return { rank: 'GRNDS', tier: 'I', color: '#ff8c00' }
 }
 
 // Helper function to get next rank info
 export function getNextRank(mmr: number): { rank: string; tier: string; mmrNeeded: number } | null {
   const thresholds = [
-    { mmr: 200, rank: 'GRNDS', tier: 'II' },
-    { mmr: 400, rank: 'GRNDS', tier: 'III' },
-    { mmr: 600, rank: 'GRNDS', tier: 'IV' },
-    { mmr: 800, rank: 'GRNDS', tier: 'V' },
-    { mmr: 1000, rank: 'BREAKPOINT', tier: 'I' },
-    { mmr: 1200, rank: 'BREAKPOINT', tier: 'II' },
-    { mmr: 1400, rank: 'BREAKPOINT', tier: 'III' },
-    { mmr: 1600, rank: 'BREAKPOINT', tier: 'IV' },
-    { mmr: 1800, rank: 'BREAKPOINT', tier: 'V' },
-    { mmr: 2000, rank: 'CHALLENGER', tier: 'I' },
-    { mmr: 2200, rank: 'CHALLENGER', tier: 'II' },
-    { mmr: 2400, rank: 'CHALLENGER', tier: 'III' },
-    { mmr: 2600, rank: 'CHALLENGER', tier: 'IV' },
-    { mmr: 2800, rank: 'CHALLENGER', tier: 'V' },
+    { mmr: 300, rank: 'GRNDS', tier: 'II' },
+    { mmr: 600, rank: 'GRNDS', tier: 'III' },
+    { mmr: 900, rank: 'GRNDS', tier: 'IV' },
+    { mmr: 1200, rank: 'GRNDS', tier: 'V' },
+    { mmr: 1500, rank: 'BREAKPOINT', tier: 'I' },
+    { mmr: 1700, rank: 'BREAKPOINT', tier: 'II' },
+    { mmr: 1900, rank: 'BREAKPOINT', tier: 'III' },
+    { mmr: 2100, rank: 'BREAKPOINT', tier: 'IV' },
+    { mmr: 2300, rank: 'BREAKPOINT', tier: 'V' },
+    { mmr: 2400, rank: 'CHALLENGER', tier: 'I' },
+    { mmr: 2500, rank: 'CHALLENGER', tier: 'II' },
+    { mmr: 2600, rank: 'CHALLENGER', tier: 'III' },
     { mmr: 3000, rank: 'X', tier: '' },
   ]
 

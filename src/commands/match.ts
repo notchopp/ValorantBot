@@ -380,6 +380,9 @@ export async function handleMatchReportModal(
       }
     }
 
+    const matchGame: 'valorant' | 'marvel_rivals' =
+      dbMatch.match_type === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
+
     // Step 2: Save player stats to database with parsed values
     const allPlayers = [...currentMatch.teams.teamA.players, ...currentMatch.teams.teamB.players];
     const winningTeam = winner === 'A' ? currentMatch.teams.teamA : currentMatch.teams.teamB;
@@ -391,7 +394,9 @@ export async function handleMatchReportModal(
       const team = currentMatch.teams.teamA.players.some(p => p.userId === player.userId) ? 'A' : 'B';
       
       // Get current MMR
-      const currentMMR = dbPlayer.current_mmr || 0;
+      const currentMMR = matchGame === 'marvel_rivals'
+        ? (dbPlayer.marvel_rivals_mmr || 0)
+        : (dbPlayer.valorant_mmr || dbPlayer.current_mmr || 0);
 
       // Get parsed stats for this player (or use defaults)
       const statsMap = team === 'A' ? teamAStats : teamBStats;
@@ -633,7 +638,7 @@ export async function handleMatchReportModal(
 
       if (hasChallengerPlayers || hasHighMMRPlayers) {
         try {
-          await customRankService.updateXRank();
+          await customRankService.updateXRank(matchGame);
         } catch (error) {
           console.error('Error updating X rank', {
             matchId: currentMatch.matchId,

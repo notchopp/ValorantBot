@@ -13,6 +13,15 @@ interface PlayerData {
   discord_username: string | null
   riot_name: string | null
   riot_tag: string | null
+  marvel_rivals_uid: string | null
+  marvel_rivals_username: string | null
+  preferred_game: 'valorant' | 'marvel_rivals' | null
+  valorant_rank: string | null
+  valorant_mmr: number | null
+  valorant_peak_mmr: number | null
+  marvel_rivals_rank: string | null
+  marvel_rivals_mmr: number | null
+  marvel_rivals_peak_mmr: number | null
   current_mmr: number
   peak_mmr: number
   discord_rank: string | null
@@ -46,7 +55,11 @@ interface RankProgressionEntry {
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { game?: string }
+}) {
   const supabase = await createClient()
   
   // Check if user has an anonymous session
@@ -104,24 +117,61 @@ export default async function DashboardPage() {
   
   const userAccentColor = accentColorProfile?.accent_color || '#ef4444'
   
+  const selectedGame =
+    searchParams?.game === 'marvel_rivals'
+      ? 'marvel_rivals'
+      : searchParams?.game === 'valorant'
+        ? 'valorant'
+        : (playerData.preferred_game || 'valorant')
+  const gameLabel = selectedGame === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant'
+  const currentMMR =
+    selectedGame === 'marvel_rivals'
+      ? (playerData.marvel_rivals_mmr ?? 0)
+      : (playerData.valorant_mmr ?? playerData.current_mmr ?? 0)
+  const peakMMR =
+    selectedGame === 'marvel_rivals'
+      ? (playerData.marvel_rivals_peak_mmr ?? 0)
+      : (playerData.valorant_peak_mmr ?? playerData.peak_mmr ?? 0)
+  const rankLabel =
+    selectedGame === 'marvel_rivals'
+      ? (playerData.marvel_rivals_rank ?? 'Unranked')
+      : (playerData.valorant_rank ?? playerData.discord_rank ?? 'GRNDS I')
+
   const playerDataToUse: PlayerData = {
     id: playerData.id,
     discord_user_id: playerData.discord_user_id,
     discord_username: playerData.discord_username ?? 'Player',
     riot_name: playerData.riot_name ?? null,
     riot_tag: playerData.riot_tag ?? null,
-    current_mmr: (playerData.current_mmr ?? 0) as number,
-    peak_mmr: (playerData.peak_mmr ?? 0) as number,
-    discord_rank: playerData.discord_rank ?? 'GRNDS I',
+    marvel_rivals_uid: playerData.marvel_rivals_uid ?? null,
+    marvel_rivals_username: playerData.marvel_rivals_username ?? null,
+    preferred_game: playerData.preferred_game ?? null,
+    valorant_rank: playerData.valorant_rank ?? null,
+    valorant_mmr: playerData.valorant_mmr ?? null,
+    valorant_peak_mmr: playerData.valorant_peak_mmr ?? null,
+    marvel_rivals_rank: playerData.marvel_rivals_rank ?? null,
+    marvel_rivals_mmr: playerData.marvel_rivals_mmr ?? null,
+    marvel_rivals_peak_mmr: playerData.marvel_rivals_peak_mmr ?? null,
+    current_mmr: currentMMR as number,
+    peak_mmr: peakMMR as number,
+    discord_rank: rankLabel,
   }
   
   // Get player's match stats and history (use admin client)
-  const { data: matchStats } = await supabaseAdmin
+  let matchStatsQuery = supabaseAdmin
     .from('match_player_stats')
-    .select('*, match:matches(match_date, map, winner)')
+    .select('*, match:matches(match_date, map, winner, match_type)')
     .eq('player_id', playerDataToUse.id)
     .order('created_at', { ascending: false })
     .limit(20)
+
+  if (selectedGame === 'marvel_rivals') {
+    matchStatsQuery = matchStatsQuery.eq('match.match_type', 'marvel_rivals')
+  } else {
+    matchStatsQuery = matchStatsQuery.in('match.match_type', ['custom', 'valorant'])
+  }
+
+  const { data: matchStats } = await matchStatsQuery
   
   interface MatchStatWithMatch {
     id: string
@@ -133,12 +183,13 @@ export default async function DashboardPage() {
     mmr_after: number
     mmr_before: number
     created_at: string
-    match?: {
-      match_date: string
-      map: string | null
-      winner?: 'A' | 'B'
+      match?: {
+        match_date: string
+        map: string | null
+        winner?: 'A' | 'B'
+        match_type?: 'custom' | 'valorant' | 'marvel_rivals'
+      }
     }
-  }
   
   const stats = (matchStats as MatchStatWithMatch[]) || []
   
@@ -200,10 +251,11 @@ export default async function DashboardPage() {
   const activityFeed = (activities as ActivityFeedType[]) || []
   
   // Get leaderboard position - use admin client
+  const leaderboardField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr'
   const { count: position } = await supabaseAdmin
     .from('players')
     .select('*', { count: 'exact', head: true })
-    .gt('current_mmr', playerDataToUse.current_mmr)
+    .gt(leaderboardField, playerDataToUse.current_mmr)
   
   const leaderboardPosition = (position || 0) + 1
   
@@ -238,6 +290,8 @@ export default async function DashboardPage() {
       userProfile={userProfile}
       kdRatio={kdRatio}
       mvpCount={mvpCount}
+      selectedGame={selectedGame}
+      gameLabel={gameLabel}
     />
   )
 }
@@ -259,6 +313,8 @@ function DashboardContent({
   kdRatio,
   mvpCount,
   userAccentColor,
+  selectedGame,
+  gameLabel,
 }: {
   playerDataToUse: PlayerData
   totalMatches: number
@@ -275,6 +331,8 @@ function DashboardContent({
   kdRatio: string
   mvpCount: number
   userAccentColor: string
+  selectedGame: 'valorant' | 'marvel_rivals'
+  gameLabel: string
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'
   
@@ -284,20 +342,45 @@ function DashboardContent({
         {/* Live Header */}
         <div className="mb-8 md:mb-12 flex items-center justify-between">
           <div>
+            <div className="inline-flex items-center gap-2 mb-4 rounded-full border border-white/10 bg-white/[0.04] p-1">
+              <Link
+                href="/dashboard?game=valorant"
+                className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                  selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Valorant
+              </Link>
+              <Link
+                href="/dashboard?game=marvel_rivals"
+                className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                  selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Marvel Rivals
+              </Link>
+            </div>
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white mb-2 tracking-tighter leading-none">
               {displayName}
             </h1>
             <p className="text-sm md:text-base text-white/40 font-light">
-              {playerDataToUse.riot_name && playerDataToUse.riot_tag 
-                ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag}`
-                : 'Link Riot ID in Discord'
+              {selectedGame === 'marvel_rivals'
+                ? (playerDataToUse.marvel_rivals_username
+                    ? `${playerDataToUse.marvel_rivals_username} • ${playerDataToUse.marvel_rivals_uid || 'UID pending'}`
+                    : 'Link Marvel Rivals in Discord')
+                : (playerDataToUse.riot_name && playerDataToUse.riot_tag
+                    ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag}`
+                    : 'Link Riot ID in Discord')
               }
             </p>
+            <div className="mt-2 text-xs font-black uppercase tracking-[0.3em] text-white/30">
+              {gameLabel}
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Rank</div>
-              <RankBadge mmr={playerDataToUse.current_mmr} size="lg" />
+              <RankBadge mmr={playerDataToUse.current_mmr} size="lg" rankLabel={playerDataToUse.discord_rank} />
             </div>
             <div className="text-right hidden sm:block">
               <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Position</div>
@@ -327,7 +410,9 @@ function DashboardContent({
               Peak: <span className="font-black" style={{ color: userAccentColor }}>{playerDataToUse.peak_mmr}</span>
             </span>
             <span className="text-white/40">
-              {playerDataToUse.current_mmr > 0 ? `${3000 - playerDataToUse.current_mmr} to X Rank` : 'Link Riot ID to start'}
+              {playerDataToUse.current_mmr > 0
+                ? `${3000 - playerDataToUse.current_mmr} to X Rank`
+                : `Link ${gameLabel} to start`}
             </span>
           </div>
         </div>

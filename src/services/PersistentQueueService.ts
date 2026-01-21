@@ -8,8 +8,10 @@ import { Config } from '../config/config';
  * This message is always available for players to join the queue
  */
 export class PersistentQueueService {
-  private persistentMessageId: string | null = null;
-  private persistentChannelId: string | null = null;
+  private persistentMessages: Record<'valorant' | 'marvel_rivals', { messageId: string | null; channelId: string | null }> = {
+    valorant: { messageId: null, channelId: null },
+    marvel_rivals: { messageId: null, channelId: null },
+  };
 
   constructor(
     private client: Client,
@@ -45,35 +47,8 @@ export class PersistentQueueService {
 
       // Check if there's already a persistent message
       const existingMessages = await lobbyChannel.messages.fetch({ limit: 50 });
-      const existingQueueMessage = existingMessages.find(
-        (msg) => msg.author.id === this.client.user?.id && msg.embeds[0]?.footer?.text?.includes('Persistent Queue')
-      );
-
-      if (existingQueueMessage) {
-        this.persistentMessageId = existingQueueMessage.id;
-        this.persistentChannelId = lobbyChannel.id;
-        console.log('✅ Found existing persistent queue message', { messageId: this.persistentMessageId });
-        // Update it
-        await this.updatePersistentQueueMessage();
-        return;
-      }
-
-      // Create new persistent queue message
-      const embed = await this.createPersistentQueueEmbed();
-      const buttons = this.createQueueButtons();
-
-      const message = await lobbyChannel.send({
-        embeds: [embed],
-        components: [buttons],
-      });
-
-      this.persistentMessageId = message.id;
-      this.persistentChannelId = lobbyChannel.id;
-
-      console.log('✅ Created persistent queue message', {
-        messageId: this.persistentMessageId,
-        channelId: this.persistentChannelId,
-      });
+      await this.initializePersistentQueueForGame(lobbyChannel, existingMessages, 'valorant');
+      await this.initializePersistentQueueForGame(lobbyChannel, existingMessages, 'marvel_rivals');
     } catch (error) {
       console.error('❌ Error initializing persistent queue', {
         error: error instanceof Error ? error.message : String(error),
@@ -84,32 +59,37 @@ export class PersistentQueueService {
   /**
    * Update the persistent queue message with current queue status
    */
-  async updatePersistentQueueMessage(): Promise<void> {
-    if (!this.persistentMessageId || !this.persistentChannelId) {
-      return;
-    }
+  async updatePersistentQueueMessage(game?: 'valorant' | 'marvel_rivals'): Promise<void> {
+    const games = game ? [game] : (['valorant', 'marvel_rivals'] as const);
 
     try {
-      const channel = (await this.client.channels.fetch(this.persistentChannelId)) as TextChannel;
-      if (!channel) {
-        console.warn('⚠️ Persistent queue channel not found');
-        return;
+      for (const targetGame of games) {
+        const { messageId, channelId } = this.persistentMessages[targetGame];
+        if (!messageId || !channelId) {
+          continue;
+        }
+
+        const channel = (await this.client.channels.fetch(channelId)) as TextChannel;
+        if (!channel) {
+          console.warn('⚠️ Persistent queue channel not found', { game: targetGame });
+          continue;
+        }
+
+        const message = await channel.messages.fetch(messageId);
+        if (!message) {
+          console.warn('⚠️ Persistent queue message not found, recreating...', { game: targetGame });
+          await this.initializePersistentQueue();
+          return;
+        }
+
+        const embed = await this.createPersistentQueueEmbed(targetGame);
+        const buttons = this.createQueueButtons(targetGame);
+
+        await message.edit({
+          embeds: [embed],
+          components: [buttons],
+        });
       }
-
-      const message = await channel.messages.fetch(this.persistentMessageId);
-      if (!message) {
-        console.warn('⚠️ Persistent queue message not found, recreating...');
-        await this.initializePersistentQueue();
-        return;
-      }
-
-      const embed = await this.createPersistentQueueEmbed();
-      const buttons = this.createQueueButtons();
-
-      await message.edit({
-        embeds: [embed],
-        components: [buttons],
-      });
     } catch (error) {
       console.error('❌ Error updating persistent queue message', {
         error: error instanceof Error ? error.message : String(error),
@@ -120,8 +100,8 @@ export class PersistentQueueService {
   /**
    * Create the embed for the persistent queue message
    */
-  private async createPersistentQueueEmbed(): Promise<EmbedBuilder> {
-    const queueStatus = this.queueService.getCurrentQueueSizeSync();
+  private async createPersistentQueueEmbed(game: 'valorant' | 'marvel_rivals'): Promise<EmbedBuilder> {
+    const queueStatus = this.queueService.getCurrentQueueSizeSync(game);
     const maxPlayers = this.config.queue.maxPlayers;
 
     // Find #GRNDSMAKER role for mention
@@ -141,8 +121,9 @@ export class PersistentQueueService {
       // Fallback to text if role not found
     }
 
+    const gameLabel = game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
     const embed = new EmbedBuilder()
-      .setTitle('Queue is Always Open!')
+      .setTitle(`${gameLabel} Queue is Always Open!`)
       .setDescription(
         '**Anyone can join the queue!** Click the button below or use `/queue join`\n\n' +
         `**Need a new queue started?** Ping ${grndsMakerMention} or any mod!\n` +
@@ -162,20 +143,19 @@ export class PersistentQueueService {
 
     // Get queue players with their rank and MMR
     try {
-      const players = await this.databaseService.getQueuePlayersWithData();
+      const players = await this.databaseService.getQueuePlayersWithData(game);
       
       if (players.length > 0) {
-        const activeGame = players[0].preferred_game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
         embed.addFields({
           name: 'Game',
-          value: activeGame,
+          value: gameLabel,
           inline: true,
         });
 
         const playerList = players
           .slice(0, 10) // Show first 10 players
           .map((p, index) => {
-            const isMarvel = p.preferred_game === 'marvel_rivals';
+            const isMarvel = game === 'marvel_rivals';
             const rank = isMarvel
               ? (p.marvel_rivals_rank || 'Unranked')
               : (p.valorant_rank || p.discord_rank || 'Unranked');
@@ -199,7 +179,7 @@ export class PersistentQueueService {
       // Continue without player list if there's an error
     }
 
-    embed.setFooter({ text: 'Persistent Queue • Always available • Use /queue start to create a new queue' });
+    embed.setFooter({ text: `Persistent Queue • ${gameLabel} • Use /queue start to create a new queue` });
 
     return embed;
   }
@@ -207,14 +187,14 @@ export class PersistentQueueService {
   /**
    * Create the buttons for the persistent queue message
    */
-  private createQueueButtons(): ActionRowBuilder<ButtonBuilder> {
+  private createQueueButtons(game: 'valorant' | 'marvel_rivals'): ActionRowBuilder<ButtonBuilder> {
     const joinButton = new ButtonBuilder()
-      .setCustomId('queue_join_button')
+      .setCustomId(`queue_join_button:${game}`)
       .setLabel('Join Queue')
       .setStyle(ButtonStyle.Primary);
 
     const leaveButton = new ButtonBuilder()
-      .setCustomId('queue_leave_button')
+      .setCustomId(`queue_leave_button:${game}`)
       .setLabel('Leave Queue')
       .setStyle(ButtonStyle.Danger);
 
@@ -224,10 +204,52 @@ export class PersistentQueueService {
   /**
    * Get the persistent message ID and channel ID
    */
-  getPersistentQueueInfo(): { messageId: string | null; channelId: string | null } {
-    return {
-      messageId: this.persistentMessageId,
-      channelId: this.persistentChannelId,
+  getPersistentQueueInfo(game: 'valorant' | 'marvel_rivals'): { messageId: string | null; channelId: string | null } {
+    return this.persistentMessages[game];
+  }
+
+  private async initializePersistentQueueForGame(
+    lobbyChannel: TextChannel,
+    existingMessages: any,
+    game: 'valorant' | 'marvel_rivals'
+  ): Promise<void> {
+    const gameLabel = game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
+    const existingQueueMessage = existingMessages.find(
+      (msg: any) =>
+        msg.author.id === this.client.user?.id &&
+        msg.embeds[0]?.footer?.text?.includes(`Persistent Queue • ${gameLabel}`)
+    );
+
+    if (existingQueueMessage) {
+      this.persistentMessages[game] = {
+        messageId: existingQueueMessage.id,
+        channelId: lobbyChannel.id,
+      };
+      console.log('✅ Found existing persistent queue message', {
+        game,
+        messageId: existingQueueMessage.id,
+      });
+      await this.updatePersistentQueueMessage(game);
+      return;
+    }
+
+    const embed = await this.createPersistentQueueEmbed(game);
+    const buttons = this.createQueueButtons(game);
+
+    const message = await lobbyChannel.send({
+      embeds: [embed],
+      components: [buttons],
+    });
+
+    this.persistentMessages[game] = {
+      messageId: message.id,
+      channelId: lobbyChannel.id,
     };
+
+    console.log('✅ Created persistent queue message', {
+      game,
+      messageId: message.id,
+      channelId: lobbyChannel.id,
+    });
   }
 }

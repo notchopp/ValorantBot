@@ -13,6 +13,14 @@ export default async function LoginPage() {
         <div className="space-y-6">
           <DiscordLoginButton />
         </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-left">
+          <div className="text-xs font-black uppercase tracking-[0.25em] text-white/40">New</div>
+          <div className="mt-2 text-lg font-black text-white">Marvel Rivals Support</div>
+          <p className="mt-2 text-sm text-white/60">
+            Link your Marvel Rivals account in Discord and track ranks, MMR, and match history alongside Valorant.
+          </p>
+        </div>
       </div>
     </div>
   )

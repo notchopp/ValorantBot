@@ -102,7 +102,8 @@ export default async function handler(
     // Get all queued players
     const { data: queueEntries, error: queueError } = await supabase
       .from('queue')
-      .select('player_id, joined_at')
+      .select('player_id, joined_at, game')
+      .eq('game', game)
       .order('joined_at', { ascending: true });
 
     if (queueError) {
@@ -126,12 +127,6 @@ export default async function handler(
     if (playersError || !players || players.length !== 10) {
       console.error('Error fetching players', { error: playersError, count: players?.length });
       res.status(500).json({ success: false, error: 'Failed to fetch player data' });
-      return;
-    }
-
-    const invalidGame = players.find((p) => p.preferred_game && p.preferred_game !== game);
-    if (invalidGame) {
-      res.status(400).json({ success: false, error: 'Queue players are not all in the same game queue' });
       return;
     }
 
@@ -182,7 +177,8 @@ export default async function handler(
     const { error: clearError } = await supabase
       .from('queue')
       .delete()
-      .in('player_id', playerIds);
+      .in('player_id', playerIds)
+      .eq('game', game);
 
     if (clearError) {
       console.warn('Error clearing queue', { error: clearError });

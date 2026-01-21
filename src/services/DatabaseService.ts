@@ -545,7 +545,7 @@ export class DatabaseService {
     hostUserId: string;
     teamA: string[]; // Array of Discord user IDs
     teamB: string[]; // Array of Discord user IDs
-    matchType?: 'custom' | 'valorant';
+    matchType?: 'custom' | 'valorant' | 'marvel_rivals';
   }): Promise<DatabaseMatch | null> {
     try {
       const supabase = this.getSupabase();
@@ -778,7 +778,10 @@ export class DatabaseService {
   /**
    * Add player to queue
    */
-  async addPlayerToQueue(playerUserId: string): Promise<boolean> {
+  async addPlayerToQueue(
+    playerUserId: string,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<boolean> {
     try {
       const supabase = this.getSupabase();
       const player = await this.getPlayer(playerUserId);
@@ -792,6 +795,7 @@ export class DatabaseService {
         .from('queue')
         .select('id')
         .eq('player_id', player.id)
+        .eq('game', game)
         .single();
 
       if (existing) {
@@ -805,6 +809,7 @@ export class DatabaseService {
         .insert({
           player_id: player.id,
           joined_at: new Date().toISOString(),
+          game,
         });
 
       if (error) {
@@ -828,7 +833,10 @@ export class DatabaseService {
   /**
    * Remove player from queue
    */
-  async removePlayerFromQueue(playerUserId: string): Promise<boolean> {
+  async removePlayerFromQueue(
+    playerUserId: string,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<boolean> {
     try {
       const supabase = this.getSupabase();
       const player = await this.getPlayer(playerUserId);
@@ -839,7 +847,8 @@ export class DatabaseService {
       const { error } = await supabase
         .from('queue')
         .delete()
-        .eq('player_id', player.id);
+        .eq('player_id', player.id)
+        .eq('game', game);
 
       if (error) {
         console.error('Error removing player from queue', {
@@ -862,12 +871,15 @@ export class DatabaseService {
   /**
    * Get all players in queue
    */
-  async getQueuePlayers(): Promise<DatabaseQueue[]> {
+  async getQueuePlayers(
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<DatabaseQueue[]> {
     try {
       const supabase = this.getSupabase();
       const { data, error } = await supabase
         .from('queue')
         .select('*')
+        .eq('game', game)
         .order('joined_at', { ascending: true });
 
       if (error) {
@@ -889,7 +901,9 @@ export class DatabaseService {
   /**
    * Get queue players with their player data (rank, MMR, etc.)
    */
-  async getQueuePlayersWithData(): Promise<DatabasePlayer[]> {
+  async getQueuePlayersWithData(
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<DatabasePlayer[]> {
     try {
       const supabase = this.getSupabase();
       
@@ -897,6 +911,7 @@ export class DatabaseService {
       const { data: queueEntries, error: queueError } = await supabase
         .from('queue')
         .select('player_id')
+        .eq('game', game)
         .order('joined_at', { ascending: true });
 
       if (queueError || !queueEntries || queueEntries.length === 0) {
@@ -937,13 +952,15 @@ export class DatabaseService {
   /**
    * Clear all players from queue
    */
-  async clearQueue(): Promise<boolean> {
+  async clearQueue(
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<boolean> {
     try {
       const supabase = this.getSupabase();
       const { error } = await supabase
         .from('queue')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .eq('game', game);
 
       if (error) {
         console.error('Error clearing queue', {
@@ -1148,9 +1165,8 @@ export class DatabaseService {
       'CHALLENGER I': 11,
       'CHALLENGER II': 12,
       'CHALLENGER III': 13,
-      'CHALLENGER IV': 14,
-      'CHALLENGER V': 15,
-      'X': 16,
+      'ABSOLUTE': 14,
+      'X': 15,
     };
     return rankMap[rank] || 0;
   }

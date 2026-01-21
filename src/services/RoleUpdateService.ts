@@ -8,7 +8,7 @@ import { Config } from '../config/config';
  */
 export class RoleUpdateService {
   // Standard rank names used across the bot
-  private static readonly RANK_NAMES = ['grnds', 'breakpoint', 'challenger', 'x'];
+  private static readonly RANK_NAMES = ['grnds', 'breakpoint', 'challenger', 'absolute', 'x'];
   private dbService: DatabaseService;
 
   constructor(dbService: DatabaseService, _config: Config) {
@@ -421,9 +421,8 @@ export class RoleUpdateService {
       'CHALLENGER I': 11,
       'CHALLENGER II': 12,
       'CHALLENGER III': 13,
-      'CHALLENGER IV': 14,
-      'CHALLENGER V': 15,
-      'X': 16,
+      'ABSOLUTE': 14,
+      'X': 15,
     };
     return rankMap[rank] || 0;
   }

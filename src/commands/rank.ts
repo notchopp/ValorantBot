@@ -9,10 +9,14 @@ import { RankCalculationService } from '../services/RankCalculationService';
 import { RankCardService } from '../services/RankCardService';
 import { RankProfileImageService } from '../services/RankProfileImageService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, getGameRankFields, resolveGameForPlayer, formatGameName, getMatchTypesForGame } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('rank')
-  .setDescription('View your Discord rank, MMR, and progression');
+  .setDescription('View your Discord rank, MMR, and progression')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Choose which game to display').addChoices(...GAME_CHOICES)
+  );
 
 // Also create /mmr as alias
 export const mmrData = new SlashCommandBuilder()
@@ -46,8 +50,9 @@ export async function execute(
       return;
     }
 
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
     // Get rank progression
-    const progression = await rankCalculationService.getRankProgression(userId);
+    const progression = await rankCalculationService.getRankProgression(userId, selectedGame);
 
     if (!progression) {
       await safeEditReply(interaction, {
@@ -56,7 +61,9 @@ export async function execute(
       return;
     }
 
-  const matchSummary = await databaseService.getPlayerMatchSummary(userId);
+  const matchSummary = await databaseService.getPlayerMatchSummary(userId, {
+    matchTypes: getMatchTypesForGame(selectedGame),
+  });
   const summaryStats = matchSummary?.stats || getEmptyMatchStats();
 
   // Create embed
@@ -77,6 +84,7 @@ export async function execute(
       }
     );
 
+  const { rank: gameRank, mmr: gameMMR, peak: gamePeak } = getGameRankFields(player, selectedGame);
   const valorantRank = player.valorant_rank || player.discord_rank || 'Unranked';
   const valorantMMR = player.valorant_mmr || player.current_mmr || 0;
   const marvelRank = player.marvel_rivals_rank || 'Unranked';
@@ -84,20 +92,25 @@ export async function execute(
 
   embed.addFields(
     {
-      name: 'Valorant',
-      value: `**${valorantRank}** (${valorantMMR} MMR)`,
+      name: 'Marvel Rivals',
+      value: `**${marvelRank}**\n${marvelMMR} MMR`,
       inline: true,
     },
     {
-      name: 'Marvel Rivals',
-      value: `**${marvelRank}** (${marvelMMR} MMR)`,
+      name: 'Valorant',
+      value: `**${valorantRank}**\n${valorantMMR} MMR`,
+      inline: true,
+    },
+    {
+      name: `${formatGameName(selectedGame)} Focus`,
+      value: `**${gameRank}**\n${gameMMR} MMR`,
       inline: true,
     }
   );
 
   embed.addFields({
     name: 'Game Settings',
-    value: `Preferred: **${(player.preferred_game || 'valorant').replace('_', ' ')}** | Primary: **${(player.primary_game || 'valorant').replace('_', ' ')}** | Mode: **${player.role_mode || 'highest'}**`,
+    value: `Preferred: **${formatGameName(player.preferred_game || 'valorant')}** | Primary: **${formatGameName(player.primary_game || 'valorant')}** | Mode: **${player.role_mode || 'highest'}**`,
     inline: false,
   });
 
@@ -131,10 +144,10 @@ export async function execute(
   }
 
   // Add peak MMR if different
-  if (player.peak_mmr > progression.currentMMR) {
+  if (gamePeak > progression.currentMMR) {
     embed.addFields({
       name: 'Peak MMR',
-      value: `**${player.peak_mmr}** MMR`,
+      value: `**${gamePeak}** MMR`,
       inline: true,
     });
   }
@@ -155,7 +168,7 @@ export async function execute(
         playerName: interaction.user.username,
         discordId: interaction.user.id,
         avatarUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
-        gameLabel: 'Combined',
+        gameLabel: formatGameName(selectedGame),
         rankName: progression.currentRank,
         rankMMR: progression.currentMMR,
         stats: summaryStats,
@@ -167,9 +180,13 @@ export async function execute(
           : undefined,
         recentGames: matchSummary?.recentGames,
       });
-      const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
-      attachments.push(attachment);
-      embed.setImage('attachment://rank-profile.png');
+      if (Buffer.isBuffer(profileBuffer)) {
+        const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+        attachments.push(attachment);
+        embed.setImage('attachment://rank-profile.png');
+      } else {
+        console.warn('Rank profile image buffer invalid', { userId });
+      }
     } catch (error) {
       console.warn('Failed to generate rank profile image', {
         userId,
@@ -189,9 +206,13 @@ export async function execute(
         marvelRank,
         marvelMMR,
       });
-      const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
-      attachments.push(attachment);
-      embed.setImage('attachment://rank-card.png');
+      if (Buffer.isBuffer(cardBuffer)) {
+        const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
+        attachments.push(attachment);
+        embed.setImage('attachment://rank-card.png');
+      } else {
+        console.warn('Rank card buffer invalid', { userId });
+      }
     } catch (error) {
       console.warn('Failed to generate rank card image', {
         userId,
@@ -251,8 +272,7 @@ function getRankColor(rank: string): number {
     'CHALLENGER I': 0xff6b6b, // Red
     'CHALLENGER II': 0xff6b6b,
     'CHALLENGER III': 0xff6b6b,
-    'CHALLENGER IV': 0xff6b6b,
-    'CHALLENGER V': 0xff6b6b,
+    'ABSOLUTE': 0xffb347, // Orange
     'X': 0xffd700, // Gold
     'UNRANKED': 0x2c2f33, // Dark gray
   };

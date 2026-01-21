@@ -116,4 +116,5 @@ export interface DatabaseQueue {
   player_id: string;
   joined_at: string;
   expires_at?: string | null;
+  game?: 'valorant' | 'marvel_rivals';
 }

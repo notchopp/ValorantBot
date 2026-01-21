@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
+    const game = searchParams.get('game') === 'marvel_rivals' ? 'marvel_rivals' : 'valorant'
     
     if (!query || query.length < 1) {
       return NextResponse.json({ players: [] })
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     // Order alphabetically by username
     const { data: players, error } = await supabaseAdmin
       .from('players')
-      .select('id, discord_user_id, discord_username, current_mmr, discord_avatar_url')
+      .select('id, discord_user_id, discord_username, valorant_mmr, marvel_rivals_mmr, discord_avatar_url')
       .ilike('discord_username', `${query}%`)
       .order('discord_username', { ascending: true })
       .limit(10)
@@ -36,24 +37,28 @@ export async function GET(request: Request) {
       id: string
       discord_user_id: string
       discord_username: string | null
-      current_mmr: number | null
+      valorant_mmr: number | null
+      marvel_rivals_mmr: number | null
       discord_avatar_url?: string | null
     }
     
     const formattedPlayers = (players || []).map((player: PlayerRow) => {
       let rank = 'GRNDS I'
-      const mmr = player.current_mmr || 0
+      const mmr = game === 'marvel_rivals' ? (player.marvel_rivals_mmr || 0) : (player.valorant_mmr || 0)
       
       if (mmr >= 3000) rank = 'X'
-      else if (mmr >= 2000) {
-        const tier = Math.floor((mmr - 2000) / 200) + 1
-        rank = `CHALLENGER ${Math.min(tier, 5)}`
-      } else if (mmr >= 1000) {
-        const tier = Math.floor((mmr - 1000) / 200) + 1
-        rank = `BREAKPOINT ${Math.min(tier, 5)}`
-      } else if (mmr > 0) {
-        const tier = Math.floor(mmr / 200) + 1
-        rank = `GRNDS ${Math.min(tier, 5)}`
+      else if (mmr >= 2600) rank = 'CHALLENGER III'
+      else if (mmr >= 2500) rank = 'CHALLENGER II'
+      else if (mmr >= 2400) rank = 'CHALLENGER I'
+      else if (mmr >= 2300) rank = 'BREAKPOINT V'
+      else if (mmr >= 2100) rank = 'BREAKPOINT IV'
+      else if (mmr >= 1900) rank = 'BREAKPOINT III'
+      else if (mmr >= 1700) rank = 'BREAKPOINT II'
+      else if (mmr >= 1500) rank = 'BREAKPOINT I'
+      else if (mmr >= 1200) rank = 'GRNDS V'
+      else if (mmr >= 900) rank = 'GRNDS IV'
+      else if (mmr >= 600) rank = 'GRNDS III'
+      else if (mmr >= 300) rank = 'GRNDS II'
       }
       
       return {

@@ -8,7 +8,13 @@ import { Player, Comment } from '@/lib/types'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
-export default async function ProfilePage({ params }: { params: { userId: string } }) {
+export default async function ProfilePage({
+  params,
+  searchParams,
+}: {
+  params: { userId: string }
+  searchParams?: { game?: string }
+}) {
   // Use admin client for data fetching
   const supabaseAdmin = getSupabaseAdminClient()
   const supabase = await createClient()
@@ -26,6 +32,23 @@ export default async function ProfilePage({ params }: { params: { userId: string
   }
   
   const playerData = player as Player
+  const selectedGame =
+    searchParams?.game === 'marvel_rivals'
+      ? 'marvel_rivals'
+      : searchParams?.game === 'valorant'
+        ? 'valorant'
+        : (playerData.preferred_game || 'valorant')
+  const gameLabel = selectedGame === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant'
+  const leaderboardField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr'
+  const currentMMR = selectedGame === 'marvel_rivals'
+    ? (playerData.marvel_rivals_mmr ?? 0)
+    : (playerData.valorant_mmr ?? playerData.current_mmr ?? 0)
+  const peakMMR = selectedGame === 'marvel_rivals'
+    ? (playerData.marvel_rivals_peak_mmr ?? 0)
+    : (playerData.valorant_peak_mmr ?? playerData.peak_mmr ?? 0)
+  const rankLabel = selectedGame === 'marvel_rivals'
+    ? (playerData.marvel_rivals_rank ?? 'Unranked')
+    : (playerData.valorant_rank ?? playerData.discord_rank ?? 'GRNDS I')
   
   // Check if current user is viewing their own profile
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,11 +62,19 @@ export default async function ProfilePage({ params }: { params: { userId: string
   }
   
   // Get player's match stats
-  const { data: matchStats } = await supabaseAdmin
+  let matchStatsQuery = supabaseAdmin
     .from('match_player_stats')
     .select('*, match:matches(*)')
     .eq('player_id', playerData.id)
     .order('created_at', { ascending: false })
+
+  if (selectedGame === 'marvel_rivals') {
+    matchStatsQuery = matchStatsQuery.eq('match.match_type', 'marvel_rivals')
+  } else {
+    matchStatsQuery = matchStatsQuery.in('match.match_type', ['custom', 'valorant'])
+  }
+
+  const { data: matchStats } = await matchStatsQuery
   
   interface MatchStatWithMatch {
     team: 'A' | 'B'
@@ -57,6 +88,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
       winner?: 'A' | 'B'
       map?: string | null
       match_date?: string
+      match_type?: 'custom' | 'valorant' | 'marvel_rivals'
     }
   }
   
@@ -134,7 +166,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
   const { count: position } = await supabaseAdmin
     .from('players')
     .select('*', { count: 'exact', head: true })
-    .gt('current_mmr', playerData.current_mmr)
+    .gt(leaderboardField, currentMMR)
   
   const leaderboardPosition = (position || 0) + 1
   
@@ -155,9 +187,28 @@ export default async function ProfilePage({ params }: { params: { userId: string
       <div className="min-h-screen py-12 md:py-20 px-4 md:px-8 relative z-10" style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}>
         <div className="max-w-[1400px] mx-auto">
         {/* Profile Header with Avatar */}
-        <div className="mb-12 md:mb-20">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
-            <div className="flex-1">
+  <div className="mb-12 md:mb-20">
+    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
+      <div className="flex-1">
+        <div className="inline-flex items-center gap-2 mb-4 rounded-full border border-white/10 bg-white/[0.04] p-1">
+          <Link
+            href={`/profile/${userId}?game=valorant`}
+            className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+              selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Valorant
+          </Link>
+          <Link
+            href={`/profile/${userId}?game=marvel_rivals`}
+            className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+              selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Marvel Rivals
+          </Link>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
+        </div>
               <div className="flex items-center gap-4 md:gap-6 mb-4 md:mb-6">
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
@@ -212,7 +263,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
               )}
             </div>
             <div className="flex flex-col items-start md:items-end gap-3">
-              <RankBadge mmr={playerData.current_mmr} size="xl" />
+              <RankBadge mmr={currentMMR} size="xl" rankLabel={rankLabel} />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
                 #{leaderboardPosition} on Leaderboard
               </p>
@@ -225,14 +276,17 @@ export default async function ProfilePage({ params }: { params: { userId: string
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Current MMR</span>
                 <span className="text-5xl md:text-7xl font-black tracking-tighter" style={{ color: profileAccentColor }}>
-                  {playerData.current_mmr}
+                  {currentMMR}
                 </span>
               </div>
             </div>
-            <MMRProgressBar currentMMR={playerData.current_mmr} accentColor={profileAccentColor} />
+            <MMRProgressBar currentMMR={currentMMR} accentColor={profileAccentColor} />
             <div className="mt-6 flex items-center justify-between text-sm md:text-base">
               <span className="text-white/40 font-light">
-                Peak: <span className="font-black" style={{ color: profileAccentColor }}>{playerData.peak_mmr} MMR</span>
+                Peak: <span className="font-black" style={{ color: profileAccentColor }}>{peakMMR} MMR</span>
+              </span>
+              <span className="text-white/40 font-light">
+                {gameLabel} Rank: <span className="font-black">{rankLabel}</span>
               </span>
             </div>
           </div>
@@ -288,7 +342,13 @@ export default async function ProfilePage({ params }: { params: { userId: string
                         </div>
                       </div>
                       <div className="text-xs text-white/60 mb-1">
-                        {stat.match?.map || 'Unknown Map'} • {stat.match?.match_date ? new Date(stat.match.match_date).toLocaleDateString() : 'Unknown Date'}
+                        {stat.match?.map || 'Unknown Map'} • {stat.match?.match_date ? new Date(stat.match.match_date).toLocaleDateString() : 'Unknown Date'} • {(() => {
+                          const type = stat.match?.match_type
+                          if (type === 'marvel_rivals') return 'Marvel Rivals'
+                          if (type === 'valorant') return 'Valorant'
+                          if (type === 'custom') return 'Custom'
+                          return 'Match'
+                        })()}
                       </div>
                       <div className="text-xs text-white/40">
                         {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="font-black" style={{ color: profileAccentColor }}>MVP</span>}
@@ -341,26 +401,48 @@ export default async function ProfilePage({ params }: { params: { userId: string
         
         {/* Valorant Info & Comments on This Profile */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-12 md:mb-20">
-          {/* Valorant Info */}
-          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Valorant Info</h2>
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Riot ID</div>
-                <div className="text-lg font-black text-white">
-                  {playerData.riot_name && playerData.riot_tag 
-                    ? `${playerData.riot_name}#${playerData.riot_tag}`
-                    : 'Not linked'
-                  }
+          <div className="space-y-6">
+            <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
+              <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Valorant Info</h2>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Riot ID</div>
+                  <div className="text-lg font-black text-white">
+                    {playerData.riot_name && playerData.riot_tag 
+                      ? `${playerData.riot_name}#${playerData.riot_tag}`
+                      : 'Not linked'
+                    }
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Region</div>
+                  <div className="text-lg font-black text-white">{playerData.riot_region || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
+                  <div className="text-lg font-black text-white">{playerData.verified_at ? 'Yes' : 'No'}</div>
                 </div>
               </div>
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Region</div>
-                <div className="text-lg font-black text-white">{playerData.riot_region || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
-                <div className="text-lg font-black text-white">{playerData.verified_at ? 'Yes' : 'No'}</div>
+            </div>
+            <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
+              <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Marvel Rivals Info</h2>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Username</div>
+                  <div className="text-lg font-black text-white">
+                    {playerData.marvel_rivals_username || 'Not linked'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">UID</div>
+                  <div className="text-lg font-black text-white">
+                    {playerData.marvel_rivals_uid || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
+                  <div className="text-lg font-black text-white">{playerData.marvel_rivals_rank ? 'Yes' : 'No'}</div>
+                </div>
               </div>
             </div>
           </div>

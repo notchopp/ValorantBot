@@ -3,8 +3,9 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder,
 } from 'discord.js';
-import { PlayerService } from '../services/PlayerService';
+import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, normalizeGameSelection, formatGameName, getGameRankFields } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('leaderboard')
@@ -15,42 +16,73 @@ export const data = new SlashCommandBuilder()
       .setDescription('Number of players to show (default: 10, max: 25)')
       .setMinValue(1)
       .setMaxValue(25)
+  )
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game leaderboard to display').addChoices(...GAME_CHOICES)
   );
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
   services: {
-    playerService: PlayerService;
+    databaseService: DatabaseService;
   }
 ) {
   // Defer IMMEDIATELY before any async operations
   await safeDefer(interaction, false);
 
   try {
-    const { playerService } = services;
+    const { databaseService } = services;
     const limit = interaction.options.getInteger('limit') || 10;
-    const topPlayers = await playerService.getTopPlayersByPoints(limit);
+    const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
+    const mmrField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr';
+    const rankField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_rank' : 'valorant_rank';
 
-    if (topPlayers.length === 0) {
+    const supabase = databaseService.supabase;
+    if (!supabase) {
       await safeEditReply(interaction, {
-        content: '❌ No players found. Join a queue to start tracking stats!',
+        content: '❌ Database unavailable. Try again later.',
+      });
+      return;
+    }
+    const { data: topPlayers, error } = await supabase
+      .from('players')
+      .select(`id, discord_user_id, discord_username, ${mmrField}, ${rankField}, discord_rank, current_mmr, valorant_rank, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_mmr, marvel_rivals_peak_mmr`)
+      .neq(mmrField, null)
+      .order(mmrField, { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Leaderboard query error', { error });
+      await safeEditReply(interaction, {
+        content: '❌ Could not fetch leaderboard.',
+      });
+      return;
+    }
+    const players = (topPlayers || []).map((player: any) => ({
+      ...player,
+      gameFields: getGameRankFields(player, selectedGame),
+    }));
+
+    if (players.length === 0) {
+      await safeEditReply(interaction, {
+        content: '❌ No players found on the leaderboard yet.',
       });
       return;
     }
 
-    const leaderboardText = topPlayers
-      .map((player, index) => {
+    const leaderboardText = players
+      .map((player: any, index: number) => {
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-        const rank = player.rank ? ` [${player.rank}]` : '';
-        return `${medal} **${player.username}**${rank} - ${player.stats.points} pts (${player.stats.wins}W/${player.stats.losses}L)`;
+        const rank = player.gameFields.rank ? ` [${player.gameFields.rank}]` : '';
+        return `${medal} **${player.discord_username}**${rank} - ${player.gameFields.mmr} MMR`;
       })
       .join('\n');
 
     const embed = new EmbedBuilder()
-      .setTitle('🏆 Leaderboard')
+      .setTitle(`🏆 ${formatGameName(selectedGame)} Leaderboard`)
       .setDescription(leaderboardText)
       .setColor(0xffd700)
-      .setFooter({ text: 'Ranked by total points • See full leaderboard: [grnds.xyz/leaderboard](https://grnds.xyz/leaderboard)' });
+      .setFooter({ text: `Ranked by ${formatGameName(selectedGame)} MMR • Visit /leaderboard for more` });
 
     await safeEditReply(interaction, { embeds: [embed] });
   } catch (error: any) {

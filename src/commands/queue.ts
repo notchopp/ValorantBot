@@ -29,10 +29,34 @@ export const data = new SlashCommandBuilder()
   .setName('queue')
   .setDescription('Queue management commands')
   .addSubcommand((subcommand: any) =>
-    subcommand.setName('start').setDescription('Start a new queue session')
+    subcommand
+      .setName('start')
+      .setDescription('Start a new queue session')
+      .addStringOption((option: any) =>
+        option
+          .setName('game')
+          .setDescription('Choose which game queue to start')
+          .addChoices(
+            { name: 'Valorant', value: 'valorant' },
+            { name: 'Marvel Rivals', value: 'marvel_rivals' }
+          )
+          .setRequired(false)
+      )
   )
   .addSubcommand((subcommand: any) =>
-    subcommand.setName('stop').setDescription('Stop the current queue session')
+    subcommand
+      .setName('stop')
+      .setDescription('Stop the current queue session')
+      .addStringOption((option: any) =>
+        option
+          .setName('game')
+          .setDescription('Choose which game queue to stop')
+          .addChoices(
+            { name: 'Valorant', value: 'valorant' },
+            { name: 'Marvel Rivals', value: 'marvel_rivals' }
+          )
+          .setRequired(false)
+      )
   )
   .addSubcommand((subcommand: any) =>
     subcommand
@@ -50,10 +74,34 @@ export const data = new SlashCommandBuilder()
       )
   )
   .addSubcommand((subcommand: any) =>
-    subcommand.setName('leave').setDescription('Leave the queue')
+    subcommand
+      .setName('leave')
+      .setDescription('Leave the queue')
+      .addStringOption((option: any) =>
+        option
+          .setName('game')
+          .setDescription('Choose which game queue to leave')
+          .addChoices(
+            { name: 'Valorant', value: 'valorant' },
+            { name: 'Marvel Rivals', value: 'marvel_rivals' }
+          )
+          .setRequired(false)
+      )
   )
   .addSubcommand((subcommand: any) =>
-    subcommand.setName('status').setDescription('Check queue status')
+    subcommand
+      .setName('status')
+      .setDescription('Check queue status')
+      .addStringOption((option: any) =>
+        option
+          .setName('game')
+          .setDescription('Choose which game queue to view')
+          .addChoices(
+            { name: 'Valorant', value: 'valorant' },
+            { name: 'Marvel Rivals', value: 'marvel_rivals' }
+          )
+          .setRequired(false)
+      )
   );
 
 export async function execute(
@@ -98,11 +146,27 @@ function formatGameLabel(game: 'valorant' | 'marvel_rivals'): string {
   return game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
 }
 
-async function getActiveQueueGame(databaseService: DatabaseService): Promise<'valorant' | 'marvel_rivals' | null> {
-  const queuePlayers = await databaseService.getQueuePlayersWithData();
-  if (!queuePlayers.length) return null;
-  const preferred = queuePlayers[0].preferred_game;
-  return preferred === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
+async function getActiveQueueGame(
+  databaseService: DatabaseService,
+  game?: 'valorant' | 'marvel_rivals'
+): Promise<'valorant' | 'marvel_rivals' | null> {
+  if (game) {
+    const queuePlayers = await databaseService.getQueuePlayersWithData(game);
+    return queuePlayers.length ? game : null;
+  }
+
+  const valorantQueue = await databaseService.getQueuePlayersWithData('valorant');
+  if (valorantQueue.length) return 'valorant';
+
+  const marvelQueue = await databaseService.getQueuePlayersWithData('marvel_rivals');
+  if (marvelQueue.length) return 'marvel_rivals';
+
+  return null;
+}
+
+function parseQueueButtonGame(customId: string): 'valorant' | 'marvel_rivals' {
+  const [, game] = customId.split(':');
+  return normalizeGameSelection(game || 'valorant');
 }
 
 function getRankDisplayForGame(player: DatabasePlayer, game: 'valorant' | 'marvel_rivals'): { rank: string; mmr: number } {
@@ -137,6 +201,7 @@ async function handleStart(
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
+  const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
 
   try {
     // Validate guild exists
@@ -174,7 +239,7 @@ async function handleStart(
     const { queueService, matchService } = services;
 
     // Check if queue is already active
-    const queue = await queueService.getStatus();
+    const queue = await queueService.getStatus(selectedGame);
     if (queue.players.length > 0) {
       await interaction.editReply('A queue is already active. Use `/queue stop` to end it first.');
       return;
@@ -188,7 +253,7 @@ async function handleStart(
     }
 
     // Clear any existing queue state
-    await queueService.clear();
+    await queueService.clear(selectedGame);
 
     const { config, voiceChannelService } = services;
 
@@ -203,7 +268,7 @@ async function handleStart(
 
     // Create embed with join button
     const embed = new EmbedBuilder()
-      .setTitle('Queue Started!')
+      .setTitle(`${formatGameLabel(selectedGame)} Queue Started!`)
       .setDescription('Click the button below to join the queue!')
       .setColor(0x00ff00)
       .addFields({
@@ -214,6 +279,11 @@ async function handleStart(
       .addFields({
         name: 'Status',
         value: 'Open',
+        inline: true,
+      })
+      .addFields({
+        name: 'Game',
+        value: formatGameLabel(selectedGame),
         inline: true,
       });
 
@@ -228,12 +298,12 @@ async function handleStart(
 
     // Create join queue button
     const joinButton = new ButtonBuilder()
-      .setCustomId('queue_join_button')
+      .setCustomId(`queue_join_button:${selectedGame}`)
       .setLabel('Join Queue')
       .setStyle(ButtonStyle.Primary);
 
     const leaveButton = new ButtonBuilder()
-      .setCustomId('queue_leave_button')
+      .setCustomId(`queue_leave_button:${selectedGame}`)
       .setLabel('Leave Queue')
       .setStyle(ButtonStyle.Danger);
 
@@ -253,7 +323,7 @@ async function handleStart(
 
     // Store queue start message info for later deletion
     if (reply instanceof Message) {
-      queueService.setQueueStartMessage(reply.id, reply.channel.id, queueId);
+      queueService.setQueueStartMessage(reply.id, reply.channel.id, queueId, selectedGame);
     }
   } catch (error) {
     console.error('Queue start error', {
@@ -286,6 +356,7 @@ async function handleStop(
 
   const userId = interaction.user.id;
   const username = interaction.user.username;
+  const selectedGameOption = interaction.options.getString('game');
 
   try {
     // Validate guild exists
@@ -316,10 +387,31 @@ async function handleStop(
       return;
     }
 
-    const { queueService } = services;
+    const { queueService, databaseService } = services;
+    const selectedGame = selectedGameOption
+      ? normalizeGameSelection(selectedGameOption)
+      : null;
+    const valorantQueue = await databaseService.getQueuePlayersWithData('valorant');
+    const marvelQueue = await databaseService.getQueuePlayersWithData('marvel_rivals');
+    const activeGames = [
+      ...(valorantQueue.length ? (['valorant'] as const) : []),
+      ...(marvelQueue.length ? (['marvel_rivals'] as const) : []),
+    ];
+
+    if (!selectedGame && activeGames.length === 0) {
+      await interaction.editReply('No active queue to stop.');
+      return;
+    }
+
+    if (!selectedGame && activeGames.length > 1) {
+      await interaction.editReply('Multiple queues are active. Please specify `game`.');
+      return;
+    }
+
+    const resolvedGame = selectedGame || activeGames[0];
 
     // Get queue start message info before clearing
-    const { messageId, channelId, queueId } = queueService.getQueueStartMessage();
+    const { messageId, channelId, queueId } = queueService.getQueueStartMessage(resolvedGame);
 
     // Delete queue start message if it exists
     if (messageId && channelId && interaction.guild) {
@@ -341,8 +433,8 @@ async function handleStop(
     }
 
     // Clear queue
-    await queueService.clear();
-    queueService.unlock();
+    await queueService.clear(resolvedGame);
+    queueService.unlock(resolvedGame);
 
     // Include queue ID in response if multiple queues might exist
     const responseText = queueId 
@@ -404,15 +496,6 @@ async function handleJoin(
     }
 
     const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
-    const queueGame = await getActiveQueueGame(databaseService);
-
-    if (queueGame && queueGame !== selectedGame) {
-      await interaction.editReply({
-        content: ` A ${formatGameLabel(queueGame)} queue is already active. Please join that queue or wait for it to finish.`,
-      });
-      return;
-    }
-
     if (dbPlayer.preferred_game !== selectedGame) {
       await databaseService.setPlayerPreferredGame(userId, selectedGame);
     }
@@ -521,7 +604,7 @@ async function handleJoin(
   }
 
   // Join queue (async)
-  const result = await queueService.join(player);
+  const result = await queueService.join(player, selectedGame);
 
   if (!result.success) {
     await interaction.editReply(result.message);
@@ -529,7 +612,7 @@ async function handleJoin(
   }
 
   // Get updated queue status
-  const queue = await queueService.getStatus();
+  const queue = await queueService.getStatus(selectedGame);
   const queueSize = queue.players.length;
 
   // Ping @everyone when first person joins the queue (only once, not spam)
@@ -551,11 +634,11 @@ async function handleJoin(
   // Update persistent queue message if it exists
   const { persistentQueueService } = services;
   if (persistentQueueService) {
-    await persistentQueueService.updatePersistentQueueMessage();
+    await persistentQueueService.updatePersistentQueueMessage(selectedGame);
   }
 
   // Check if queue is full (async)
-  if (await queueService.isFull()) {
+  if (await queueService.isFull(selectedGame)) {
       // Validate guild exists for voice channels
       if (!interaction.guild) {
         await interaction.editReply('Cannot create match: guild not found.');
@@ -563,11 +646,11 @@ async function handleJoin(
       }
 
       // Lock queue to prevent further joins
-      queueService.lock();
+      queueService.lock(selectedGame);
 
       // NEW: Analyze skill gap before creating match
       const playerIds = queue.players.map((p) => p.userId);
-      const gapWarning = await skillGapAnalyzer.analyzeQueue(playerIds);
+      const gapWarning = await skillGapAnalyzer.analyzeQueue(playerIds, selectedGame);
 
       if (gapWarning.hasWarning && gapWarning.message) {
         // Post warning in channel (visible to everyone)
@@ -590,7 +673,7 @@ async function handleJoin(
       
       if (!vercelAPI) {
         console.error('vercelAPI is not available in services for queue processing (handleJoin command)');
-        queueService.unlock();
+        queueService.unlock(selectedGame);
         await interaction.editReply('Vercel API service is not available. Please configure VERCEL_API_URL.');
         return;
       }
@@ -608,7 +691,7 @@ async function handleJoin(
       });
 
       if (!processResult.success || !processResult.match) {
-        queueService.unlock();
+        queueService.unlock(selectedGame);
         await interaction.editReply(
           ` Failed to create match: ${processResult.error || 'Unknown error'}`
         );
@@ -675,36 +758,36 @@ async function handleJoin(
           matchId: match.matchId,
           map: match.map,
           hostUserId: match.host.userId,
-        teamA: teamAUserIds,
-        teamB: teamBUserIds,
-        matchType: 'custom',
-      });
-
-      if (!dbMatch) {
-        console.error('Failed to save match to database', {
-          matchId: match.matchId,
+          teamA: teamAUserIds,
+          teamB: teamBUserIds,
+          matchType: selectedGame === 'marvel_rivals' ? 'marvel_rivals' : 'custom',
         });
-        // Continue anyway - match exists in memory
-      }
-    } catch (error) {
+
+        if (!dbMatch) {
+          console.error('Failed to save match to database', {
+            matchId: match.matchId,
+          });
+          // Continue anyway - match exists in memory
+        }
+      } catch (error) {
       console.error('Error saving match to database', {
         matchId: match.matchId,
         error: error instanceof Error ? error.message : String(error),
       });
       // Continue anyway - match exists in memory
-    }
+      }
 
-    queueService.lock();
+    queueService.lock(selectedGame);
 
     // Send match announcement with voice channel info
-    const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel);
+    const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel, selectedGame);
     if (interaction.channel && 'send' in interaction.channel) {
       await (interaction.channel as any).send({ embeds: [embed] });
     }
 
     // Clear queue after match creation (async)
-    await queueService.clear();
-    queueService.unlock();
+    await queueService.clear(selectedGame);
+    queueService.unlock(selectedGame);
 
     await interaction.editReply(' Queue is full! Match created. Check your team voice channels!');
     } else {
@@ -740,14 +823,19 @@ async function handleLeave(
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const userId = interaction.user.id;
+  const selectedGameOption = interaction.options.getString('game');
 
   try {
-    const { queueService, persistentQueueService } = services;
-    const result = await queueService.leave(userId);
+    const { queueService, persistentQueueService, databaseService } = services;
+    const dbPlayer = await databaseService.getPlayer(userId);
+    const selectedGame = selectedGameOption
+      ? normalizeGameSelection(selectedGameOption)
+      : (dbPlayer?.preferred_game || 'valorant');
+    const result = await queueService.leave(userId, selectedGame);
     
     // Update persistent queue message if it exists
     if (persistentQueueService) {
-      await persistentQueueService.updatePersistentQueueMessage();
+      await persistentQueueService.updatePersistentQueueMessage(selectedGame);
     }
     
     await interaction.editReply(result.message);
@@ -780,10 +868,15 @@ async function handleStatus(
 
   try {
     const { queueService, databaseService, config } = services;
-    const queue = await queueService.getStatus();
+    const selectedGameOption = interaction.options.getString('game');
+    const dbPlayer = await databaseService.getPlayer(interaction.user.id);
+    const selectedGame = selectedGameOption
+      ? normalizeGameSelection(selectedGameOption)
+      : (dbPlayer?.preferred_game || 'valorant');
+    const queue = await queueService.getStatus(selectedGame);
 
   const embed = new EmbedBuilder()
-    .setTitle('Queue Status')
+    .setTitle(`${formatGameLabel(selectedGame)} Queue Status`)
     .setColor(queue.isLocked ? 0xff0000 : 0x00ff00)
     .addFields({
       name: 'Players',
@@ -797,14 +890,11 @@ async function handleStatus(
     });
 
   if (queue.players.length > 0) {
-    const activeGame = await getActiveQueueGame(databaseService);
-    if (activeGame) {
-      embed.addFields({
-        name: 'Game',
-        value: formatGameLabel(activeGame),
-        inline: true,
-      });
-    }
+    embed.addFields({
+      name: 'Game',
+      value: formatGameLabel(selectedGame),
+      inline: true,
+    });
 
     // Fetch player data from database to get custom ranks and MMR
     const playersWithRanks = await Promise.all(
@@ -817,8 +907,7 @@ async function handleStatus(
             currentMMR: 0,
           };
         }
-        const game = activeGame || 'valorant';
-        const display = getRankDisplayForGame(dbPlayer, game);
+        const display = getRankDisplayForGame(dbPlayer, selectedGame);
         return {
           ...p,
           discordRank: display.rank,
@@ -855,8 +944,10 @@ function createMatchEmbed(
   match: any,
   _config: Config,
   teamAChannel?: any,
-  teamBChannel?: any
+  teamBChannel?: any,
+  game: 'valorant' | 'marvel_rivals' = 'valorant'
 ): EmbedBuilder {
+  const gameLabel = formatGameLabel(game);
   const embed = new EmbedBuilder()
     .setTitle(' Match Created!')
     .setColor(match.hostConfirmed ? 0x00ff00 : 0xff9900)
@@ -887,7 +978,7 @@ function createMatchEmbed(
   } else {
       embed.addFields({
         name: '⏳ Waiting for Host',
-        value: `<@${match.host.userId}> must create a custom game in Valorant and use \`/host confirm\` to enter the invite code.\n\nUse \`/host info\` to see all players.`,
+        value: `<@${match.host.userId}> must create a custom game in ${gameLabel} and use \`/host confirm\` to enter the invite code.\n\nUse \`/host info\` to see all players.`,
         inline: false,
       });
       embed.setDescription('Match is pending host confirmation. Host has 10 minutes to create the game and enter the code.');
@@ -964,10 +1055,12 @@ export async function handleButtonInteraction(
       return;
     }
 
-    if (customId === 'queue_join_button') {
-      await handleJoinButton(interaction, services);
-    } else if (customId === 'queue_leave_button') {
-      await handleLeaveButton(interaction, services);
+    if (customId.startsWith('queue_join_button')) {
+      const selectedGame = parseQueueButtonGame(customId);
+      await handleJoinButton(interaction, services, selectedGame);
+    } else if (customId.startsWith('queue_leave_button')) {
+      const selectedGame = parseQueueButtonGame(customId);
+      await handleLeaveButton(interaction, services, selectedGame);
     } else {
       await interaction.reply({
         content: ' Unknown button interaction.',
@@ -1026,7 +1119,8 @@ async function handleJoinButton(
     skillGapAnalyzer: SkillGapAnalyzer;
     persistentQueueService?: any; // PersistentQueueService
     config: Config;
-  }
+  },
+  selectedGame: 'valorant' | 'marvel_rivals'
 ) {
   const userId = interaction.user.id;
   const username = interaction.user.username;
@@ -1070,22 +1164,7 @@ async function handleJoinButton(
       return;
     }
 
-    const selectedGame = dbPlayer.preferred_game === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
-    const queueGame = await getActiveQueueGame(databaseService);
-
-    if (queueGame && queueGame !== selectedGame) {
-      try {
-        await interaction.followUp({
-          content: ` A ${formatGameLabel(queueGame)} queue is already active. Please join that queue or wait for it to finish.`,
-          flags: MessageFlags.Ephemeral,
-        });
-      } catch (error: any) {
-        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
-          console.error('Error sending follow-up message', { userId, error: error.message });
-        }
-      }
-      return;
-    }
+    const queueGame = await getActiveQueueGame(databaseService, selectedGame);
 
     if (selectedGame === 'valorant') {
       // VALIDATION 1: Must have linked Riot ID
@@ -1244,7 +1323,7 @@ async function handleJoinButton(
     }
 
     // Join queue (async)
-    const result = await queueService.join(player);
+    const result = await queueService.join(player, selectedGame);
 
     if (!result.success) {
       // Send ephemeral error message
@@ -1283,7 +1362,7 @@ async function handleJoinButton(
     }
 
     // Get updated queue status
-    const queue = await queueService.getStatus();
+    const queue = await queueService.getStatus(selectedGame);
     const queueSize = queue.players.length;
 
     // Ping @everyone when first person joins the queue (only once, not spam)
@@ -1303,7 +1382,7 @@ async function handleJoinButton(
     }
 
     // Check if queue is full (async)
-    if (await queueService.isFull()) {
+    if (await queueService.isFull(selectedGame)) {
       // Validate guild exists for voice channels
       if (!interaction.guild) {
         try {
@@ -1318,11 +1397,11 @@ async function handleJoinButton(
       }
 
       // Lock queue to prevent further joins
-      queueService.lock();
+      queueService.lock(selectedGame);
 
       // NEW: Analyze skill gap before creating match
       const playerIds = queue.players.map((p) => p.userId);
-      const gapWarning = await skillGapAnalyzer.analyzeQueue(playerIds);
+      const gapWarning = await skillGapAnalyzer.analyzeQueue(playerIds, selectedGame);
 
       if (gapWarning.hasWarning && gapWarning.message) {
         // Post warning in channel (visible to everyone)
@@ -1349,7 +1428,7 @@ async function handleJoinButton(
       
       if (!vercelAPI) {
         console.error('vercelAPI is not available in services for queue processing (handleJoinButton)');
-        queueService.unlock();
+        queueService.unlock(selectedGame);
         try {
           await interaction.followUp({
             content: ' Vercel API service is not available. Please configure VERCEL_API_URL.',
@@ -1374,7 +1453,7 @@ async function handleJoinButton(
       });
 
       if (!processResult.success || !processResult.match) {
-        queueService.unlock();
+        queueService.unlock(selectedGame);
         await interaction.editReply(
           ` Failed to create match: ${processResult.error || 'Unknown error'}`
         );
@@ -1443,7 +1522,7 @@ async function handleJoinButton(
       if (teamBChannel) match.teams.teamB.voiceChannelId = teamBChannel.id;
 
       // Send match announcement with voice channel info
-      const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel);
+      const embed = createMatchEmbed(match, config, teamAChannel, teamBChannel, selectedGame);
       await interaction.channel?.send({ embeds: [embed] });
       
       // Notify host to confirm
@@ -1455,9 +1534,9 @@ async function handleJoinButton(
             `**Match ID:** ${match.matchId}\n` +
             `**Map:** ${match.map}\n\n` +
             `**Steps to host:**\n` +
-            `1. Create a custom game in Valorant\n` +
-            `2. Valorant will generate a unique invite code\n` +
-            `3. Use \`/host confirm\` and enter the code Valorant gave you\n\n` +
+            `1. Create a custom game in ${formatGameLabel(selectedGame)}\n` +
+            `2. ${formatGameLabel(selectedGame)} will generate a unique invite code\n` +
+            `3. Use \`/host confirm\` and enter the code ${formatGameLabel(selectedGame)} gave you\n\n` +
             `You have 10 minutes to confirm, or a new host will be selected.\n\n` +
             `Use \`/host pass\` if you don't want to host.`
           );
@@ -1470,8 +1549,8 @@ async function handleJoinButton(
       }
 
       // Clear queue after match creation (async)
-      await queueService.clear();
-      queueService.unlock();
+      await queueService.clear(selectedGame);
+      queueService.unlock(selectedGame);
 
       // Update the original queue message to show match created
       if (interaction.message && interaction.message.editable) {
@@ -1548,12 +1627,12 @@ async function handleJoinButton(
       }
 
       const joinButton = new ButtonBuilder()
-        .setCustomId('queue_join_button')
+        .setCustomId(`queue_join_button:${activeGame}`)
         .setLabel('Join Queue')
         .setStyle(ButtonStyle.Primary);
 
       const leaveButton = new ButtonBuilder()
-        .setCustomId('queue_leave_button')
+        .setCustomId(`queue_leave_button:${activeGame}`)
         .setLabel('Leave Queue')
         .setStyle(ButtonStyle.Danger);
 
@@ -1595,7 +1674,7 @@ async function handleJoinButton(
 
       // Also update persistent queue message if it exists
       if (services.persistentQueueService) {
-        await services.persistentQueueService.updatePersistentQueueMessage();
+        await services.persistentQueueService.updatePersistentQueueMessage(selectedGame);
       }
     }
   } catch (error) {
@@ -1628,7 +1707,8 @@ async function handleLeaveButton(
     valorantAPI?: ValorantAPIService;
     skillGapAnalyzer: SkillGapAnalyzer;
     config: Config;
-  }
+  },
+  selectedGame: 'valorant' | 'marvel_rivals'
 ) {
   const userId = interaction.user.id;
 
@@ -1647,11 +1727,11 @@ async function handleLeaveButton(
 
   try {
     const { queueService, databaseService } = services;
-    const result = await queueService.leave(userId);
+    const result = await queueService.leave(userId, selectedGame);
 
     // Update queue message if it exists
     if (interaction.message) {
-      const queue = await queueService.getStatus();
+      const queue = await queueService.getStatus(selectedGame);
       const queueSize = queue.players.length;
 
       const updatedEmbed = new EmbedBuilder()
@@ -1669,14 +1749,11 @@ async function handleLeaveButton(
           inline: true,
         });
 
-      const activeGame = await getActiveQueueGame(databaseService);
-      if (activeGame) {
-        updatedEmbed.addFields({
-          name: 'Game',
-          value: formatGameLabel(activeGame),
-          inline: true,
-        });
-      }
+      updatedEmbed.addFields({
+        name: 'Game',
+        value: formatGameLabel(selectedGame),
+        inline: true,
+      });
 
       if (queueSize > 0) {
         // Fetch player data from database to get custom ranks and MMR for display
@@ -1690,8 +1767,7 @@ async function handleLeaveButton(
                 currentMMR: 0,
               };
             }
-            const game = activeGame || 'valorant';
-            const display = getRankDisplayForGame(dbPlayer, game);
+            const display = getRankDisplayForGame(dbPlayer, selectedGame);
             return {
               ...p,
               discordRank: display.rank,
@@ -1718,12 +1794,12 @@ async function handleLeaveButton(
       }
 
       const joinButton = new ButtonBuilder()
-        .setCustomId('queue_join_button')
+        .setCustomId(`queue_join_button:${selectedGame}`)
         .setLabel('Join Queue')
         .setStyle(ButtonStyle.Primary);
 
       const leaveButton = new ButtonBuilder()
-        .setCustomId('queue_leave_button')
+        .setCustomId(`queue_leave_button:${selectedGame}`)
         .setLabel('Leave Queue')
         .setStyle(ButtonStyle.Danger);
 

@@ -1,4 +1,5 @@
 import { DatabaseService } from './DatabaseService';
+import { getGameRankFields, GameSelection } from '../utils/game-selection';
 
 export interface SkillGapWarning {
   hasWarning: boolean;
@@ -32,7 +33,7 @@ export class SkillGapAnalyzer {
    * Analyze queue for skill gaps (only runs when queue is full or requested)
    * Follows guardrails: error handling, logging, null checks
    */
-  async analyzeQueue(playerUserIds: string[]): Promise<SkillGapWarning> {
+  async analyzeQueue(playerUserIds: string[], game: GameSelection = 'valorant'): Promise<SkillGapWarning> {
     try {
       // Get all players from database
       const players = await Promise.all(
@@ -50,10 +51,16 @@ export class SkillGapAnalyzer {
       }
 
       // Find highest and lowest MMR
-      const sortedByMMR = [...validPlayers].sort((a, b) => b.current_mmr - a.current_mmr);
+      const sortedByMMR = [...validPlayers].sort((a, b) => {
+        const mmrA = getGameRankFields(a, game).mmr;
+        const mmrB = getGameRankFields(b, game).mmr;
+        return mmrB - mmrA;
+      });
       const highest = sortedByMMR[0];
       const lowest = sortedByMMR[sortedByMMR.length - 1];
-      const mmrGap = highest.current_mmr - lowest.current_mmr;
+      const highestFields = getGameRankFields(highest, game);
+      const lowestFields = getGameRankFields(lowest, game);
+      const mmrGap = highestFields.mmr - lowestFields.mmr;
 
       // Check for significant Discord MMR gap
       if (mmrGap >= this.SIGNIFICANT_GAP_THRESHOLD) {
@@ -61,22 +68,22 @@ export class SkillGapAnalyzer {
           hasWarning: true,
           message:
             `⚠️ **Large skill gap detected in queue!**\n\n` +
-            `Highest: **${highest.discord_username}** [${highest.discord_rank}] (${highest.current_mmr} MMR)\n` +
-            `Lowest: **${lowest.discord_username}** [${lowest.discord_rank}] (${lowest.current_mmr} MMR)\n` +
+            `Highest: **${highest.discord_username}** [${highestFields.rank}] (${highestFields.mmr} MMR)\n` +
+            `Lowest: **${lowest.discord_username}** [${lowestFields.rank}] (${lowestFields.mmr} MMR)\n` +
             `Gap: **${mmrGap} MMR**\n\n` +
             `Games may be imbalanced. Consider adjusting teams or waiting for more similar-ranked players.`,
           details: {
             highestPlayer: {
               username: highest.discord_username,
               valorantRank: 'N/A',
-              discordRank: highest.discord_rank,
-              mmr: highest.current_mmr,
+              discordRank: highestFields.rank,
+              mmr: highestFields.mmr,
             },
             lowestPlayer: {
               username: lowest.discord_username,
               valorantRank: 'N/A',
-              discordRank: lowest.discord_rank,
-              mmr: lowest.current_mmr,
+              discordRank: lowestFields.rank,
+              mmr: lowestFields.mmr,
             },
             gap: mmrGap,
           },

@@ -6,12 +6,16 @@ import {
 import { PlayerService } from '../services/PlayerService';
 import { getKD, getWinRate } from '../models/Player';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, resolveGameForPlayer, getGameRankFields, formatGameName } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('stats')
   .setDescription('View player statistics')
   .addUserOption((option) =>
     option.setName('user').setDescription('User to view stats for (defaults to you)')
+  )
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game to focus on').addChoices(...GAME_CHOICES)
   );
 
 export async function execute(
@@ -39,11 +43,13 @@ export async function execute(
       return;
     }
 
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
+    const gameFields = getGameRankFields(player as any, selectedGame);
     const kd = getKD(player);
     const winRate = getWinRate(player);
 
     const embed = new EmbedBuilder()
-      .setTitle(`${username}'s Statistics`)
+      .setTitle(`${username}'s ${formatGameName(selectedGame)} Statistics`)
       .setColor(0x00ff00)
       .setThumbnail(targetUser.displayAvatarURL())
       .addFields(
@@ -85,6 +91,16 @@ export async function execute(
         {
           name: 'Points',
           value: player.stats.points.toString(),
+          inline: true,
+        },
+        {
+          name: `${formatGameName(selectedGame)} Rank`,
+          value: gameFields.rank,
+          inline: true,
+        },
+        {
+          name: `${formatGameName(selectedGame)} MMR`,
+          value: `${gameFields.mmr}`,
           inline: true,
         },
         {

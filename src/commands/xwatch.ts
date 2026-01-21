@@ -4,10 +4,14 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { GAME_CHOICES, normalizeGameSelection, formatGameName, getMatchTypesForGame, getGameRankFields } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('xwatch')
-  .setDescription('Track the Top 10 X rank players and their movement');
+  .setDescription('Track the Top 10 X rank players and their movement')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Choose Valorant or Marvel').addChoices(...GAME_CHOICES)
+  );
 
 interface XRankPlayer {
   rank: number;
@@ -31,9 +35,10 @@ export async function execute(
 
   try {
     const { databaseService } = services;
+    const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
 
     // Get top 10 players (X rank threshold is 3000+ MMR)
-    const xRankPlayers = await getXRankPlayers(databaseService);
+    const xRankPlayers = await getXRankPlayers(databaseService, selectedGame);
 
     if (!xRankPlayers || xRankPlayers.length === 0) {
       await interaction.editReply(
@@ -44,9 +49,9 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle('👑 X Rank - Top 10 Leaderboard')
+      .setTitle(`👑 ${formatGameName(selectedGame)} X Rank - Top 10 Leaderboard`)
       .setColor(0xffd700) // Gold
-      .setDescription('The elite. The best. The X rank players.')
+      .setDescription(`The elite ${formatGameName(selectedGame)} players.`)
       .setTimestamp();
 
     // Add players to embed
@@ -96,7 +101,8 @@ export async function execute(
  * Get X rank players (top 10 by MMR, minimum 3000 MMR)
  */
 async function getXRankPlayers(
-  databaseService: DatabaseService
+  databaseService: DatabaseService,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<XRankPlayer[]> {
   try {
     const supabase = databaseService.supabase;
@@ -104,11 +110,14 @@ async function getXRankPlayers(
 
     // Get top players by MMR
     if (!supabase) return [];
+    const mmrField = game === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr';
+    const peakField = game === 'marvel_rivals' ? 'marvel_rivals_peak_mmr' : 'valorant_peak_mmr';
+
     const { data: topPlayers, error } = await supabase
       .from('players')
-      .select('id, discord_user_id, discord_username, current_mmr, peak_mmr')
-      .gte('current_mmr', X_RANK_THRESHOLD)
-      .order('current_mmr', { ascending: false })
+      .select(`id, discord_user_id, discord_username, ${mmrField}, ${peakField}, valorant_rank, marvel_rivals_rank`)
+      .gte(mmrField, X_RANK_THRESHOLD)
+      .order(mmrField, { ascending: false })
       .limit(10);
 
     if (error || !topPlayers || topPlayers.length === 0) {
@@ -128,12 +137,14 @@ async function getXRankPlayers(
         .select(`
           matches!inner(
             winner,
-            status
+            status,
+            match_type
           ),
           team
         `)
         .eq('player_id', player.id)
-        .eq('matches.status', 'completed');
+        .eq('matches.status', 'completed')
+        .in('matches.match_type', getMatchTypesForGame(game));
 
       let wins = 0;
       let losses = 0;
@@ -164,12 +175,14 @@ async function getXRankPlayers(
           mmr_after,
           matches!inner(
             match_date,
-            status
+            status,
+            match_type
           )
         `)
         .eq('player_id', player.id)
         .eq('matches.status', 'completed')
         .gte('matches.match_date', twentyFourHoursAgo.toISOString())
+        .in('matches.match_type', getMatchTypesForGame(game))
         .order('matches(match_date)', { ascending: true });
 
       let recentMMRChange = 0;
@@ -178,13 +191,13 @@ async function getXRankPlayers(
         const lastMatch = recentMatches[recentMatches.length - 1];
         recentMMRChange = lastMatch.mmr_after - firstMatch.mmr_before;
       }
-
+      const gameFields = getGameRankFields(player, game);
       xRankPlayers.push({
         rank: i + 1,
         discordUserId: player.discord_user_id,
         discordUsername: player.discord_username,
-        mmr: player.current_mmr || 0,
-        peakMMR: player.peak_mmr || 0,
+        mmr: gameFields.mmr,
+        peakMMR: gameFields.peak,
         wins,
         losses,
         winRate: parseFloat(winRate),

@@ -34,25 +34,23 @@ interface ValorantMMR {
 
 // Custom rank thresholds (from CUSTOM_RANK_SYSTEM.md)
 const RANK_THRESHOLDS = [
-  { rank: 'GRNDS I', min: 0, max: 199 },
-  { rank: 'GRNDS II', min: 200, max: 399 },
-  { rank: 'GRNDS III', min: 400, max: 599 },
-  { rank: 'GRNDS IV', min: 600, max: 799 },
-  { rank: 'GRNDS V', min: 800, max: 999 },
-  { rank: 'BREAKPOINT I', min: 1000, max: 1199 },
-  { rank: 'BREAKPOINT II', min: 1200, max: 1399 },
-  { rank: 'BREAKPOINT III', min: 1400, max: 1599 },
-  { rank: 'BREAKPOINT IV', min: 1600, max: 1799 },
-  { rank: 'BREAKPOINT V', min: 1800, max: 1999 },
-  { rank: 'CHALLENGER I', min: 2000, max: 2199 },
-  { rank: 'CHALLENGER II', min: 2200, max: 2399 },
-  { rank: 'CHALLENGER III', min: 2400, max: 2599 },
-  { rank: 'CHALLENGER IV', min: 2600, max: 2799 },
-  { rank: 'CHALLENGER V', min: 2800, max: 2999 },
+  { rank: 'GRNDS I', min: 0, max: 299 },
+  { rank: 'GRNDS II', min: 300, max: 599 },
+  { rank: 'GRNDS III', min: 600, max: 899 },
+  { rank: 'GRNDS IV', min: 900, max: 1199 },
+  { rank: 'GRNDS V', min: 1200, max: 1499 },
+  { rank: 'BREAKPOINT I', min: 1500, max: 1699 },
+  { rank: 'BREAKPOINT II', min: 1700, max: 1899 },
+  { rank: 'BREAKPOINT III', min: 1900, max: 2099 },
+  { rank: 'BREAKPOINT IV', min: 2100, max: 2299 },
+  { rank: 'BREAKPOINT V', min: 2300, max: 2399 },
+  { rank: 'CHALLENGER I', min: 2400, max: 2499 },
+  { rank: 'CHALLENGER II', min: 2500, max: 2599 },
+  { rank: 'CHALLENGER III', min: 2600, max: 2999 },
   { rank: 'X', min: 3000, max: 99999 },
 ];
 
-const GRNDS_V_MAX_MMR = 900; // Cap at GRNDS V for initial boost from Valorant rank
+const GRNDS_V_MAX_MMR = 1499; // Cap at GRNDS V for initial boost from Valorant rank
 
 /**
  * Get rank from MMR
@@ -70,8 +68,62 @@ function getRankFromMMR(mmr: number): string {
  * Get rank value (numeric)
  */
 function getRankValue(rank: string): number {
-  const index = RANK_THRESHOLDS.findIndex(t => t.rank === rank);
-  return index >= 0 ? index + 1 : 1;
+  const rankMap: Record<string, number> = {
+    'Unranked': 0,
+    'GRNDS I': 1,
+    'GRNDS II': 2,
+    'GRNDS III': 3,
+    'GRNDS IV': 4,
+    'GRNDS V': 5,
+    'BREAKPOINT I': 6,
+    'BREAKPOINT II': 7,
+    'BREAKPOINT III': 8,
+    'BREAKPOINT IV': 9,
+    'BREAKPOINT V': 10,
+    'CHALLENGER I': 11,
+    'CHALLENGER II': 12,
+    'CHALLENGER III': 13,
+    'ABSOLUTE': 14,
+    'X': 15,
+  };
+  return rankMap[rank] ?? 0;
+}
+
+function computeCombinedRank(params: {
+  roleMode: 'highest' | 'primary';
+  primaryGame: 'valorant' | 'marvel_rivals';
+  valorantRank: string;
+  valorantRankValue: number;
+  valorantMMR: number;
+  marvelRank: string;
+  marvelRankValue: number;
+  marvelMMR: number;
+}): { discordRank: string; discordRankValue: number; currentMMR: number } {
+  const {
+    roleMode,
+    primaryGame,
+    valorantRank,
+    valorantRankValue,
+    valorantMMR,
+    marvelRank,
+    marvelRankValue,
+    marvelMMR,
+  } = params;
+
+  if (roleMode === 'primary') {
+    if (primaryGame === 'marvel_rivals') {
+      return { discordRank: marvelRank, discordRankValue: marvelRankValue, currentMMR: marvelMMR };
+    }
+    return { discordRank: valorantRank, discordRankValue: valorantRankValue, currentMMR: valorantMMR };
+  }
+
+  if (marvelRankValue > valorantRankValue) {
+    return { discordRank: marvelRank, discordRankValue: marvelRankValue, currentMMR: marvelMMR };
+  }
+  if (marvelRankValue === valorantRankValue && marvelMMR > valorantMMR) {
+    return { discordRank: marvelRank, discordRankValue: marvelRankValue, currentMMR: marvelMMR };
+  }
+  return { discordRank: valorantRank, discordRankValue: valorantRankValue, currentMMR: valorantMMR };
 }
 
 /**
@@ -80,15 +132,15 @@ function getRankValue(rank: string): number {
 function calculateMMRFromValorantRank(valorantRank: string, valorantELO: number): number {
   try {
     const rankMMRMap: Record<string, { min: number; max: number }> = {
-      'Iron 1': { min: 0, max: 100 }, 'Iron 2': { min: 100, max: 200 }, 'Iron 3': { min: 200, max: 300 },
-      'Bronze 1': { min: 300, max: 400 }, 'Bronze 2': { min: 400, max: 500 }, 'Bronze 3': { min: 500, max: 600 },
-      'Silver 1': { min: 600, max: 700 }, 'Silver 2': { min: 700, max: 800 }, 'Silver 3': { min: 800, max: 900 },
-      'Gold 1': { min: 800, max: 900 }, 'Gold 2': { min: 800, max: 900 }, 'Gold 3': { min: 800, max: 900 },
-      'Platinum 1': { min: 800, max: 900 }, 'Platinum 2': { min: 800, max: 900 }, 'Platinum 3': { min: 800, max: 900 },
-      'Diamond 1': { min: 800, max: 900 }, 'Diamond 2': { min: 800, max: 900 }, 'Diamond 3': { min: 800, max: 900 },
-      'Ascendant 1': { min: 800, max: 900 }, 'Ascendant 2': { min: 800, max: 900 }, 'Ascendant 3': { min: 800, max: 900 },
-      'Immortal 1': { min: 800, max: 900 }, 'Immortal 2': { min: 800, max: 900 }, 'Immortal 3': { min: 800, max: 900 },
-      'Radiant': { min: 800, max: 900 },
+      'Iron 1': { min: 0, max: 150 }, 'Iron 2': { min: 100, max: 250 }, 'Iron 3': { min: 200, max: 350 },
+      'Bronze 1': { min: 300, max: 450 }, 'Bronze 2': { min: 350, max: 500 }, 'Bronze 3': { min: 450, max: 599 },
+      'Silver 1': { min: 500, max: 650 }, 'Silver 2': { min: 600, max: 750 }, 'Silver 3': { min: 700, max: 899 },
+      'Gold 1': { min: 450, max: 599 }, 'Gold 2': { min: 600, max: 899 }, 'Gold 3': { min: 900, max: 1199 },
+      'Platinum 1': { min: 900, max: 1099 }, 'Platinum 2': { min: 1100, max: 1299 }, 'Platinum 3': { min: 1200, max: 1499 },
+      'Diamond 1': { min: 1250, max: 1499 }, 'Diamond 2': { min: 1300, max: 1499 }, 'Diamond 3': { min: 1350, max: 1499 },
+      'Ascendant 1': { min: 1350, max: 1499 }, 'Ascendant 2': { min: 1400, max: 1499 }, 'Ascendant 3': { min: 1450, max: 1499 },
+      'Immortal 1': { min: 1450, max: 1499 }, 'Immortal 2': { min: 1450, max: 1499 }, 'Immortal 3': { min: 1450, max: 1499 },
+      'Radiant': { min: 1450, max: 1499 },
     };
 
     const range = rankMMRMap[valorantRank] || { min: 0, max: 200 };
@@ -201,7 +253,7 @@ export default async function handler(
     // Get current player from database
     const { data: player, error: fetchError } = await supabase
       .from('players')
-      .select('id, discord_rank, current_mmr, discord_rank_value, peak_mmr')
+      .select('id, discord_rank, current_mmr, discord_rank_value, peak_mmr, role_mode, primary_game, valorant_rank, valorant_rank_value, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_rank_value, marvel_rivals_mmr, marvel_rivals_peak_mmr')
       .eq('discord_user_id', userId)
       .single();
 
@@ -498,15 +550,40 @@ export default async function handler(
     }
 
     // Update player in database
+    const updatedValorantRank = discordRank;
+    const updatedValorantRankValue = discordRankValue;
+    const updatedValorantMMR = newMMR;
+    const updatedMarvelRank = player.marvel_rivals_rank || 'Unranked';
+    const updatedMarvelRankValue = player.marvel_rivals_rank_value ?? getRankValue(updatedMarvelRank);
+    const updatedMarvelMMR = player.marvel_rivals_mmr ?? 0;
+
+    const combined = computeCombinedRank({
+      roleMode: player.role_mode || 'highest',
+      primaryGame: player.primary_game || 'valorant',
+      valorantRank: updatedValorantRank,
+      valorantRankValue: updatedValorantRankValue,
+      valorantMMR: updatedValorantMMR,
+      marvelRank: updatedMarvelRank,
+      marvelRankValue: updatedMarvelRankValue,
+      marvelMMR: updatedMarvelMMR,
+    });
+    const combinedRank = combined.discordRank;
+    const combinedRankValue = combined.discordRankValue;
+    const combinedMMR = combined.currentMMR;
+
     const { error: updateError } = await supabase
       .from('players')
       .update({
         riot_puuid: puuid, // Update PUUID for future v3 API calls
         riot_region: accountRegion, // Update region in case it changed
-        discord_rank: discordRank,
-        discord_rank_value: discordRankValue,
-        current_mmr: newMMR,
-        peak_mmr: Math.max(currentPeakMMR, newMMR),
+        valorant_rank: updatedValorantRank,
+        valorant_rank_value: updatedValorantRankValue,
+        valorant_mmr: updatedValorantMMR,
+        valorant_peak_mmr: Math.max(player.valorant_peak_mmr || 0, updatedValorantMMR),
+        discord_rank: combinedRank,
+        discord_rank_value: combinedRankValue,
+        current_mmr: combinedMMR,
+        peak_mmr: Math.max(currentPeakMMR, combinedMMR),
         updated_at: new Date().toISOString(),
       })
       .eq('discord_user_id', userId);
@@ -518,13 +595,13 @@ export default async function handler(
     }
 
     // Log rank history if rank changed
-    if (discordRank !== oldRank || newMMR !== oldMMR) {
+    if (combinedRank !== oldRank || combinedMMR !== oldMMR) {
       await supabase.from('rank_history').insert({
         player_id: player.id,
         old_rank: oldRank,
-        new_rank: discordRank,
+        new_rank: combinedRank,
         old_mmr: oldMMR,
-        new_mmr: newMMR,
+        new_mmr: combinedMMR,
         reason: boosted ? 'valorant_refresh_boost' : 'valorant_refresh',
       });
     }
@@ -532,9 +609,9 @@ export default async function handler(
     console.log('Rank refreshed successfully', {
       userId,
       oldRank,
-      newRank: discordRank,
+      newRank: combinedRank,
       oldMMR,
-      newMMR,
+      newMMR: combinedMMR,
       valorantRank,
       boosted,
     });

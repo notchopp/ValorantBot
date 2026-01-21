@@ -84,25 +84,23 @@ if (process.env.VALORANT_API_KEY) {
 
 // Custom rank thresholds (from CUSTOM_RANK_SYSTEM.md)
 const RANK_THRESHOLDS = [
-  { rank: 'GRNDS I', min: 0, max: 199 },
-  { rank: 'GRNDS II', min: 200, max: 399 },
-  { rank: 'GRNDS III', min: 400, max: 599 },
-  { rank: 'GRNDS IV', min: 600, max: 799 },
-  { rank: 'GRNDS V', min: 800, max: 999 },
-  { rank: 'BREAKPOINT I', min: 1000, max: 1199 },
-  { rank: 'BREAKPOINT II', min: 1200, max: 1399 },
-  { rank: 'BREAKPOINT III', min: 1400, max: 1599 },
-  { rank: 'BREAKPOINT IV', min: 1600, max: 1799 },
-  { rank: 'BREAKPOINT V', min: 1800, max: 1999 },
-  { rank: 'CHALLENGER I', min: 2000, max: 2199 },
-  { rank: 'CHALLENGER II', min: 2200, max: 2399 },
-  { rank: 'CHALLENGER III', min: 2400, max: 2599 },
-  { rank: 'CHALLENGER IV', min: 2600, max: 2799 },
-  { rank: 'CHALLENGER V', min: 2800, max: 2999 },
+  { rank: 'GRNDS I', min: 0, max: 299 },
+  { rank: 'GRNDS II', min: 300, max: 599 },
+  { rank: 'GRNDS III', min: 600, max: 899 },
+  { rank: 'GRNDS IV', min: 900, max: 1199 },
+  { rank: 'GRNDS V', min: 1200, max: 1499 },
+  { rank: 'BREAKPOINT I', min: 1500, max: 1699 },
+  { rank: 'BREAKPOINT II', min: 1700, max: 1899 },
+  { rank: 'BREAKPOINT III', min: 1900, max: 2099 },
+  { rank: 'BREAKPOINT IV', min: 2100, max: 2299 },
+  { rank: 'BREAKPOINT V', min: 2300, max: 2399 },
+  { rank: 'CHALLENGER I', min: 2400, max: 2499 },
+  { rank: 'CHALLENGER II', min: 2500, max: 2599 },
+  { rank: 'CHALLENGER III', min: 2600, max: 2999 },
   { rank: 'X', min: 3000, max: 99999 },
 ];
 
-const GRNDS_V_MAX_MMR = 900; // Cap for initial placement at GRNDS V
+const GRNDS_V_MAX_MMR = 1499; // Cap for initial placement at GRNDS V
 
 /**
  * Get rank from MMR
@@ -130,15 +128,15 @@ function getRankValue(rank: string): number {
 function calculateInitialMMR(valorantRank: string, valorantELO: number): number {
   try {
     const rankMMRMap: Record<string, { min: number; max: number }> = {
-      'Iron 1': { min: 0, max: 100 }, 'Iron 2': { min: 100, max: 200 }, 'Iron 3': { min: 200, max: 300 },
-      'Bronze 1': { min: 300, max: 400 }, 'Bronze 2': { min: 400, max: 500 }, 'Bronze 3': { min: 500, max: 600 },
-      'Silver 1': { min: 600, max: 700 }, 'Silver 2': { min: 700, max: 800 }, 'Silver 3': { min: 800, max: 900 },
-      'Gold 1': { min: 800, max: 900 }, 'Gold 2': { min: 800, max: 900 }, 'Gold 3': { min: 800, max: 900 },
-      'Platinum 1': { min: 800, max: 900 }, 'Platinum 2': { min: 800, max: 900 }, 'Platinum 3': { min: 800, max: 900 },
-      'Diamond 1': { min: 800, max: 900 }, 'Diamond 2': { min: 800, max: 900 }, 'Diamond 3': { min: 800, max: 900 },
-      'Ascendant 1': { min: 800, max: 900 }, 'Ascendant 2': { min: 800, max: 900 }, 'Ascendant 3': { min: 800, max: 900 },
-      'Immortal 1': { min: 800, max: 900 }, 'Immortal 2': { min: 800, max: 900 }, 'Immortal 3': { min: 800, max: 900 },
-      'Radiant': { min: 800, max: 900 },
+      'Iron 1': { min: 0, max: 150 }, 'Iron 2': { min: 100, max: 250 }, 'Iron 3': { min: 200, max: 350 },
+      'Bronze 1': { min: 300, max: 450 }, 'Bronze 2': { min: 350, max: 500 }, 'Bronze 3': { min: 450, max: 599 },
+      'Silver 1': { min: 500, max: 650 }, 'Silver 2': { min: 600, max: 750 }, 'Silver 3': { min: 700, max: 899 },
+      'Gold 1': { min: 450, max: 599 }, 'Gold 2': { min: 600, max: 899 }, 'Gold 3': { min: 900, max: 1199 },
+      'Platinum 1': { min: 900, max: 1099 }, 'Platinum 2': { min: 1100, max: 1299 }, 'Platinum 3': { min: 1200, max: 1499 },
+      'Diamond 1': { min: 1250, max: 1499 }, 'Diamond 2': { min: 1300, max: 1499 }, 'Diamond 3': { min: 1350, max: 1499 },
+      'Ascendant 1': { min: 1350, max: 1499 }, 'Ascendant 2': { min: 1400, max: 1499 }, 'Ascendant 3': { min: 1450, max: 1499 },
+      'Immortal 1': { min: 1450, max: 1499 }, 'Immortal 2': { min: 1450, max: 1499 }, 'Immortal 3': { min: 1450, max: 1499 },
+      'Radiant': { min: 1450, max: 1499 },
     };
 
     const range = rankMMRMap[valorantRank] || { min: 0, max: 200 };
@@ -220,7 +218,7 @@ export default async function handler(
     // Check if player already exists and is verified (we'll reuse this data later for insert/update)
     const { data: existingVerifiedPlayer, error: fetchError } = await supabase
       .from('players')
-      .select('id, discord_user_id, discord_rank, current_mmr, peak_mmr')
+      .select('id, discord_user_id, discord_rank, current_mmr, peak_mmr, valorant_rank, valorant_rank_value, valorant_mmr, valorant_peak_mmr')
       .eq('discord_user_id', userId)
       .maybeSingle(); // Use maybeSingle() to handle "not found" gracefully
 
@@ -516,6 +514,10 @@ export default async function handler(
         discord_rank_value: discordRankValue,
         current_mmr: startingMMR,
         peak_mmr: Math.max(existingVerifiedPlayer.peak_mmr || existingVerifiedPlayer.current_mmr || 0, startingMMR), // Preserve existing peak if higher
+        valorant_rank: discordRank,
+        valorant_rank_value: discordRankValue,
+        valorant_mmr: startingMMR,
+        valorant_peak_mmr: Math.max(existingVerifiedPlayer.valorant_peak_mmr || existingVerifiedPlayer.valorant_mmr || 0, startingMMR),
         verified_at: new Date().toISOString(),
       };
       
@@ -542,6 +544,10 @@ export default async function handler(
         discord_rank_value: discordRankValue,
         current_mmr: startingMMR,
         peak_mmr: startingMMR,
+        valorant_rank: discordRank,
+        valorant_rank_value: discordRankValue,
+        valorant_mmr: startingMMR,
+        valorant_peak_mmr: startingMMR,
         verified_at: new Date().toISOString(),
       };
       

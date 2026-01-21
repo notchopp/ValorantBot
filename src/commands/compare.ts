@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, normalizeGameSelection, formatGameName, getGameRankFields, getMatchTypesForGame } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('compare')
@@ -15,6 +16,9 @@ export const data = new SlashCommandBuilder()
       .setName('user')
       .setDescription('Player to compare with')
       .setRequired(true)
+  )
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Game to compare').addChoices(...GAME_CHOICES)
   );
 
 interface PlayerComparisonStats {
@@ -45,6 +49,7 @@ export async function execute(
 
   const user1 = interaction.user;
   const user2 = interaction.options.getUser('user', true);
+  const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
 
   // Prevent comparing with yourself
   if (user1.id === user2.id) {
@@ -59,8 +64,8 @@ export async function execute(
 
     // Get both players' data
     const [player1Data, player2Data] = await Promise.all([
-      getPlayerComparisonData(databaseService, user1),
-      getPlayerComparisonData(databaseService, user2),
+      getPlayerComparisonData(databaseService, user1, selectedGame),
+      getPlayerComparisonData(databaseService, user2, selectedGame),
     ]);
 
     if (!player1Data) {
@@ -79,9 +84,9 @@ export async function execute(
 
     // Create comparison embed
     const embed = new EmbedBuilder()
-      .setTitle('⚔️ Player Comparison')
+      .setTitle(`⚔️ ${formatGameName(selectedGame)} Player Comparison`)
       .setColor(0x5865f2)
-      .setDescription(`${user1.username} vs ${user2.username}`);
+      .setDescription(`${user1.username} vs ${user2.username} • ${formatGameName(selectedGame)}`);
 
     // Rank & MMR
     const higherMMR = player1Data.mmr > player2Data.mmr ? player1Data : player2Data;
@@ -194,7 +199,8 @@ export async function execute(
  */
 async function getPlayerComparisonData(
   databaseService: DatabaseService,
-  user: User
+  user: User,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<PlayerComparisonStats | null> {
   try {
     const player = await databaseService.getPlayer(user.id);
@@ -218,11 +224,13 @@ async function getPlayerComparisonData(
         mvp,
         matches!inner(
           winner,
-          status
+          status,
+          match_type
         )
       `)
       .eq('player_id', player.id)
-      .eq('matches.status', 'completed');
+      .eq('matches.status', 'completed')
+      .in('matches.match_type', getMatchTypesForGame(game));
 
     if (error) {
       console.error('Error getting player stats', {
@@ -262,12 +270,13 @@ async function getPlayerComparisonData(
 
     const kd = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
 
+    const gameFields = getGameRankFields(player, game);
     return {
       userId: user.id,
       username: user.username,
-      rank: player.discord_rank || 'Unranked',
-      mmr: player.current_mmr || 0,
-      peakMMR: player.peak_mmr || 0,
+      rank: gameFields.rank,
+      mmr: gameFields.mmr,
+      peakMMR: gameFields.peak,
       gamesPlayed,
       wins,
       losses,

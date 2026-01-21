@@ -150,9 +150,13 @@ export async function execute(
             stats: summaryStats,
             recentGames: matchSummary?.recentGames,
           });
-          const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
-          attachments.push(attachment);
-          embed.setImage('attachment://rank-profile.png');
+          if (Buffer.isBuffer(profileBuffer)) {
+            const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+            attachments.push(attachment);
+            embed.setImage('attachment://rank-profile.png');
+          } else {
+            console.warn('Marvel Rivals profile buffer invalid', { userId });
+          }
         } catch (error) {
           console.warn('Failed to generate Marvel Rivals rank card', {
             userId,
@@ -172,9 +176,13 @@ export async function execute(
             marvelRank: verifyResult.marvelRivalsRank || verifyResult.discordRank || 'Unranked',
             marvelMMR: verifyResult.startingMMR || 0,
           });
-          const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
-          attachments.push(attachment);
-          embed.setImage('attachment://rank-card.png');
+          if (Buffer.isBuffer(cardBuffer)) {
+            const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
+            attachments.push(attachment);
+            embed.setImage('attachment://rank-card.png');
+          } else {
+            console.warn('Marvel Rivals rank card buffer invalid', { userId });
+          }
         } catch (error) {
           console.warn('Failed to generate Marvel Rivals rank card', {
             userId,
@@ -364,9 +372,13 @@ export async function execute(
           stats: summaryStats,
           recentGames: matchSummary?.recentGames,
         });
-        const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
-        attachments.push(attachment);
-        embed.setImage('attachment://rank-profile.png');
+        if (Buffer.isBuffer(profileBuffer)) {
+          const attachment = new AttachmentBuilder(profileBuffer, { name: 'rank-profile.png' });
+          attachments.push(attachment);
+          embed.setImage('attachment://rank-profile.png');
+        } else {
+          console.warn('Valorant profile buffer invalid', { userId });
+        }
       } catch (error) {
         console.warn('Failed to generate Valorant rank profile', {
           userId,
@@ -386,9 +398,13 @@ export async function execute(
           marvelRank: existingPlayer.marvel_rivals_rank || 'Unranked',
           marvelMMR: existingPlayer.marvel_rivals_mmr || 0,
         });
-        const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
-        attachments.push(attachment);
-        embed.setImage('attachment://rank-card.png');
+        if (Buffer.isBuffer(cardBuffer)) {
+          const attachment = new AttachmentBuilder(cardBuffer, { name: 'rank-card.png' });
+          attachments.push(attachment);
+          embed.setImage('attachment://rank-card.png');
+        } else {
+          console.warn('Valorant rank card buffer invalid', { userId });
+        }
       } catch (error) {
         console.warn('Failed to generate Valorant rank card', {
           userId,

@@ -9,9 +9,21 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function SeasonPage() {
+export default async function SeasonPage({
+  searchParams,
+}: {
+  searchParams?: { game?: string }
+}) {
   // Use admin client to ensure data access
   const supabaseAdmin = getSupabaseAdminClient()
+  const selectedGame =
+    searchParams?.game === 'marvel_rivals'
+      ? 'marvel_rivals'
+      : searchParams?.game === 'valorant'
+        ? 'valorant'
+        : 'valorant'
+  const gameLabel = selectedGame === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant'
+  const leaderboardField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr'
   
   const now = new Date()
   
@@ -87,7 +99,7 @@ export default async function SeasonPage() {
   const { data: leaderboard } = await supabaseAdmin
     .from('players')
     .select('*')
-    .order('current_mmr', { ascending: false })
+    .order(leaderboardField, { ascending: false })
     .limit(50)
   
   const players = (leaderboard as (Player & { discord_avatar_url?: string | null })[]) || []
@@ -111,12 +123,20 @@ export default async function SeasonPage() {
       
       if (!isBeforeStart && currentSeason) {
         // Get match stats for this player this season
-        const { data: matchStats } = await supabaseAdmin
+        let matchStatsQuery = supabaseAdmin
           .from('match_player_stats')
-          .select('*, match:matches(match_date, winner)')
+          .select('*, match:matches(match_date, winner, match_type)')
           .eq('player_id', player.id)
           .gte('created_at', currentSeason.start_date)
           .lte('created_at', currentSeason.end_date)
+
+        if (selectedGame === 'marvel_rivals') {
+          matchStatsQuery = matchStatsQuery.eq('match.match_type', 'marvel_rivals')
+        } else {
+          matchStatsQuery = matchStatsQuery.in('match.match_type', ['custom', 'valorant'])
+        }
+
+        const { data: matchStats } = await matchStatsQuery
         
         const stats = (matchStats as SeasonMatchStat[]) || []
         wins = stats.filter((s) => {
@@ -131,21 +151,30 @@ export default async function SeasonPage() {
         netMMR = stats.reduce((sum, s) => sum + (s.mmr_after - s.mmr_before), 0)
       }
       
+      const currentMMR = selectedGame === 'marvel_rivals'
+        ? (player.marvel_rivals_mmr ?? 0)
+        : (player.valorant_mmr ?? player.current_mmr ?? 0)
+      const rankLabel = selectedGame === 'marvel_rivals'
+        ? (player.marvel_rivals_rank ?? 'Unranked')
+        : (player.valorant_rank ?? player.discord_rank ?? 'GRNDS I')
+
       return {
         ...player,
         discord_avatar_url: player.discord_avatar_url,
+        currentMMR,
+        rankLabel,
         seasonMatches: totalMatches,
         seasonWins: wins,
         seasonWinRate: winRate,
         seasonNetMMR: netMMR,
-      } as typeof player & { seasonMatches: number; seasonWins: number; seasonWinRate: number; seasonNetMMR: number }
+      } as typeof player & { currentMMR: number; rankLabel: string; seasonMatches: number; seasonWins: number; seasonWinRate: number; seasonNetMMR: number }
     })
   )
   
   // Get top 10 for X rank (only players with 3000+ MMR)
-  const xRankPlayers = playersWithStats.filter(p => p.current_mmr >= 3000)
+  const xRankPlayers = playersWithStats.filter(p => p.currentMMR >= 3000)
   const top10 = xRankPlayers.slice(0, 10)
-  const xWatch = playersWithStats.filter(p => p.current_mmr < 3000 && p.current_mmr >= 2000).slice(0, 10)
+  const xWatch = playersWithStats.filter(p => p.currentMMR < 3000 && p.currentMMR >= 2000).slice(0, 10)
   
   // Get comments for season (use admin client for read access)
   const { data: comments } = await supabaseAdmin
@@ -160,8 +189,8 @@ export default async function SeasonPage() {
   
   // Calculate season-wide stats
   const totalSeasonMatches = playersWithStats.reduce((sum, p) => sum + (p.seasonMatches || 0), 0)
-  const averageMMR = players.length > 0 
-    ? Math.round(players.reduce((sum, p) => sum + p.current_mmr, 0) / players.length)
+  const averageMMR = playersWithStats.length > 0 
+    ? Math.round(playersWithStats.reduce((sum, p) => sum + p.currentMMR, 0) / playersWithStats.length)
     : 0
   
   return (
@@ -186,6 +215,25 @@ export default async function SeasonPage() {
                 {isBeforeStart ? 'Starting Soon' : 'Active'}
               </div>
             </div>
+          </div>
+          <div className="inline-flex items-center gap-2 mb-8 rounded-full border border-white/10 bg-white/[0.04] p-1">
+            <Link
+              href="/season?game=valorant"
+              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              Valorant
+            </Link>
+            <Link
+              href="/season?game=marvel_rivals"
+              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              Marvel Rivals
+            </Link>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
           </div>
           
           {/* Countdown & Stats */}
@@ -256,10 +304,10 @@ export default async function SeasonPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
                       <div className="text-xs text-white/40">
-                        {player.current_mmr} MMR • {player.seasonMatches || 0} matches • {player.seasonWinRate || 0}% WR
+                        {player.currentMMR} MMR • {player.seasonMatches || 0} matches • {player.seasonWinRate || 0}% WR
                       </div>
                     </div>
-                    <RankBadge mmr={player.current_mmr} size="sm" />
+                    <RankBadge mmr={player.currentMMR} size="sm" rankLabel={player.rankLabel} />
                     <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -310,15 +358,15 @@ export default async function SeasonPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
                       <div className="text-xs text-white/40">
-                        {player.current_mmr} MMR
+                        {player.currentMMR} MMR
                         {top10.length > 0 && top10[top10.length - 1] && (
                           <span className="ml-2 text-white/30">
-                            (-{top10[top10.length - 1].current_mmr - player.current_mmr} from #10)
+                            (-{top10[top10.length - 1].currentMMR - player.currentMMR} from #10)
                           </span>
                         )}
                       </div>
                     </div>
-                    <RankBadge mmr={player.current_mmr} size="sm" />
+                    <RankBadge mmr={player.currentMMR} size="sm" rankLabel={player.rankLabel} />
                     <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -334,7 +382,7 @@ export default async function SeasonPage() {
         {/* Full Leaderboard Link */}
         <div className="text-center mb-8 md:mb-12">
           <Link
-            href="/leaderboard"
+            href={`/leaderboard?game=${selectedGame}`}
             className="inline-block px-8 py-4 bg-red-500 text-white font-black uppercase tracking-wider text-xs rounded-xl hover:bg-red-600 transition-all shadow-xl"
           >
             View Full Leaderboard

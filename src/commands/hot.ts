@@ -4,10 +4,14 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
+import { GAME_CHOICES, normalizeGameSelection, getMatchTypesForGame, getGameRankFields } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('hot')
-  .setDescription('View players with the biggest MMR gains recently');
+  .setDescription('View players with the biggest MMR gains recently')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Select which game to show').addChoices(...GAME_CHOICES)
+  );
 
 interface HotPlayer {
   discordUserId: string;
@@ -29,9 +33,10 @@ export async function execute(
 
   try {
     const { databaseService } = services;
+    const selectedGame = normalizeGameSelection(interaction.options.getString('game'));
 
     // Get hot players (last 7 days)
-    const hotPlayers = await getHotPlayers(databaseService, 10);
+    const hotPlayers = await getHotPlayers(databaseService, 10, selectedGame);
 
     if (!hotPlayers || hotPlayers.length === 0) {
       await interaction.editReply(
@@ -42,7 +47,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle('🔥 Hot Players - Biggest MMR Gains')
+      .setTitle(`🔥 ${selectedGame === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant'} Hot Players`)
       .setColor(0xff6b6b)
       .setDescription('Top performers in the last 7 days')
       .setTimestamp();
@@ -84,7 +89,8 @@ export async function execute(
  */
 async function getHotPlayers(
   databaseService: DatabaseService,
-  limit: number
+  limit: number,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<HotPlayer[]> {
   try {
     const supabase = databaseService.supabase;
@@ -109,11 +115,13 @@ async function getHotPlayers(
           status,
           match_date,
           team_a,
-          team_b
+          team_b,
+          match_type
         )
       `)
       .eq('matches.status', 'completed')
-      .gte('matches.match_date', sevenDaysAgo.toISOString());
+      .gte('matches.match_date', sevenDaysAgo.toISOString())
+      .in('matches.match_type', getMatchTypesForGame(game));
 
     if (error || !recentMatches) {
       console.error('Error getting recent matches', { error });
@@ -168,7 +176,19 @@ async function getHotPlayers(
       if (!supabase) continue;
       const { data: player, error: playerError } = await supabase
         .from('players')
-        .select('discord_user_id, discord_username, discord_rank, current_mmr')
+        .select(`
+          id,
+          discord_user_id,
+          discord_username,
+          discord_rank,
+          current_mmr,
+          valorant_rank,
+          valorant_mmr,
+          valorant_peak_mmr,
+          marvel_rivals_rank,
+          marvel_rivals_mmr,
+          marvel_rivals_peak_mmr
+        `)
         .eq('id', playerId)
         .single();
 
@@ -177,12 +197,13 @@ async function getHotPlayers(
       }
 
       const winRate = ((stats.wins / stats.matchCount) * 100).toFixed(0);
+      const { rank, mmr } = getGameRankFields(player, game);
 
       hotPlayers.push({
         discordUserId: player.discord_user_id,
         discordUsername: player.discord_username,
-        rank: player.discord_rank || 'Unranked',
-        currentMMR: player.current_mmr || 0,
+        rank: rank || 'Unranked',
+        currentMMR: mmr,
         mmrGain: stats.mmrGain,
         matchesPlayed: stats.matchCount,
         winRate: parseFloat(winRate),

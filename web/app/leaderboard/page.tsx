@@ -7,15 +7,27 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function LeaderboardPage() {
+export default async function LeaderboardPage({
+  searchParams,
+}: {
+  searchParams?: { game?: string }
+}) {
   // Use admin client to ensure data access
   const supabaseAdmin = getSupabaseAdminClient()
+  const selectedGame =
+    searchParams?.game === 'marvel_rivals'
+      ? 'marvel_rivals'
+      : searchParams?.game === 'valorant'
+        ? 'valorant'
+        : 'valorant'
+  const gameLabel = selectedGame === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant'
+  const leaderboardField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr'
   
   // Get all players ordered by MMR with real stats
   const { data: leaderboard } = await supabaseAdmin
     .from('players')
     .select('*')
-    .order('current_mmr', { ascending: false })
+    .order(leaderboardField, { ascending: false })
     .limit(100)
   
   const players = (leaderboard as (Player & { discord_avatar_url?: string | null })[]) || []
@@ -32,10 +44,18 @@ export default async function LeaderboardPage() {
   
   const playersWithStats = await Promise.all(
     players.map(async (player) => {
-      const { data: matchStats } = await supabaseAdmin
+      let matchStatsQuery = supabaseAdmin
         .from('match_player_stats')
-        .select('*, match:matches(winner)')
+        .select('*, match:matches(winner, match_type)')
         .eq('player_id', player.id)
+
+      if (selectedGame === 'marvel_rivals') {
+        matchStatsQuery = matchStatsQuery.eq('match.match_type', 'marvel_rivals')
+      } else {
+        matchStatsQuery = matchStatsQuery.in('match.match_type', ['custom', 'valorant'])
+      }
+
+      const { data: matchStats } = await matchStatsQuery
       
       const stats = (matchStats as MatchStatWithMatch[]) || []
       const wins = stats.filter((s) => {
@@ -51,8 +71,21 @@ export default async function LeaderboardPage() {
       const totalDeaths = stats.reduce((sum, s) => sum + (s.deaths || 0), 0)
       const kd = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : '0.00'
       
+      const currentMMR = selectedGame === 'marvel_rivals'
+        ? (player.marvel_rivals_mmr ?? 0)
+        : (player.valorant_mmr ?? player.current_mmr ?? 0)
+      const peakMMR = selectedGame === 'marvel_rivals'
+        ? (player.marvel_rivals_peak_mmr ?? 0)
+        : (player.valorant_peak_mmr ?? player.peak_mmr ?? 0)
+      const rankLabel = selectedGame === 'marvel_rivals'
+        ? (player.marvel_rivals_rank ?? 'Unranked')
+        : (player.valorant_rank ?? player.discord_rank ?? 'GRNDS I')
+
       return {
         ...player,
+        currentMMR,
+        peakMMR,
+        rankLabel,
         totalMatches,
         wins,
         winRate,
@@ -63,8 +96,8 @@ export default async function LeaderboardPage() {
   
   // Calculate global stats
   const totalPlayers = playersWithStats.length
-  const averageMMR = players.length > 0 
-    ? Math.round(players.reduce((sum, p) => sum + p.current_mmr, 0) / players.length)
+  const averageMMR = playersWithStats.length > 0 
+    ? Math.round(playersWithStats.reduce((sum, p) => sum + p.currentMMR, 0) / playersWithStats.length)
     : 0
   
   const topPlayer = playersWithStats[0]
@@ -82,6 +115,26 @@ export default async function LeaderboardPage() {
           <p className="text-base md:text-lg text-white/60 font-light mb-8 max-w-2xl">
             Top players ranked by MMR. Real stats from competitive matches.
           </p>
+
+          <div className="inline-flex items-center gap-2 mb-8 rounded-full border border-white/10 bg-white/[0.04] p-1">
+            <Link
+              href="/leaderboard?game=valorant"
+              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              Valorant
+            </Link>
+            <Link
+              href="/leaderboard?game=marvel_rivals"
+              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
+                selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              Marvel Rivals
+            </Link>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
+          </div>
           
           {/* Stats Bar */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl">
@@ -99,7 +152,7 @@ export default async function LeaderboardPage() {
                 {topPlayer?.discord_username || 'N/A'}
               </div>
               {topPlayer && (
-                <div className="text-sm text-red-500 font-black mt-1">{topPlayer.current_mmr} MMR</div>
+                <div className="text-sm text-red-500 font-black mt-1">{topPlayer.currentMMR} MMR</div>
               )}
             </div>
           </div>
@@ -186,10 +239,18 @@ export default async function LeaderboardPage() {
                             <div className="font-black text-white tracking-tight truncate group-hover/link:text-red-500 transition-colors">
                               {player.discord_username || 'Unknown'}
                             </div>
-                            {player.riot_name && player.riot_tag && (
-                              <div className="text-sm text-white/40 font-light truncate">
-                                {player.riot_name}#{player.riot_tag}
-                              </div>
+                            {selectedGame === 'marvel_rivals' ? (
+                              player.marvel_rivals_username && (
+                                <div className="text-sm text-white/40 font-light truncate">
+                                  {player.marvel_rivals_username}
+                                </div>
+                              )
+                            ) : (
+                              player.riot_name && player.riot_tag && (
+                                <div className="text-sm text-white/40 font-light truncate">
+                                  {player.riot_name}#{player.riot_tag}
+                                </div>
+                              )
                             )}
                           </div>
                           <svg className="w-4 h-4 text-white/20 group-hover/link:text-red-500 group-hover/link:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,10 +259,10 @@ export default async function LeaderboardPage() {
                         </Link>
                       </td>
                       <td className="px-4 md:px-8 py-4">
-                        <RankBadge mmr={player.current_mmr} size="sm" />
+                        <RankBadge mmr={player.currentMMR} size="sm" rankLabel={player.rankLabel} />
                       </td>
                       <td className="px-4 md:px-8 py-4 text-right">
-                        <span className="text-lg md:text-xl font-black text-white tracking-tighter">{player.current_mmr}</span>
+                        <span className="text-lg md:text-xl font-black text-white tracking-tighter">{player.currentMMR}</span>
                       </td>
                       <td className="px-4 md:px-8 py-4 text-right hidden md:table-cell">
                         <span className={`text-base font-black tracking-tight ${player.kd >= 1.0 ? 'text-green-500' : 'text-white/60'}`}>
@@ -215,7 +276,7 @@ export default async function LeaderboardPage() {
                         <div className="text-xs text-white/40">{player.totalMatches || 0} matches</div>
                       </td>
                       <td className="px-4 md:px-8 py-4 text-right">
-                        <span className="text-base md:text-lg font-black text-white/60 tracking-tight">{player.peak_mmr}</span>
+                        <span className="text-base md:text-lg font-black text-white/60 tracking-tight">{player.peakMMR}</span>
                       </td>
                     </tr>
                   ))

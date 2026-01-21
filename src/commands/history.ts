@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, resolveGameForPlayer, getGameRankFields, formatGameName } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('history')
@@ -15,6 +16,9 @@ export const data = new SlashCommandBuilder()
       .setDescription('Number of matches to display (1-25, default: 10)')
       .setMinValue(1)
       .setMaxValue(25)
+  )
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game to display').addChoices(...GAME_CHOICES)
   );
 
 interface MatchHistoryEntry {
@@ -30,6 +34,7 @@ interface MatchHistoryEntry {
   deaths: number;
   assists: number;
   mvp: boolean;
+  matchType: 'custom' | 'valorant' | 'marvel_rivals';
 }
 
 export async function execute(
@@ -58,7 +63,8 @@ export async function execute(
     }
 
     // Get match history
-    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, count);
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
+    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, count, selectedGame);
 
     if (!matchHistory || matchHistory.length === 0) {
       await safeEditReply(interaction, {
@@ -75,7 +81,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`📜 ${interaction.user.username}'s Match History`)
+      .setTitle(`📜 ${interaction.user.username}'s ${formatGameName(selectedGame)} Match History`)
       .setColor(0x5865f2)
       .setThumbnail(interaction.user.displayAvatarURL())
       .setDescription(`Last ${matchHistory.length} matches`)
@@ -91,8 +97,8 @@ export async function execute(
           inline: true,
         },
         {
-          name: 'Current MMR',
-          value: `**${player.current_mmr}**`,
+          name: `${formatGameName(selectedGame)} MMR`,
+          value: `**${getGameRankFields(player, selectedGame).mmr}**`,
           inline: true,
         }
       );
@@ -159,7 +165,8 @@ export async function execute(
 async function getPlayerMatchHistory(
   databaseService: DatabaseService,
   playerId: string,
-  limit: number
+  limit: number,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<MatchHistoryEntry[]> {
   try {
     const supabase = databaseService.supabase;
@@ -179,16 +186,18 @@ async function getPlayerMatchHistory(
         deaths,
         assists,
         mvp,
-        matches!inner(
-          match_id,
-          match_date,
-          map,
-          winner,
-          status
-        )
+      matches!inner(
+        match_id,
+        match_date,
+        map,
+        winner,
+        status
+        match_type
+      )
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
+      .eq('matches.match_type', game === 'marvel_rivals' ? 'marvel_rivals' : 'custom')
       .order('matches(match_date)', { ascending: false })
       .limit(limit);
 
@@ -215,6 +224,7 @@ async function getPlayerMatchHistory(
         deaths: stat.deaths,
         assists: stat.assists,
         mvp: stat.mvp,
+        matchType: stat.matches.match_type,
       };
     });
 

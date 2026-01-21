@@ -281,16 +281,16 @@ export class RankService {
   }
 
   private mapMarvelTierToDiscordRank(rank: string, tier: number): string | null {
-    if (rank.includes('one above all')) return 'X';
-    if (rank.includes('eternity')) return 'CHALLENGER V';
+    if (rank.includes('one above all')) return 'GRNDS V';
+    if (rank.includes('eternity')) return 'GRNDS V';
 
     if (rank.includes('bronze')) return this.mapTierToRank(['GRNDS I', 'GRNDS II', 'GRNDS III'], tier);
-    if (rank.includes('silver')) return this.mapTierToRank(['GRNDS IV', 'GRNDS V', 'GRNDS V'], tier);
-    if (rank.includes('gold')) return this.mapTierToRank(['BREAKPOINT I', 'BREAKPOINT II', 'BREAKPOINT II'], tier);
-    if (rank.includes('platinum')) return this.mapTierToRank(['BREAKPOINT III', 'BREAKPOINT IV', 'BREAKPOINT IV'], tier);
-    if (rank.includes('diamond')) return this.mapTierToRank(['BREAKPOINT V', 'CHALLENGER I', 'CHALLENGER I'], tier);
-    if (rank.includes('grandmaster')) return this.mapTierToRank(['CHALLENGER II', 'CHALLENGER III', 'CHALLENGER III'], tier);
-    if (rank.includes('celestial')) return this.mapTierToRank(['CHALLENGER IV', 'CHALLENGER V', 'CHALLENGER V'], tier);
+    if (rank.includes('silver')) return this.mapTierToRank(['GRNDS II', 'GRNDS III', 'GRNDS IV'], tier);
+    if (rank.includes('gold')) return this.mapTierToRank(['GRNDS II', 'GRNDS III', 'GRNDS IV'], tier);
+    if (rank.includes('platinum')) return this.mapTierToRank(['GRNDS III', 'GRNDS IV', 'GRNDS V'], tier);
+    if (rank.includes('diamond')) return this.mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
+    if (rank.includes('grandmaster')) return this.mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
+    if (rank.includes('celestial')) return this.mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
 
     return null;
   }
@@ -318,31 +318,29 @@ export class RankService {
       'CHALLENGER I': 11,
       'CHALLENGER II': 12,
       'CHALLENGER III': 13,
-      'CHALLENGER IV': 14,
-      'CHALLENGER V': 15,
-      'X': 16,
+      'ABSOLUTE': 14,
+      'X': 15,
     };
     return rankMap[rank] || 0;
   }
 
   private getCustomRankMMR(rank: string): number {
     const mmrMap: Record<string, number> = {
-      'GRNDS I': 100,
-      'GRNDS II': 300,
-      'GRNDS III': 500,
-      'GRNDS IV': 700,
-      'GRNDS V': 900,
-      'BREAKPOINT I': 1100,
-      'BREAKPOINT II': 1300,
-      'BREAKPOINT III': 1500,
-      'BREAKPOINT IV': 1700,
-      'BREAKPOINT V': 1900,
-      'CHALLENGER I': 2100,
-      'CHALLENGER II': 2300,
-      'CHALLENGER III': 2500,
-      'CHALLENGER IV': 2700,
-      'CHALLENGER V': 2900,
-      'X': 3200,
+      'GRNDS I': 150,
+      'GRNDS II': 450,
+      'GRNDS III': 750,
+      'GRNDS IV': 1050,
+      'GRNDS V': 1350,
+      'BREAKPOINT I': 1600,
+      'BREAKPOINT II': 1800,
+      'BREAKPOINT III': 2000,
+      'BREAKPOINT IV': 2150,
+      'BREAKPOINT V': 2300,
+      'CHALLENGER I': 2450,
+      'CHALLENGER II': 2550,
+      'CHALLENGER III': 2800,
+      'ABSOLUTE': 2700,
+      'X': 3000,
     };
     return mmrMap[rank] || 0;
   }

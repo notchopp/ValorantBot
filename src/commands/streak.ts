@@ -5,10 +5,14 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, resolveGameForPlayer, formatGameName, getGameRankFields } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('streak')
-  .setDescription('View your current win/loss streak and MMR impact');
+  .setDescription('View your current win/loss streak and MMR impact')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Select Valorant or Marvel').addChoices(...GAME_CHOICES)
+  );
 
 interface MatchResult {
   won: boolean;
@@ -40,8 +44,10 @@ export async function execute(
       return;
     }
 
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
+
     // Get match history (last 50 matches for streak calculation)
-    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, 50);
+    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, 50, selectedGame);
 
     if (!matchHistory || matchHistory.length === 0) {
       await safeEditReply(interaction, {
@@ -55,7 +61,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`${streakInfo.emoji} ${interaction.user.username}'s Streak`)
+      .setTitle(`${streakInfo.emoji} ${interaction.user.username}'s ${formatGameName(selectedGame)} Streak`)
       .setColor(streakInfo.color)
       .setThumbnail(interaction.user.displayAvatarURL());
 
@@ -89,8 +95,8 @@ export async function execute(
 
     // Add current MMR
     embed.addFields({
-      name: 'Current MMR',
-      value: `**${player.current_mmr}**`,
+      name: `${formatGameName(selectedGame)} MMR`,
+      value: `**${getGameRankFields(player, selectedGame).mmr}**`,
       inline: true,
     });
 
@@ -168,7 +174,8 @@ export async function execute(
 async function getPlayerMatchHistory(
   databaseService: DatabaseService,
   playerId: string,
-  limit: number
+  limit: number,
+  game: 'valorant' | 'marvel_rivals'
 ): Promise<MatchResult[]> {
   try {
     const supabase = databaseService.supabase;
@@ -193,6 +200,7 @@ async function getPlayerMatchHistory(
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
+      .eq('matches.match_type', game === 'marvel_rivals' ? 'marvel_rivals' : 'custom')
       .order('matches(match_date)', { ascending: false })
       .limit(limit);
 

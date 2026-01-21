@@ -6,10 +6,14 @@ import {
 import { DatabaseService } from '../services/DatabaseService';
 import { RankCalculationService } from '../services/RankCalculationService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, getGameRankFields, resolveGameForPlayer, formatGameName } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('progress')
-  .setDescription('View your detailed rank progression and MMR trends');
+  .setDescription('View your detailed rank progression and MMR trends')
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Choose which game to view').addChoices(...GAME_CHOICES)
+  );
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
@@ -35,9 +39,12 @@ export async function execute(
       });
       return;
     }
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
 
-    // Check if player has rank
-    if (!player.discord_rank || player.discord_rank === 'Unranked') {
+    const { rank: gameRank, mmr: gameMMR, peak: gamePeak } = getGameRankFields(player, selectedGame);
+
+    // Check if player has rank for selected game
+    if (!gameRank || gameRank === 'Unranked') {
       await safeEditReply(interaction, {
         content: '❌ You need to be ranked first. Use `/verify` to get your initial rank placement.',
       });
@@ -45,7 +52,7 @@ export async function execute(
     }
 
     // Get rank progression
-    const progression = await rankCalculationService.getRankProgression(userId);
+    const progression = await rankCalculationService.getRankProgression(userId, selectedGame);
     if (!progression) {
       await safeEditReply(interaction, {
         content: '❌ Could not fetch rank progression.',
@@ -58,7 +65,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`📊 ${interaction.user.username}'s Progression`)
+      .setTitle(`📊 ${interaction.user.username}'s ${formatGameName(selectedGame)} Progression`)
       .setColor(getRankColor(progression.currentRank))
       .setThumbnail(interaction.user.displayAvatarURL())
       .addFields(
@@ -68,13 +75,18 @@ export async function execute(
           inline: true,
         },
         {
-          name: 'Current MMR',
-          value: `**${progression.currentMMR}**`,
+          name: `${formatGameName(selectedGame)} Rank`,
+          value: `**${gameRank}**`,
           inline: true,
         },
         {
-          name: 'Peak MMR',
-          value: `**${player.peak_mmr}**`,
+          name: `${formatGameName(selectedGame)} MMR`,
+          value: `**${gameMMR}**`,
+          inline: true,
+        },
+        {
+          name: `${formatGameName(selectedGame)} Peak`,
+          value: `**${gamePeak}**`,
           inline: true,
         }
       );
@@ -198,8 +210,7 @@ function getRankColor(rank: string): number {
     'CHALLENGER I': 0xff6b6b,
     'CHALLENGER II': 0xff6b6b,
     'CHALLENGER III': 0xff6b6b,
-    'CHALLENGER IV': 0xff6b6b,
-    'CHALLENGER V': 0xff6b6b,
+    'ABSOLUTE': 0xffb347,
     'X': 0xffd700,
     'UNRANKED': 0x2c2f33,
   };

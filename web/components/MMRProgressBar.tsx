@@ -31,8 +31,8 @@ export function MMRProgressBar({ currentMMR, animated = true, accentColor = '#ef
   
   // Calculate progress within current rank tier
   const rankThresholds = [
-    0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 
-    2000, 2200, 2400, 2600, 2800, 3000
+    0, 300, 600, 900, 1200, 1500, 1700, 1900, 2100, 2300,
+    2400, 2500, 2600, 3000
   ]
   
   let currentThreshold = 0

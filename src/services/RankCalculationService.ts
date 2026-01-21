@@ -50,6 +50,9 @@ export class RankCalculationService {
         throw new Error('Match not found');
       }
 
+      const matchGame: 'valorant' | 'marvel_rivals' =
+        match.match_type === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
+
       // Get all player stats for this match
       const { data: playerStats, error: statsError } = await supabase
         .from('match_player_stats')
@@ -70,27 +73,39 @@ export class RankCalculationService {
 
     const results: RankCalculationResult[] = [];
 
+    const teamAStats = playerStats.filter((stat) => stat.team === 'A');
+    const teamBStats = playerStats.filter((stat) => stat.team === 'B');
+    const teamAAvg = this.getTeamAverageMMR(teamAStats);
+    const teamBAvg = this.getTeamAverageMMR(teamBStats);
+    const expectedA = this.getExpectedScore(teamAAvg, teamBAvg);
+    const expectedB = 1 - expectedA;
+
     for (const stat of playerStats) {
       // Get current player data
       const player = await this.dbService.getPlayer(stat.player_id);
       if (!player) continue;
 
       // Get old MMR from stat
-      const oldMMR = stat.mmr_before;
+      const oldMMR = stat.mmr_before ?? (matchGame === 'marvel_rivals'
+        ? (player.marvel_rivals_mmr || 0)
+        : (player.valorant_mmr || player.current_mmr || 0));
 
       // Calculate points earned using custom rank system
-      const pointsEarned = this.calculatePoints(stat, match.winner === stat.team, oldMMR);
+      const expectedScore = stat.team === 'A' ? expectedA : expectedB;
+      const pointsEarned = this.calculatePoints(stat, match.winner === stat.team, oldMMR, expectedScore);
 
       // Calculate new MMR
       const newMMR = oldMMR + pointsEarned;
 
       // Determine new rank using custom rank system
-      const oldRank = player.discord_rank || 'Unranked';
+      const oldRank = matchGame === 'marvel_rivals'
+        ? (player.marvel_rivals_rank || 'Unranked')
+        : (player.valorant_rank || player.discord_rank || 'Unranked');
       const newRank = await this.customRankService.getRankFromMMR(newMMR);
       const newRankValue = this.customRankService.getRankValue(newRank);
 
       // Update player MMR and rank in database
-      await this.dbService.updatePlayerRank(player.discord_user_id, newRank, newRankValue, newMMR);
+      await this.dbService.updatePlayerRank(player.discord_user_id, newRank, newRankValue, newMMR, matchGame);
 
       const rankChanged = oldRank !== newRank;
 
@@ -141,7 +156,7 @@ export class RankCalculationService {
    * Calculate points earned based on match performance
    * Uses CustomRankService for sticky rank system
    */
-  private calculatePoints(stat: DatabaseMatchPlayerStats, won: boolean, currentMMR: number): number {
+  private calculatePoints(stat: DatabaseMatchPlayerStats, won: boolean, currentMMR: number, expectedScore: number): number {
     try {
       const input: RankCalculationInput = {
         won,
@@ -151,6 +166,7 @@ export class RankCalculationService {
         mvp: stat.mvp,
         damage: stat.damage,
         score: stat.score,
+        expectedScore,
       };
 
       const result = this.customRankService.calculateMatchPoints(input, currentMMR);
@@ -167,11 +183,27 @@ export class RankCalculationService {
     }
   }
 
+  private getTeamAverageMMR(stats: DatabaseMatchPlayerStats[]): number {
+    if (!stats.length) {
+      return 0;
+    }
+    const total = stats.reduce((sum, stat) => sum + (stat.mmr_before || 0), 0);
+    return Math.round(total / stats.length);
+  }
+
+  private getExpectedScore(teamMMR: number, opponentMMR: number): number {
+    const exponent = (opponentMMR - teamMMR) / 400;
+    return 1 / (1 + Math.pow(10, exponent));
+  }
+
   /**
    * Get rank progression info (current rank, MMR, progress to next rank)
    * Follows guardrails: error handling, null checks
    */
-  async getRankProgression(discordUserId: string): Promise<{
+  async getRankProgression(
+    discordUserId: string,
+    game: 'valorant' | 'marvel_rivals' = 'valorant'
+  ): Promise<{
     currentRank: string;
     currentMMR: number;
     nextRank?: string;
@@ -186,14 +218,21 @@ export class RankCalculationService {
       }
 
     const thresholds = await this.dbService.getAllRankThresholds();
+    const currentMMR = game === 'marvel_rivals'
+      ? (player.marvel_rivals_mmr || 0)
+      : (player.valorant_mmr || player.current_mmr || 0);
+    const currentRank = game === 'marvel_rivals'
+      ? (player.marvel_rivals_rank || 'Unranked')
+      : (player.valorant_rank || player.discord_rank || 'Unranked');
+
     const currentThreshold = thresholds.find(
-      t => t.min_mmr <= player.current_mmr && player.current_mmr <= t.max_mmr
+      t => t.min_mmr <= currentMMR && currentMMR <= t.max_mmr
     );
 
     if (!currentThreshold) {
       return {
-        currentRank: player.discord_rank || 'Unranked',
-        currentMMR: player.current_mmr,
+        currentRank,
+        currentMMR,
         nextRankMMR: 0,
         progressToNext: 0,
         mmrNeeded: 0,
@@ -210,7 +249,7 @@ export class RankCalculationService {
       // Already at max rank (Radiant)
       return {
         currentRank: currentThreshold.rank,
-        currentMMR: player.current_mmr,
+        currentMMR,
         nextRank: undefined,
         nextRankMMR: currentThreshold.max_mmr,
         progressToNext: 100,
@@ -218,16 +257,16 @@ export class RankCalculationService {
       };
     }
 
-    const mmrInCurrentRank = player.current_mmr - currentThreshold.min_mmr;
+    const mmrInCurrentRank = currentMMR - currentThreshold.min_mmr;
     const mmrRange = currentThreshold.max_mmr - currentThreshold.min_mmr;
     const progressToNext = mmrRange > 0
       ? Math.round((mmrInCurrentRank / mmrRange) * 100)
       : 0;
-    const mmrNeeded = nextThreshold.min_mmr - player.current_mmr;
+    const mmrNeeded = nextThreshold.min_mmr - currentMMR;
 
       return {
         currentRank: currentThreshold.rank,
-        currentMMR: player.current_mmr,
+        currentMMR,
         nextRank: nextThreshold.rank,
         nextRankMMR: nextThreshold.min_mmr,
         progressToNext,

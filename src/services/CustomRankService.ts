@@ -11,6 +11,7 @@ export interface RankCalculationInput {
   score?: number; // Combat score
   roundsWon?: number;
   roundsLost?: number;
+  expectedScore?: number; // Elo expected score (0-1)
 }
 
 export interface RankCalculationResult {
@@ -59,8 +60,13 @@ export class CustomRankService {
       const deaths = typeof input.deaths === 'number' && !isNaN(input.deaths) ? input.deaths : 0;
       // Note: assists not used in current calculation but kept for future use
 
-      // Base points: Win/Loss
-      basePoints = input.won ? 15 : -8; // Reduced from 25/-10 for stickiness
+      // Base points: Elo K-factor outcome
+      const expectedScore = typeof input.expectedScore === 'number'
+        ? Math.min(Math.max(input.expectedScore, 0), 1)
+        : 0.5;
+      const resultScore = input.won ? 1 : 0;
+      const kFactor = this.getKFactor(currentMMR);
+      basePoints = Math.round(kFactor * (resultScore - expectedScore));
 
       // Performance multiplier based on K/D
       const kd = deaths > 0 ? kills / deaths : kills;
@@ -70,49 +76,44 @@ export class CustomRankService {
         // Winning performance bonuses
         if (kd >= 2.0) {
           performanceMultiplier = 1.3; // +30% for excellent performance
-          performanceBonus = Math.round(basePoints * 0.3);
         } else if (kd >= 1.5) {
           performanceMultiplier = 1.15; // +15% for good performance
-          performanceBonus = Math.round(basePoints * 0.15);
         } else if (kd >= 1.0) {
           performanceMultiplier = 1.0; // Base
         } else if (kd >= 0.7) {
           performanceMultiplier = 0.9; // -10% for below average
-          performanceBonus = Math.round(basePoints * -0.1);
         } else {
           performanceMultiplier = 0.8; // -20% for poor performance
-          performanceBonus = Math.round(basePoints * -0.2);
         }
       } else {
         // Losing performance penalties (less harsh)
         if (kd >= 1.5) {
           performanceMultiplier = 0.9; // -10% penalty (good performance despite loss)
-          performanceBonus = Math.round(basePoints * -0.1);
         } else if (kd >= 1.0) {
           performanceMultiplier = 1.0; // Base loss
         } else if (kd >= 0.5) {
           performanceMultiplier = 1.1; // +10% penalty (poor performance)
-          performanceBonus = Math.round(basePoints * 0.1);
         } else {
           performanceMultiplier = 1.2; // +20% penalty (very poor performance)
-          performanceBonus = Math.round(basePoints * 0.2);
         }
       }
 
       // MVP bonuses
       if (input.mvp === true && input.won) {
-        mvpBonus = 8; // MVP on win
+        mvpBonus = 6; // MVP on win
       } else if (input.mvp === true && !input.won) {
         mvpBonus = 3; // MVP on loss (less but still rewarded)
       }
 
       // Team MVP bonus (if implemented)
       if (input.teamMVP === true && input.won) {
-        teamMVPBonus = 5;
+        teamMVPBonus = 4;
       }
 
       // Calculate final points with sticky system
-      const rawPoints = Math.round(basePoints * performanceMultiplier) + mvpBonus + teamMVPBonus;
+      const adjustedPoints = Math.round(basePoints * performanceMultiplier);
+      performanceBonus = adjustedPoints - basePoints;
+      const rawPoints = adjustedPoints + mvpBonus + teamMVPBonus;
     
       // Apply sticky rank system: Harder to gain MMR at higher ranks
       const stickyMultiplier = this.getStickyMultiplier(currentMMR, rawPoints > 0);
@@ -153,27 +154,43 @@ export class CustomRankService {
   private getStickyMultiplier(currentMMR: number, isGain: boolean): number {
     if (isGain) {
       // Harder to gain MMR at higher ranks
-      if (currentMMR >= 2800) {
-        return 0.6; // CHALLENGER V+ - 40% reduction
-      } else if (currentMMR >= 2000) {
-        return 0.7; // CHALLENGER - 30% reduction
-      } else if (currentMMR >= 1000) {
-        return 0.85; // BREAKPOINT - 15% reduction
+      if (currentMMR >= 3000) {
+        return 0.8; // X range - 20% reduction
+      } else if (currentMMR >= 2600) {
+        return 0.85; // CHALLENGER III+ - 15% reduction
+      } else if (currentMMR >= 1500) {
+        return 0.9; // BREAKPOINT - 10% reduction
       } else {
         return 1.0; // GRNDS - Full points
       }
     } else {
       // Easier to lose MMR (but still sticky)
-      if (currentMMR >= 2800) {
-        return 0.8; // CHALLENGER V+ - 20% reduction in loss
-      } else if (currentMMR >= 2000) {
-        return 0.85; // CHALLENGER - 15% reduction
-      } else if (currentMMR >= 1000) {
-        return 0.9; // BREAKPOINT - 10% reduction
+      if (currentMMR >= 3000) {
+        return 0.9; // X range - 10% reduction
+      } else if (currentMMR >= 2600) {
+        return 0.92; // CHALLENGER III+ - 8% reduction
+      } else if (currentMMR >= 1500) {
+        return 0.95; // BREAKPOINT - 5% reduction
       } else {
         return 1.0; // GRNDS - Full loss
       }
     }
+  }
+
+  private getKFactor(currentMMR: number): number {
+    if (currentMMR >= 3000) {
+      return 18; // X range
+    }
+    if (currentMMR >= 2600) {
+      return 22; // CHALLENGER III/ABSOLUTE
+    }
+    if (currentMMR >= 2400) {
+      return 26; // CHALLENGER I-II
+    }
+    if (currentMMR >= 1500) {
+      return 30; // BREAKPOINT
+    }
+    return 36; // GRNDS
   }
 
   /**
@@ -213,16 +230,15 @@ export class CustomRankService {
       'CHALLENGER I': 11,
       'CHALLENGER II': 12,
       'CHALLENGER III': 13,
-      'CHALLENGER IV': 14,
-      'CHALLENGER V': 15,
-      'X': 16,
+      'ABSOLUTE': 14,
+      'X': 15,
     };
     return rankMap[rank] || 1;
   }
 
   /**
    * Calculate initial MMR from Valorant rank with confidence boosting
-   * Caps at GRNDS V (800-999 MMR)
+   * Caps at GRNDS V (1200-1499 MMR)
    * Follows guardrails: input validation, error handling
    */
   calculateInitialMMR(valorantRank: string, valorantELO: number, lifetimeStats?: {
@@ -246,31 +262,31 @@ export class CustomRankService {
 
     // Map Valorant rank to base MMR (all capped at GRNDS V max)
     const rankMMRMap: Record<string, { min: number; max: number }> = {
-      'Iron 1': { min: 0, max: 100 },
-      'Iron 2': { min: 100, max: 200 },
-      'Iron 3': { min: 200, max: 300 },
-      'Bronze 1': { min: 300, max: 400 },
-      'Bronze 2': { min: 400, max: 500 },
-      'Bronze 3': { min: 500, max: 600 },
-      'Silver 1': { min: 600, max: 700 },
-      'Silver 2': { min: 700, max: 800 },
-      'Silver 3': { min: 800, max: 900 },
-      'Gold 1': { min: 800, max: 900 }, // Capped at GRNDS V
-      'Gold 2': { min: 800, max: 900 },
-      'Gold 3': { min: 800, max: 900 },
-      'Platinum 1': { min: 800, max: 900 },
-      'Platinum 2': { min: 800, max: 900 },
-      'Platinum 3': { min: 800, max: 900 },
-      'Diamond 1': { min: 800, max: 900 },
-      'Diamond 2': { min: 800, max: 900 },
-      'Diamond 3': { min: 800, max: 900 },
-      'Ascendant 1': { min: 800, max: 900 },
-      'Ascendant 2': { min: 800, max: 900 },
-      'Ascendant 3': { min: 800, max: 900 },
-      'Immortal 1': { min: 800, max: 900 },
-      'Immortal 2': { min: 800, max: 900 },
-      'Immortal 3': { min: 800, max: 900 },
-      'Radiant': { min: 800, max: 900 },
+      'Iron 1': { min: 0, max: 150 },
+      'Iron 2': { min: 100, max: 250 },
+      'Iron 3': { min: 200, max: 350 },
+      'Bronze 1': { min: 300, max: 450 },
+      'Bronze 2': { min: 350, max: 500 },
+      'Bronze 3': { min: 450, max: 599 },
+      'Silver 1': { min: 500, max: 650 },
+      'Silver 2': { min: 600, max: 750 },
+      'Silver 3': { min: 700, max: 899 },
+      'Gold 1': { min: 450, max: 599 },
+      'Gold 2': { min: 600, max: 899 },
+      'Gold 3': { min: 900, max: 1199 },
+      'Platinum 1': { min: 900, max: 1099 },
+      'Platinum 2': { min: 1100, max: 1299 },
+      'Platinum 3': { min: 1200, max: 1499 },
+      'Diamond 1': { min: 1250, max: 1499 },
+      'Diamond 2': { min: 1300, max: 1499 },
+      'Diamond 3': { min: 1350, max: 1499 },
+      'Ascendant 1': { min: 1350, max: 1499 },
+      'Ascendant 2': { min: 1400, max: 1499 },
+      'Ascendant 3': { min: 1450, max: 1499 },
+      'Immortal 1': { min: 1450, max: 1499 },
+      'Immortal 2': { min: 1450, max: 1499 },
+      'Immortal 3': { min: 1450, max: 1499 },
+      'Radiant': { min: 1450, max: 1499 },
     };
 
     const range = rankMMRMap[valorantRank] || { min: 0, max: 200 };
@@ -306,7 +322,7 @@ export class CustomRankService {
       }
 
       // Apply confidence boost (capped at GRNDS V max)
-      const finalMMR = Math.min(baseMMR + confidenceBoost, 999);
+      const finalMMR = Math.min(baseMMR + confidenceBoost, 1499);
 
       return Math.max(0, finalMMR); // Ensure non-negative
     } catch (error) {
@@ -347,7 +363,7 @@ export class CustomRankService {
    * Check and update X rank (top 10 players only)
    * Should be called periodically or after significant MMR changes
    */
-  async updateXRank(): Promise<void> {
+  async updateXRank(game: 'valorant' | 'marvel_rivals' = 'valorant'): Promise<void> {
     try {
       const supabase = this.dbService.supabase;
       if (!supabase) {
@@ -355,12 +371,15 @@ export class CustomRankService {
         return;
       }
 
-      // Get top 10 players by MMR
+      const mmrField = game === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr';
+      const rankField = game === 'marvel_rivals' ? 'marvel_rivals_rank' : 'valorant_rank';
+
+      // Get top 20 players by MMR
       const { data: topPlayers, error: topError } = await supabase
         .from('players')
-        .select('id, discord_user_id, current_mmr, discord_rank')
-        .order('current_mmr', { ascending: false })
-        .limit(10);
+        .select(`id, discord_user_id, ${mmrField}, ${rankField}`)
+        .order(mmrField, { ascending: false })
+        .limit(20);
 
       if (topError) {
         console.error('Error fetching top players', {
@@ -371,11 +390,11 @@ export class CustomRankService {
 
       if (!topPlayers || topPlayers.length === 0) return;
 
-      // Get all players currently with X rank
-      const { data: currentXPlayers, error: xError } = await supabase
+      // Get all players currently with X or ABSOLUTE rank
+      const { data: currentElitePlayers, error: xError } = await supabase
         .from('players')
-        .select('id, discord_user_id, current_mmr')
-        .eq('discord_rank', 'X');
+        .select(`id, discord_user_id, ${mmrField}`)
+        .in(rankField, ['X', 'ABSOLUTE']);
 
       if (xError) {
         console.error('Error fetching X rank players', {
@@ -384,32 +403,69 @@ export class CustomRankService {
         return;
       }
 
-      const currentXIds = new Set((currentXPlayers || []).map((p: { id: string }) => p.id));
-      const newXIds = new Set(topPlayers.map((p: { id: string }) => p.id));
+      const topTen = topPlayers.slice(0, 10);
+      const absoluteCandidates = topPlayers.slice(10, 20);
 
-      // Remove X rank from players no longer in top 10
-      for (const player of currentXPlayers || []) {
-        if (!newXIds.has(player.id)) {
-          // Demote to CHALLENGER V
+      const xIds = new Set(
+        topTen.filter((p: Record<string, any>) => (p[mmrField] || 0) >= 3000).map((p: { id: string }) => p.id)
+      );
+      const absoluteIds = new Set(
+        absoluteCandidates
+          .filter((p: Record<string, any>) => (p[mmrField] || 0) >= 2600)
+          .map((p: { id: string }) => p.id)
+      );
+
+      // Demote players no longer in elite positions
+      for (const player of currentElitePlayers || []) {
+        const shouldBeX = xIds.has(player.id);
+        const shouldBeAbsolute = absoluteIds.has(player.id);
+
+        if (!shouldBeX && !shouldBeAbsolute) {
+          const currentMMR = (player as Record<string, any>)[mmrField] || 0;
+          const fallbackRank = await this.getRankFromMMR(currentMMR);
           await this.dbService.updatePlayerRank(
             player.discord_user_id,
-            'CHALLENGER V',
-            this.getRankValue('CHALLENGER V'),
-            player.current_mmr
+            fallbackRank,
+            this.getRankValue(fallbackRank),
+            currentMMR,
+            game
           );
         }
       }
 
-      // Add X rank to new top 10 players
-      for (const player of topPlayers) {
-        if (!currentXIds.has((player as { id: string }).id) && player.current_mmr >= 3000) {
-          await this.dbService.updatePlayerRank(
-            player.discord_user_id,
-            'X',
-            this.getRankValue('X'),
-            player.current_mmr
-          );
+      // Assign X (positions 1-10, 3000+ MMR)
+      for (const player of topTen) {
+        const currentMMR = (player as Record<string, any>)[mmrField] || 0;
+        if (currentMMR < 3000) {
+          continue;
         }
+        if (!xIds.has((player as { id: string }).id)) {
+          continue;
+        }
+        await this.dbService.updatePlayerRank(
+          player.discord_user_id,
+          'X',
+          this.getRankValue('X'),
+          currentMMR,
+          game
+        );
+      }
+
+      // Assign ABSOLUTE (positions 11-20, 2600+ MMR)
+      for (const player of absoluteCandidates) {
+        const currentMMR = (player as Record<string, any>)[mmrField] || 0;
+        if (currentMMR < 2600) {
+          continue;
+        }
+        const isX = xIds.has((player as { id: string }).id);
+        const targetRank = isX ? 'X' : 'ABSOLUTE';
+        await this.dbService.updatePlayerRank(
+          player.discord_user_id,
+          targetRank,
+          this.getRankValue(targetRank),
+          currentMMR,
+          game
+        );
       }
     } catch (error) {
       console.error('Error updating X rank', {
