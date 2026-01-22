@@ -177,7 +177,7 @@ function getRankDisplayForGame(player: DatabasePlayer, game: 'valorant' | 'marve
     };
   }
   return {
-    rank: player.valorant_rank || player.discord_rank || 'Unranked',
+    rank: player.valorant_rank || 'Unranked',
     mmr: player.valorant_mmr || player.current_mmr || 0,
   };
 }
@@ -237,6 +237,7 @@ async function handleStart(
     }
 
     const { queueService, matchService } = services;
+    const maxPlayers = queueService.getMaxPlayers(selectedGame);
 
     // Check if queue is already active
     const queue = await queueService.getStatus(selectedGame);
@@ -255,7 +256,7 @@ async function handleStart(
     // Clear any existing queue state
     await queueService.clear(selectedGame);
 
-    const { config, voiceChannelService } = services;
+    const { voiceChannelService } = services;
 
     // Create queue lobby voice channel
     let queueLobbyChannel = null;
@@ -273,7 +274,7 @@ async function handleStart(
       .setColor(0x00ff00)
       .addFields({
         name: 'Players Needed',
-        value: `0/${config.queue.maxPlayers}`,
+        value: `0/${maxPlayers}`,
         inline: true,
       })
       .addFields({
@@ -867,20 +868,21 @@ async function handleStatus(
   await interaction.deferReply();
 
   try {
-    const { queueService, databaseService, config } = services;
+    const { queueService, databaseService } = services;
     const selectedGameOption = interaction.options.getString('game');
     const dbPlayer = await databaseService.getPlayer(interaction.user.id);
     const selectedGame = selectedGameOption
       ? normalizeGameSelection(selectedGameOption)
       : (dbPlayer?.preferred_game || 'valorant');
     const queue = await queueService.getStatus(selectedGame);
+    const maxPlayers = queueService.getMaxPlayers(selectedGame);
 
   const embed = new EmbedBuilder()
     .setTitle(`${formatGameLabel(selectedGame)} Queue Status`)
     .setColor(queue.isLocked ? 0xff0000 : 0x00ff00)
     .addFields({
       name: 'Players',
-      value: `${queue.players.length}/${config.queue.maxPlayers}`,
+      value: `${queue.players.length}/${maxPlayers}`,
       inline: true,
     })
     .addFields({
@@ -1341,7 +1343,7 @@ async function handleJoinButton(
     if (interaction.guild) {
       // Find queue lobby channel
       const queueLobbyChannel = interaction.guild.channels.cache.find(
-        (ch: any) => ch.type === 2 && ch.name === ' Queue Lobby' // ChannelType.GuildVoice = 2
+        (ch: any) => ch.type === 2 && ch.name.includes('Queue Lobby') // ChannelType.GuildVoice = 2
       ) as any;
       
       if (queueLobbyChannel && interaction.member?.voice.channel) {
@@ -1588,13 +1590,14 @@ async function handleJoinButton(
       );
 
       // Update the queue message with new player count
+      const maxPlayers = queueService.getMaxPlayers(activeGame);
       const updatedEmbed = new EmbedBuilder()
         .setTitle(' Queue Started!')
         .setDescription('Click the button below to join the queue!')
         .setColor(0x00ff00)
         .addFields({
           name: 'Players',
-          value: `${queueSize}/${config.queue.maxPlayers}`,
+          value: `${queueSize}/${maxPlayers}`,
           inline: true,
         })
         .addFields({
@@ -1734,13 +1737,14 @@ async function handleLeaveButton(
       const queue = await queueService.getStatus(selectedGame);
       const queueSize = queue.players.length;
 
+      const maxPlayers = queueService.getMaxPlayers(selectedGame);
       const updatedEmbed = new EmbedBuilder()
         .setTitle(' Queue Started!')
         .setDescription('Click the button below to join the queue!')
         .setColor(0x00ff00)
         .addFields({
           name: 'Players',
-          value: `${queueSize}/${services.config.queue.maxPlayers}`,
+          value: `${queueSize}/${maxPlayers}`,
           inline: true,
         })
         .addFields({

@@ -1,7 +1,7 @@
 /**
  * Vercel Cloud Agent: Queue Processor
  * 
- * Processes queue when it hits 10 players - balances teams and creates match.
+ * Processes queue when it hits the game-specific player count - balances teams and creates match.
  * Called by Fly.io bot when queue becomes full.
  * 
  * Follows guardrails: error handling, input validation, logging, type safety
@@ -97,7 +97,9 @@ export default async function handler(
   try {
     const { balancingMode = 'auto', game = 'valorant' } = req.body as ProcessQueueRequest;
 
-    console.log('Processing queue', { balancingMode, game });
+    const requiredPlayers = game === 'marvel_rivals' ? 12 : 10;
+
+    console.log('Processing queue', { balancingMode, game, requiredPlayers });
 
     // Get all queued players
     const { data: queueEntries, error: queueError } = await supabase
@@ -112,19 +114,20 @@ export default async function handler(
       return;
     }
 
-    if (!queueEntries || queueEntries.length < 10) {
-      res.status(400).json({ success: false, error: `Queue has ${queueEntries?.length || 0} players, need 10` });
+    if (!queueEntries || queueEntries.length < requiredPlayers) {
+      res.status(400).json({ success: false, error: `Queue has ${queueEntries?.length || 0} players, need ${requiredPlayers}` });
       return;
     }
 
     // Get player data with MMR
-    const playerIds = queueEntries.map(q => q.player_id);
+    const selectedEntries = queueEntries.slice(0, requiredPlayers);
+    const playerIds = selectedEntries.map(q => q.player_id);
     const { data: players, error: playersError } = await supabase
       .from('players')
       .select('id, discord_user_id, current_mmr, valorant_mmr, marvel_rivals_mmr, preferred_game')
       .in('id', playerIds);
 
-    if (playersError || !players || players.length !== 10) {
+    if (playersError || !players || players.length < requiredPlayers) {
       console.error('Error fetching players', { error: playersError, count: players?.length });
       res.status(500).json({ success: false, error: 'Failed to fetch player data' });
       return;

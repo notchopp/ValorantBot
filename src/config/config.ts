@@ -20,6 +20,7 @@ export interface Config {
   queue: {
     maxPlayers: number;
     minPlayers: number;
+    maxPlayersByGame?: Partial<Record<'valorant' | 'marvel_rivals', number>>;
   };
   ranks: {
     roleNames: string[];
@@ -58,6 +59,10 @@ export const defaultConfig: Config = {
   queue: {
     maxPlayers: 10,
     minPlayers: 10,
+    maxPlayersByGame: {
+      valorant: 10,
+      marvel_rivals: 12,
+    },
   },
   ranks: {
     roleNames: [

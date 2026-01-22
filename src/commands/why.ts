@@ -5,13 +5,20 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
-import { GAME_CHOICES, resolveGameForPlayer, formatGameName, getMatchTypesForGame } from '../utils/game-selection';
+import { GAME_CHOICES, MODE_CHOICES, normalizeModeSelection, resolveGameForPlayer, formatGameName, formatModeName, getMatchTypesForMode } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('why')
   .setDescription('Get AI-powered analysis of why you might be losing or stuck at your rank')
   .addStringOption((option) =>
     option.setName('game').setDescription('Which game to analyze').addChoices(...GAME_CHOICES)
+  )
+  .addStringOption((option) =>
+    option
+      .setName('mode')
+      .setDescription('Analyze custom or ranked matches')
+      .addChoices(...MODE_CHOICES)
+      .setRequired(true)
   );
 
 interface PerformanceAnalysis {
@@ -89,6 +96,7 @@ export async function execute(
     }
 
     const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
+    const selectedMode = normalizeModeSelection(interaction.options.getString('mode'));
     // Check if player has enough games by counting matches
     const supabaseCheck = databaseService.supabase;
     if (!supabaseCheck) {
@@ -100,7 +108,7 @@ export async function execute(
       .from('match_player_stats')
       .select('*', { count: 'exact', head: true })
       .eq('player_id', player.id)
-      .in('matches.match_type', getMatchTypesForGame(selectedGame));
+      .in('matches.match_type', getMatchTypesForMode(selectedGame, selectedMode));
     
     if (!matchCount || matchCount < 5) {
       await interaction.editReply(
@@ -110,7 +118,7 @@ export async function execute(
     }
 
     // Get recent match data for analysis
-    const analysis = await analyzePerformance(databaseService, player.id, userId, selectedGame);
+    const analysis = await analyzePerformance(databaseService, player.id, userId, selectedGame, selectedMode);
 
     if (!analysis) {
       await interaction.editReply(
@@ -124,7 +132,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`🧠 ${formatGameName(selectedGame)} Performance Analysis for ${interaction.user.username}`)
+      .setTitle(`🧠 ${formatGameName(selectedGame)} ${formatModeName(selectedMode)} Analysis for ${interaction.user.username}`)
       .setColor(getAnalysisColor(analysis))
       .setThumbnail(interaction.user.displayAvatarURL())
       .setDescription(insights.summary);
@@ -204,7 +212,8 @@ async function analyzePerformance(
   databaseService: DatabaseService,
   playerId: string,
   _userId: string,
-  game: 'valorant' | 'marvel_rivals'
+  game: 'valorant' | 'marvel_rivals',
+  mode: 'custom' | 'ranked'
 ): Promise<PerformanceAnalysis | null> {
   try {
     const supabase = databaseService.supabase;
@@ -214,6 +223,7 @@ async function analyzePerformance(
     }
 
     // Get last 20 matches
+    const matchTypes = getMatchTypesForMode(game, mode);
     const { data: matches, error } = await supabase
       .from('match_player_stats')
       .select(`
@@ -231,7 +241,7 @@ async function analyzePerformance(
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
-      .in('matches.match_type', getMatchTypesForGame(game))
+      .in('matches.match_type', matchTypes)
       .order('matches(match_date)', { ascending: false })
       .limit(20);
 

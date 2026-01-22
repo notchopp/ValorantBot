@@ -5,10 +5,17 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
+import { GAME_CHOICES, MODE_CHOICES, normalizeModeSelection, resolveGameForPlayer, formatGameName, formatModeName, getMatchTypesForMode } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('session')
-  .setDescription("View today's gaming session summary");
+  .setDescription("View today's gaming session summary")
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game to display').addChoices(...GAME_CHOICES)
+  )
+  .addStringOption((option) =>
+    option.setName('mode').setDescription('Custom or ranked matches').addChoices(...MODE_CHOICES)
+  );
 
 interface SessionStats {
   matchesPlayed: number;
@@ -52,8 +59,11 @@ export async function execute(
       return;
     }
 
+    const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
+    const selectedMode = normalizeModeSelection(interaction.options.getString('mode'));
+
     // Get today's session stats
-    const sessionStats = await getTodaySessionStats(databaseService, player.id);
+    const sessionStats = await getTodaySessionStats(databaseService, player.id, selectedGame, selectedMode);
 
     if (sessionStats.matchesPlayed === 0) {
       await safeEditReply(interaction, {
@@ -94,7 +104,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`${emoji} ${interaction.user.username}'s Today's Session`)
+      .setTitle(`${emoji} ${interaction.user.username}'s ${formatGameName(selectedGame)} ${formatModeName(selectedMode)} Session`)
       .setColor(color)
       .setThumbnail(interaction.user.displayAvatarURL())
       .setDescription(`**${performanceText}**`);
@@ -201,7 +211,9 @@ export async function execute(
  */
 async function getTodaySessionStats(
   databaseService: DatabaseService,
-  playerId: string
+  playerId: string,
+  game: 'valorant' | 'marvel_rivals',
+  mode: 'custom' | 'ranked'
 ): Promise<SessionStats> {
   try {
     const supabase = databaseService.supabase;
@@ -227,6 +239,7 @@ async function getTodaySessionStats(
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // Get all matches from today
+    const matchTypes = getMatchTypesForMode(game, mode);
     const { data, error } = await supabase
       .from('match_player_stats')
       .select(`
@@ -247,6 +260,7 @@ async function getTodaySessionStats(
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
+      .in('matches.match_type', matchTypes)
       .gte('matches.match_date', startOfDay.toISOString())
       .order('matches(match_date)', { ascending: true });
 

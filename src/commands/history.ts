@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { safeDefer, safeEditReply } from '../utils/interaction-helpers';
-import { GAME_CHOICES, resolveGameForPlayer, getGameRankFields, formatGameName } from '../utils/game-selection';
+import { GAME_CHOICES, MODE_CHOICES, normalizeModeSelection, resolveGameForPlayer, getGameRankFields, formatGameName, formatModeName, getMatchTypesForMode } from '../utils/game-selection';
 
 export const data = new SlashCommandBuilder()
   .setName('history')
@@ -19,6 +19,9 @@ export const data = new SlashCommandBuilder()
   )
   .addStringOption((option) =>
     option.setName('game').setDescription('Which game to display').addChoices(...GAME_CHOICES)
+  )
+  .addStringOption((option) =>
+    option.setName('mode').setDescription('Custom or ranked matches').addChoices(...MODE_CHOICES)
   );
 
 interface MatchHistoryEntry {
@@ -64,7 +67,8 @@ export async function execute(
 
     // Get match history
     const selectedGame = resolveGameForPlayer(player, interaction.options.getString('game'));
-    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, count, selectedGame);
+    const selectedMode = normalizeModeSelection(interaction.options.getString('mode'));
+    const matchHistory = await getPlayerMatchHistory(databaseService, player.id, count, selectedGame, selectedMode);
 
     if (!matchHistory || matchHistory.length === 0) {
       await safeEditReply(interaction, {
@@ -81,7 +85,7 @@ export async function execute(
 
     // Create embed
     const embed = new EmbedBuilder()
-      .setTitle(`📜 ${interaction.user.username}'s ${formatGameName(selectedGame)} Match History`)
+      .setTitle(`📜 ${interaction.user.username}'s ${formatGameName(selectedGame)} ${formatModeName(selectedMode)} History`)
       .setColor(0x5865f2)
       .setThumbnail(interaction.user.displayAvatarURL())
       .setDescription(`Last ${matchHistory.length} matches`)
@@ -166,7 +170,8 @@ async function getPlayerMatchHistory(
   databaseService: DatabaseService,
   playerId: string,
   limit: number,
-  game: 'valorant' | 'marvel_rivals'
+  game: 'valorant' | 'marvel_rivals',
+  mode: 'custom' | 'ranked'
 ): Promise<MatchHistoryEntry[]> {
   try {
     const supabase = databaseService.supabase;
@@ -176,6 +181,7 @@ async function getPlayerMatchHistory(
     }
 
     // Get match player stats with match details
+    const matchTypes = getMatchTypesForMode(game, mode);
     const { data, error } = await supabase
       .from('match_player_stats')
       .select(`
@@ -197,7 +203,7 @@ async function getPlayerMatchHistory(
       `)
       .eq('player_id', playerId)
       .eq('matches.status', 'completed')
-      .eq('matches.match_type', game === 'marvel_rivals' ? 'marvel_rivals' : 'custom')
+      .in('matches.match_type', matchTypes)
       .order('matches(match_date)', { ascending: false })
       .limit(limit);
 

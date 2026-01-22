@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>#GRNDS Rank Icons Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000000;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 3rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .icon-large {
+            margin-bottom: 1.5rem;
+        }
+        
+        .rank-name {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+        }
+        
+        .rank-color {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+        
+        .icon-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .section {
+            margin-top: 4rem;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 2rem;
+        }
+        
+        .size-comparison {
+            display: flex;
+            align-items: flex-end;
+            gap: 2rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+        
+        .size-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .size-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+        
+        .all-ranks {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3rem;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>#GRNDS Rank Icons</h1>
+        <p class="subtitle">Visual preview of all rank icons</p>
+        
+        <div class="grid">
+            <!-- GRNDS -->
+            <div class="card">
+                <div class="icon-large" id="grnds-large"></div>
+                <div class="rank-name">GRNDS</div>
+                <div class="rank-color">#ff8c00</div>
+                <div class="icon-row">
+                    <div id="grnds-50"></div>
+                    <div id="grnds-30"></div>
+                </div>
+            </div>
+            
+            <!-- BREAKPOINT -->
+            <div class="card">
+                <div class="icon-large" id="breakpoint-large"></div>
+                <div class="rank-name">BREAKPOINT</div>
+                <div class="rank-color">#2a2a2a</div>
+                <div class="icon-row">
+                    <div id="breakpoint-50"></div>
+                    <div id="breakpoint-30"></div>
+                </div>
+            </div>
+            
+            <!-- CHALLENGER -->
+            <div class="card">
+                <div class="icon-large" id="challenger-large"></div>
+                <div class="rank-name">CHALLENGER</div>
+                <div class="rank-color">#dc2626</div>
+                <div class="icon-row">
+                    <div id="challenger-50"></div>
+                    <div id="challenger-30"></div>
+                </div>
+            </div>
+            
+            <!-- ABSOLUTE -->
+            <div class="card">
+                <div class="icon-large" id="absolute-large"></div>
+                <div class="rank-name">ABSOLUTE</div>
+                <div class="rank-color">#f59e0b</div>
+                <div class="icon-row">
+                    <div id="absolute-50"></div>
+                    <div id="absolute-30"></div>
+                </div>
+            </div>
+            
+            <!-- X -->
+            <div class="card">
+                <div class="icon-large" id="x-large"></div>
+                <div class="rank-name">X</div>
+                <div class="rank-color">#ffffff</div>
+                <div class="icon-row">
+                    <div id="x-50"></div>
+                    <div id="x-30"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Size Comparison -->
+        <div class="section">
+            <h2 class="section-title">Size Comparison</h2>
+            <div class="size-comparison">
+                <div class="size-item">
+                    <div id="size-200"></div>
+                    <div class="size-label">200px</div>
+                </div>
+                <div class="size-item">
+                    <div id="size-100"></div>
+                    <div class="size-label">100px</div>
+                </div>
+                <div class="size-item">
+                    <div id="size-50"></div>
+                    <div class="size-label">50px</div>
+                </div>
+                <div class="size-item">
+                    <div id="size-30"></div>
+                    <div class="size-label">30px</div>
+                </div>
+                <div class="size-item">
+                    <div id="size-20"></div>
+                    <div class="size-label">20px</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Ranks Side by Side -->
+        <div class="section">
+            <h2 class="section-title">All Ranks - Side by Side</h2>
+            <div class="all-ranks">
+                <div id="all-grnds"></div>
+                <div id="all-breakpoint"></div>
+                <div id="all-challenger"></div>
+                <div id="all-absolute"></div>
+                <div id="all-x"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import the rank icon components
+        // Since we can't directly import React components in HTML, we'll use the SVG code directly
+        
+        // GRNDS Icon SVG
+        const grndsIcon = (size) => `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 10 L85 30 L85 70 L50 90 L15 70 L15 30 Z" fill="#ff8c00" stroke="#ff8c00" stroke-width="2" opacity="0.9"/>
+                <path d="M50 25 L70 35 L70 65 L50 75 L30 65 L30 35 Z" fill="#000000" opacity="0.3"/>
+                <text x="50" y="60" text-anchor="middle" fill="#000000" font-size="32" font-weight="900" font-family="monospace" letter-spacing="-2">G</text>
+                <circle cx="15" cy="30" r="2" fill="#000000" opacity="0.5"/>
+                <circle cx="85" cy="30" r="2" fill="#000000" opacity="0.5"/>
+                <circle cx="85" cy="70" r="2" fill="#000000" opacity="0.5"/>
+                <circle cx="15" cy="70" r="2" fill="#000000" opacity="0.5"/>
+            </svg>
+        `;
+        
+        // BREAKPOINT Icon SVG
+        const breakpointIcon = (size) => `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 20 L50 15 L80 20 L85 50 L80 80 L50 85 L20 80 L15 50 Z" fill="#2a2a2a" stroke="#ffffff" stroke-width="1.5" opacity="0.9"/>
+                <line x1="50" y1="15" x2="50" y2="85" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
+                <line x1="20" y1="50" x2="80" y2="50" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
+                <line x1="35" y1="30" x2="65" y2="70" stroke="#ffffff" stroke-width="1" opacity="0.2"/>
+                <line x1="65" y1="30" x2="35" y2="70" stroke="#ffffff" stroke-width="1" opacity="0.2"/>
+                <text x="50" y="60" text-anchor="middle" fill="#ffffff" font-size="28" font-weight="900" font-family="monospace" letter-spacing="-1">B</text>
+                <polygon points="20,20 25,20 20,25" fill="#ffffff" opacity="0.4"/>
+                <polygon points="80,20 75,20 80,25" fill="#ffffff" opacity="0.4"/>
+                <polygon points="80,80 75,80 80,75" fill="#ffffff" opacity="0.4"/>
+                <polygon points="20,80 25,80 20,75" fill="#ffffff" opacity="0.4"/>
+            </svg>
+        `;
+        
+        // CHALLENGER Icon SVG
+        const challengerIcon = (size) => `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 10 L90 50 L50 90 L10 50 Z" fill="#dc2626" stroke="#dc143c" stroke-width="2" opacity="0.95"/>
+                <path d="M50 25 L75 50 L50 75 L25 50 Z" fill="#000000" opacity="0.2"/>
+                <line x1="50" y1="10" x2="50" y2="90" stroke="#ffffff" stroke-width="1" opacity="0.2"/>
+                <line x1="10" y1="50" x2="90" y2="50" stroke="#ffffff" stroke-width="1" opacity="0.2"/>
+                <text x="50" y="62" text-anchor="middle" fill="#ffffff" font-size="30" font-weight="900" font-family="monospace" letter-spacing="-1">C</text>
+                <circle cx="50" cy="10" r="3" fill="#ffffff" opacity="0.6"/>
+                <circle cx="90" cy="50" r="3" fill="#ffffff" opacity="0.6"/>
+                <circle cx="50" cy="90" r="3" fill="#ffffff" opacity="0.6"/>
+                <circle cx="10" cy="50" r="3" fill="#ffffff" opacity="0.6"/>
+            </svg>
+        `;
+        
+        // ABSOLUTE Icon SVG
+        const absoluteIcon = (size) => `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 5 L65 35 L95 40 L70 60 L75 90 L50 75 L25 90 L30 60 L5 40 L35 35 Z" fill="#f59e0b" stroke="#ffd700" stroke-width="2" opacity="0.95"/>
+                <path d="M50 20 L58 38 L78 42 L62 55 L66 75 L50 65 L34 75 L38 55 L22 42 L42 38 Z" fill="#000000" opacity="0.3"/>
+                <text x="50" y="62" text-anchor="middle" fill="#000000" font-size="28" font-weight="900" font-family="monospace" letter-spacing="-1">A</text>
+                <circle cx="50" cy="5" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="65" cy="35" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="95" cy="40" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="70" cy="60" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="75" cy="90" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="50" cy="75" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="25" cy="90" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="30" cy="60" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="5" cy="40" r="2" fill="#ffd700" opacity="0.8"/>
+                <circle cx="35" cy="35" r="2" fill="#ffd700" opacity="0.8"/>
+            </svg>
+        `;
+        
+        // X Icon SVG
+        const xIcon = (size) => `
+            <svg width="${size}" height="${size}" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="40" fill="#ffffff" stroke="#ffffff" stroke-width="2" opacity="0.95"/>
+                <circle cx="50" cy="50" r="25" fill="#000000" opacity="0.3"/>
+                <text x="50" y="62" text-anchor="middle" fill="#000000" font-size="36" font-weight="900" font-family="monospace" letter-spacing="-2">X</text>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
+                <line x1="10" y1="10" x2="20" y2="20" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="90" y1="10" x2="80" y2="20" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="10" y1="90" x2="20" y2="80" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+                <line x1="90" y1="90" x2="80" y2="80" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+            </svg>
+        `;
+        
+        // Render icons
+        document.getElementById('grnds-large').innerHTML = grndsIcon(150);
+        document.getElementById('grnds-50').innerHTML = grndsIcon(50);
+        document.getElementById('grnds-30').innerHTML = grndsIcon(30);
+        
+        document.getElementById('breakpoint-large').innerHTML = breakpointIcon(150);
+        document.getElementById('breakpoint-50').innerHTML = breakpointIcon(50);
+        document.getElementById('breakpoint-30').innerHTML = breakpointIcon(30);
+        
+        document.getElementById('challenger-large').innerHTML = challengerIcon(150);
+        document.getElementById('challenger-50').innerHTML = challengerIcon(50);
+        document.getElementById('challenger-30').innerHTML = challengerIcon(30);
+        
+        document.getElementById('absolute-large').innerHTML = absoluteIcon(150);
+        document.getElementById('absolute-50').innerHTML = absoluteIcon(50);
+        document.getElementById('absolute-30').innerHTML = absoluteIcon(30);
+        
+        document.getElementById('x-large').innerHTML = xIcon(150);
+        document.getElementById('x-50').innerHTML = xIcon(50);
+        document.getElementById('x-30').innerHTML = xIcon(30);
+        
+        // Size comparison
+        document.getElementById('size-200').innerHTML = grndsIcon(200);
+        document.getElementById('size-100').innerHTML = grndsIcon(100);
+        document.getElementById('size-50').innerHTML = grndsIcon(50);
+        document.getElementById('size-30').innerHTML = grndsIcon(30);
+        document.getElementById('size-20').innerHTML = grndsIcon(20);
+        
+        // All ranks
+        document.getElementById('all-grnds').innerHTML = grndsIcon(120);
+        document.getElementById('all-breakpoint').innerHTML = breakpointIcon(120);
+        document.getElementById('all-challenger').innerHTML = challengerIcon(120);
+        document.getElementById('all-absolute').innerHTML = absoluteIcon(120);
+        document.getElementById('all-x').innerHTML = xIcon(120);
+    </script>
+</body>
+</html>

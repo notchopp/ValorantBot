@@ -56,6 +56,7 @@ export class QueueService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       const state = this.getState(game);
+      const maxPlayers = this.getMaxPlayers(game);
       // Check if queue is locked
       if (state.isLockedFlag) {
         return { success: false, message: 'Queue is locked. A match is in progress.' };
@@ -63,7 +64,7 @@ export class QueueService {
 
       // Check if queue is full (from database)
       const queueSize = await this.getCurrentQueueSize(game);
-      if (queueSize >= this.config.queue.maxPlayers) {
+      if (queueSize >= maxPlayers) {
         return { success: false, message: 'Queue is full.' };
       }
 
@@ -78,7 +79,7 @@ export class QueueService {
         state.queue.players.push(player);
       }
 
-      const remaining = this.config.queue.maxPlayers - queueSize - 1;
+      const remaining = maxPlayers - queueSize - 1;
       return {
         success: true,
         message: `Joined queue. ${remaining} player${remaining !== 1 ? 's' : ''} needed.`,
@@ -151,12 +152,12 @@ export class QueueService {
   async isFull(game: QueueGame = 'valorant'): Promise<boolean> {
     try {
       const size = await this.getCurrentQueueSize(game);
-      return size >= this.config.queue.maxPlayers;
+      return size >= this.getMaxPlayers(game);
     } catch (error) {
       console.error('Error checking if queue is full', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return isQueueFull(this.getState(game).queue, this.config.queue.maxPlayers); // Fallback to cache
+      return isQueueFull(this.getState(game).queue, this.getMaxPlayers(game)); // Fallback to cache
     }
   }
 
@@ -277,6 +278,10 @@ export class QueueService {
    */
   getCurrentQueueSizeSync(game: QueueGame = 'valorant'): number {
     return this.getState(game).queue.players.length;
+  }
+
+  getMaxPlayers(game: QueueGame = 'valorant'): number {
+    return this.config.queue.maxPlayersByGame?.[game] ?? this.config.queue.maxPlayers;
   }
 
   /**

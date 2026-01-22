@@ -440,7 +440,7 @@ client.once('ready', async () => {
 
   // Initialize persistent queue service
   try {
-    persistentQueueService = new PersistentQueueService(client, queueService, databaseService, appConfig);
+    persistentQueueService = new PersistentQueueService(client, queueService, databaseService);
     await persistentQueueService.initializePersistentQueue('lobby');
     // Add to services object after initialization
     services.persistentQueueService = persistentQueueService;

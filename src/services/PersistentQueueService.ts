@@ -1,7 +1,6 @@
 import { Client, TextChannel, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { QueueService } from './QueueService';
 import { DatabaseService } from './DatabaseService';
-import { Config } from '../config/config';
 
 /**
  * Service to maintain a persistent queue message in the lobby channel
@@ -16,8 +15,7 @@ export class PersistentQueueService {
   constructor(
     private client: Client,
     private queueService: QueueService,
-    private databaseService: DatabaseService,
-    private config: Config
+    private databaseService: DatabaseService
   ) {}
 
   /**
@@ -102,7 +100,7 @@ export class PersistentQueueService {
    */
   private async createPersistentQueueEmbed(game: 'valorant' | 'marvel_rivals'): Promise<EmbedBuilder> {
     const queueStatus = this.queueService.getCurrentQueueSizeSync(game);
-    const maxPlayers = this.config.queue.maxPlayers;
+    const maxPlayers = this.queueService.getMaxPlayers(game);
 
     // Find #GRNDSMAKER role for mention
     let grndsMakerMention = '#GRNDSMAKER';
@@ -158,7 +156,7 @@ export class PersistentQueueService {
             const isMarvel = game === 'marvel_rivals';
             const rank = isMarvel
               ? (p.marvel_rivals_rank || 'Unranked')
-              : (p.valorant_rank || p.discord_rank || 'Unranked');
+              : (p.valorant_rank || 'Unranked');
             const mmr = isMarvel
               ? (p.marvel_rivals_mmr || 0)
               : (p.valorant_mmr || p.current_mmr || 0);

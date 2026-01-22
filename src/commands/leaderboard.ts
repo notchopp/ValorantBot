@@ -47,7 +47,7 @@ export async function execute(
     const { data: topPlayers, error } = await supabase
       .from('players')
       .select(`id, discord_user_id, discord_username, ${mmrField}, ${rankField}, discord_rank, current_mmr, valorant_rank, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_mmr, marvel_rivals_peak_mmr`)
-      .neq(mmrField, null)
+      .not(mmrField, 'is', null)
       .order(mmrField, { ascending: false })
       .limit(limit);
 

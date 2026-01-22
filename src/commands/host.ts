@@ -47,6 +47,10 @@ export async function execute(
   }
 }
 
+function getMatchGameLabel(matchType?: string | null): string {
+  return matchType === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
+}
+
 async function handleInfo(
   interaction: ChatInputCommandInteraction,
   services: {
@@ -80,6 +84,7 @@ async function handleInfo(
     }
 
     const hostPlayer = currentMatch.host;
+    const gameLabel = getMatchGameLabel(dbMatch.match_type);
     const hostMember = await interaction.guild.members.fetch(hostPlayer.userId).catch(() => null);
 
     const embed = new EmbedBuilder()
@@ -104,7 +109,7 @@ async function handleInfo(
       });
       embed.setDescription('Share this invite code with all players in the queue!');
     } else {
-      embed.setDescription('Host must create a custom game in Valorant and use `/host confirm` to enter the invite code Valorant generates.');
+      embed.setDescription(`Host must create a custom game in ${gameLabel} and use \`/host confirm\` to enter the invite code ${gameLabel} generates.`);
     }
 
     // Show all players in queue
@@ -158,7 +163,7 @@ async function handleConfirm(
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
-    const { matchService } = services;
+    const { matchService, databaseService } = services;
     const currentMatch = matchService.getCurrentMatch();
     const userId = interaction.user.id;
 
@@ -177,18 +182,21 @@ async function handleConfirm(
       return;
     }
 
-    // Host needs to provide the invite code from Valorant
+    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
+    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+
+    // Host needs to provide the invite code from the game
     // We'll use a modal to get the code
     const modal = new ModalBuilder()
       .setCustomId('host_confirm_modal')
-      .setTitle('Enter Valorant Invite Code');
+      .setTitle(`Enter ${gameLabel} Invite Code`);
 
     const codeInput = new TextInputBuilder()
       .setCustomId('invite_code')
-      .setLabel('Valorant Invite Code')
+      .setLabel(`${gameLabel} Invite Code`)
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
-      .setPlaceholder('Enter the code Valorant generated')
+      .setPlaceholder(`Enter the code ${gameLabel} generated`)
       .setMinLength(4)
       .setMaxLength(10);
 
@@ -234,11 +242,14 @@ export async function handleHostConfirmModal(
       return;
     }
 
+    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
+    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+
     // Get invite code from modal
     const inviteCode = interaction.fields.getTextInputValue('invite_code').trim().toUpperCase();
 
     if (!inviteCode || inviteCode.length < 4) {
-      await interaction.editReply('❌ Invalid invite code. Please enter the code Valorant generated (at least 4 characters).');
+      await interaction.editReply(`❌ Invalid invite code. Please enter the code ${gameLabel} generated (at least 4 characters).`);
       return;
     }
 
@@ -262,7 +273,7 @@ export async function handleHostConfirmModal(
     if (interaction.channel && 'send' in interaction.channel) {
       const embed = new EmbedBuilder()
         .setTitle('✅ Host Confirmed!')
-        .setDescription(`<@${userId}> has entered the Valorant invite code!`)
+        .setDescription(`<@${userId}> has entered the ${gameLabel} invite code!`)
         .setColor(0x00ff00)
         .addFields({
           name: '🎮 Invite Code',
@@ -271,7 +282,7 @@ export async function handleHostConfirmModal(
         })
         .addFields({
           name: 'Instructions',
-          value: 'Join the custom game in Valorant using the invite code above!',
+          value: `Join the custom game in ${gameLabel} using the invite code above!`,
           inline: false,
         });
 
@@ -363,6 +374,9 @@ async function handlePass(
       host_selected_at: new Date().toISOString(),
     });
 
+    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
+    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+
     // Notify in channel
     if (interaction.channel && 'send' in interaction.channel) {
       const embed = new EmbedBuilder()
@@ -376,7 +390,7 @@ async function handlePass(
         })
         .addFields({
           name: 'Action Required',
-          value: 'New host must create a custom game in Valorant and use `/host confirm` to enter the invite code.',
+          value: `New host must create a custom game in ${gameLabel} and use \`/host confirm\` to enter the invite code.`,
           inline: false,
         });
 

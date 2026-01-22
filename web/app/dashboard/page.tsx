@@ -132,10 +132,6 @@ export default async function DashboardPage({
     selectedGame === 'marvel_rivals'
       ? (playerData.marvel_rivals_peak_mmr ?? 0)
       : (playerData.valorant_peak_mmr ?? playerData.peak_mmr ?? 0)
-  const rankLabel =
-    selectedGame === 'marvel_rivals'
-      ? (playerData.marvel_rivals_rank ?? 'Unranked')
-      : (playerData.valorant_rank ?? playerData.discord_rank ?? 'GRNDS I')
 
   const playerDataToUse: PlayerData = {
     id: playerData.id,
@@ -154,7 +150,7 @@ export default async function DashboardPage({
     marvel_rivals_peak_mmr: playerData.marvel_rivals_peak_mmr ?? null,
     current_mmr: currentMMR as number,
     peak_mmr: peakMMR as number,
-    discord_rank: rankLabel,
+    discord_rank: playerData.discord_rank ?? 'Unranked',
   }
   
   // Get player's match stats and history (use admin client)
@@ -366,10 +362,10 @@ function DashboardContent({
             <p className="text-sm md:text-base text-white/40 font-light">
               {selectedGame === 'marvel_rivals'
                 ? (playerDataToUse.marvel_rivals_username
-                    ? `${playerDataToUse.marvel_rivals_username} • ${playerDataToUse.marvel_rivals_uid || 'UID pending'}`
+                    ? `${playerDataToUse.marvel_rivals_username} • ${playerDataToUse.marvel_rivals_uid || 'UID pending'} • Linked`
                     : 'Link Marvel Rivals in Discord')
                 : (playerDataToUse.riot_name && playerDataToUse.riot_tag
-                    ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag}`
+                    ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag} • Linked`
                     : 'Link Riot ID in Discord')
               }
             </p>
@@ -379,7 +375,7 @@ function DashboardContent({
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Rank</div>
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Discord Rank</div>
               <RankBadge mmr={playerDataToUse.current_mmr} size="lg" rankLabel={playerDataToUse.discord_rank} />
             </div>
             <div className="text-right hidden sm:block">

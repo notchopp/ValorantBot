@@ -59,7 +59,6 @@ export async function GET(request: Request) {
       else if (mmr >= 900) rank = 'GRNDS IV'
       else if (mmr >= 600) rank = 'GRNDS III'
       else if (mmr >= 300) rank = 'GRNDS II'
-      }
       
       return {
         id: player.id,

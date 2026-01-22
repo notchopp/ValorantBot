@@ -79,7 +79,7 @@ export default async function LeaderboardPage({
         : (player.valorant_peak_mmr ?? player.peak_mmr ?? 0)
       const rankLabel = selectedGame === 'marvel_rivals'
         ? (player.marvel_rivals_rank ?? 'Unranked')
-        : (player.valorant_rank ?? player.discord_rank ?? 'GRNDS I')
+        : (player.valorant_rank ?? 'Unranked')
 
       return {
         ...player,

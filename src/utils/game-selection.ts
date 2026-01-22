@@ -1,10 +1,16 @@
 import { DatabasePlayer } from '../database/supabase';
 
 export type GameSelection = 'valorant' | 'marvel_rivals';
+export type MatchMode = 'custom' | 'ranked';
 
 export const GAME_CHOICES = [
   { name: 'Valorant', value: 'valorant' },
   { name: 'Marvel Rivals', value: 'marvel_rivals' },
+];
+
+export const MODE_CHOICES = [
+  { name: 'Custom', value: 'custom' },
+  { name: 'Ranked', value: 'ranked' },
 ];
 
 export function normalizeGameSelection(game?: string | null): GameSelection {
@@ -12,6 +18,13 @@ export function normalizeGameSelection(game?: string | null): GameSelection {
     return 'marvel_rivals';
   }
   return 'valorant';
+}
+
+export function normalizeModeSelection(mode?: string | null): MatchMode {
+  if (mode === 'ranked') {
+    return 'ranked';
+  }
+  return 'custom';
 }
 
 type GameSelectionSource = {
@@ -34,6 +47,10 @@ export function resolveGameForPlayer(player?: GameSelectionSource, option?: stri
 
 export function formatGameName(game: GameSelection): string {
   return game === 'marvel_rivals' ? 'Marvel Rivals' : 'Valorant';
+}
+
+export function formatModeName(mode: MatchMode): string {
+  return mode === 'ranked' ? 'Ranked' : 'Custom';
 }
 
 type GameRankSource = Partial<Pick<
@@ -79,4 +96,11 @@ export const GAME_MATCH_TYPES: Record<GameSelection, ('custom' | 'valorant' | 'm
 
 export function getMatchTypesForGame(game: GameSelection) {
   return GAME_MATCH_TYPES[game];
+}
+
+export function getMatchTypesForMode(game: GameSelection, mode: MatchMode) {
+  if (mode === 'custom') {
+    return ['custom'] as const;
+  }
+  return [game === 'marvel_rivals' ? 'marvel_rivals' : 'valorant'] as const;
 }

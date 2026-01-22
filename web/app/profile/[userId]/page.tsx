@@ -48,7 +48,7 @@ export default async function ProfilePage({
     : (playerData.valorant_peak_mmr ?? playerData.peak_mmr ?? 0)
   const rankLabel = selectedGame === 'marvel_rivals'
     ? (playerData.marvel_rivals_rank ?? 'Unranked')
-    : (playerData.valorant_rank ?? playerData.discord_rank ?? 'GRNDS I')
+    : (playerData.valorant_rank ?? 'Unranked')
   
   // Check if current user is viewing their own profile
   const { data: { user } } = await supabase.auth.getUser()
@@ -264,6 +264,9 @@ export default async function ProfilePage({
             </div>
             <div className="flex flex-col items-start md:items-end gap-3">
               <RankBadge mmr={currentMMR} size="xl" rankLabel={rankLabel} />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
+                Discord Rank: {playerData.discord_rank || 'Unranked'}
+              </p>
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
                 #{leaderboardPosition} on Leaderboard
               </p>
