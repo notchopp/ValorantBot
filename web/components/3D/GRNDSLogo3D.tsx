@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import * as THREE from 'three'
 
 interface GRNDSLogo3DProps {
@@ -87,11 +87,12 @@ function Particle({
 
 // Main G logo component with breathing and click particle effect
 function GRNDSLogoModel(_props: GRNDSLogo3DProps) {
-  const router = useRouter()
+  const supabase = createClient()
   const groupRef = useRef<THREE.Group>(null)
   const logoRef = useRef<HTMLImageElement>(null)
   const clickAreaRef = useRef<THREE.Mesh>(null)
   const [isClicked, setIsClicked] = useState(false)
+  const [authLoading, setAuthLoading] = useState(false)
   const [particles, setParticles] = useState<Array<{
     position: [number, number, number]
     targetPosition: [number, number, number]
@@ -159,8 +160,28 @@ function GRNDSLogoModel(_props: GRNDSLogo3DProps) {
     setIsClicked(!isClicked)
   }
 
-  const handleEnterClick = () => {
-    router.push('/auth/login')
+  const handleEnterClick = async () => {
+    if (authLoading) return
+    try {
+      setAuthLoading(true)
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : 'https://hub.grnds.xyz/auth/callback'
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: { redirectTo: redirectUrl },
+      })
+      if (error) {
+        console.error('Discord OAuth error:', error)
+        alert('Failed to sign in with Discord. Please try again.')
+      }
+      // Success: browser redirects to Discord, then callback
+    } catch (err) {
+      console.error('Unexpected error:', err)
+      alert('An unexpected error occurred. Please try again.')
+    } finally {
+      setAuthLoading(false)
+    }
   }
 
   return (
@@ -201,29 +222,29 @@ function GRNDSLogoModel(_props: GRNDSLogo3DProps) {
               filter: 'hue-rotate(-30deg) saturate(2.0) brightness(1.0)'
             }}
           />
-          {/* Enter #GRNDS text - clickable */}
+          {/* Enter #GRNDS – click triggers Discord OAuth */}
           <div
             onClick={handleEnterClick}
             style={{
-              color: '#ff0000',
+              color: authLoading ? '#ff6666' : '#ff0000',
               fontFamily: 'monospace',
               fontSize: '24px',
               marginTop: '20px',
               letterSpacing: '2px',
               opacity: isClicked ? 0 : 1,
               transition: 'opacity 0.3s ease-out, color 0.2s ease',
-              cursor: 'pointer',
+              cursor: authLoading ? 'wait' : 'pointer',
               userSelect: 'none',
-              pointerEvents: 'auto'
+              pointerEvents: authLoading ? 'none' : 'auto'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#ff3333'
+              if (!authLoading) e.currentTarget.style.color = '#ff3333'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#ff0000'
+              e.currentTarget.style.color = authLoading ? '#ff6666' : '#ff0000'
             }}
           >
-            enter #GRNDS
+            {authLoading ? '> connecting...' : 'enter #GRNDS'}
           </div>
         </div>
       </Html>

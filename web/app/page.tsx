@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
 export default function Home() {
-  // Redirect to login (landing page)
-  redirect('/auth/login')
+  // Hub is the landing page (3D logo + enter #GRNDS → Discord auth)
+  redirect('/hub')
 }

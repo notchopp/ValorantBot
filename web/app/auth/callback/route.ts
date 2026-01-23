@@ -212,9 +212,9 @@ export async function GET(request: Request) {
     }
   }
 
-  // If there's an error, redirect back to login
+  // If there's an error, redirect back to hub (landing + auth)
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hub.grnds.xyz'
-  const loginUrl = new URL('/auth/login', baseUrl)
-  loginUrl.searchParams.set('error', 'oauth_error')
-  return NextResponse.redirect(loginUrl)
+  const hubUrl = new URL('/hub', baseUrl)
+  hubUrl.searchParams.set('error', 'oauth_error')
+  return NextResponse.redirect(hubUrl)
 }
