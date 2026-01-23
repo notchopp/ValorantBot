@@ -61,43 +61,52 @@ function calculateInitialMMR(valorantRank: string, valorantELO: number): number 
 }
 
 /**
- * Fetch Valorant rank from Henrik API
+ * Fetch Valorant MMR using PUUID (v3 API like verify-account.ts)
  */
-async function fetchValorantRank(riotName: string, riotTag: string, region: string): Promise<{ rank: string; elo: number } | null> {
+async function fetchValorantMMR(puuid: string, region: string): Promise<{ rank: string; elo: number } | null> {
   try {
-    const encodedName = encodeURIComponent(riotName)
-    const encodedTag = encodeURIComponent(riotTag)
     const apiRegion = region === 'latam' || region === 'br' ? 'na' : region
+    const platform = 'pc'
+    
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'User-Agent': 'GRNDS-Bot/1.0',
+    }
+    
+    // Add API key if available
+    if (process.env.VALORANT_API_KEY) {
+      headers['Authorization'] = process.env.VALORANT_API_KEY
+    }
     
     const response = await fetch(
-      `https://api.henrikdev.xyz/valorant/v2/mmr/${apiRegion}/${encodedName}/${encodedTag}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'GRNDS-Bot/1.0',
-        },
-        next: { revalidate: 0 }
-      }
+      `https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/${apiRegion}/${platform}/${puuid}`,
+      { headers, next: { revalidate: 0 } }
     )
     
     if (!response.ok) {
-      console.error(`Henrik API error: ${response.status}`)
+      console.error(`MMR API error: ${response.status}`)
       return null
     }
     
     const data = await response.json()
+    const mmrData = data?.data
     
-    if (data.status !== 200 || !data.data) {
+    if (!mmrData) {
       return null
     }
     
-    const currentData = data.data.current_data || data.data
-    const rankTier = currentData.currenttierpatched || currentData.current_tier_patched || 'Unranked'
-    const elo = currentData.elo || currentData.ranking_in_tier || 0
+    // Map v3 response structure
+    const rank = mmrData.current?.tier?.name || 'Unrated'
+    const elo = mmrData.current?.elo || 0
     
-    return { rank: rankTier, elo }
+    // Check if unrated
+    if (!rank || rank.toLowerCase().includes('unrated')) {
+      return null
+    }
+    
+    return { rank, elo }
   } catch (error) {
-    console.error('Error fetching Valorant rank:', error)
+    console.error('Error fetching Valorant MMR:', error)
     return null
   }
 }
@@ -153,6 +162,7 @@ export async function POST(request: NextRequest) {
       discord_username: string | null
       riot_name: string | null
       riot_tag: string | null
+      riot_puuid: string | null
       riot_region: string | null
       valorant_mmr: number | null
       valorant_rank: string | null
@@ -164,7 +174,7 @@ export async function POST(request: NextRequest) {
     
     const { data: players, error: playersError } = await supabaseAdmin
       .from('players')
-      .select('id, discord_username, riot_name, riot_tag, riot_region, valorant_mmr, valorant_rank, marvel_rivals_mmr, marvel_rivals_rank, current_mmr, discord_rank') as { data: PlayerRow[] | null; error: unknown }
+      .select('id, discord_username, riot_name, riot_tag, riot_puuid, riot_region, valorant_mmr, valorant_rank, marvel_rivals_mmr, marvel_rivals_rank, current_mmr, discord_rank') as { data: PlayerRow[] | null; error: unknown }
     
     if (playersError) {
       return NextResponse.json({ error: 'Failed to fetch players' }, { status: 500 })
@@ -186,16 +196,15 @@ export async function POST(request: NextRequest) {
     for (const player of players || []) {
       try {
         // Only process Valorant for now (Marvel Rivals API would need separate implementation)
-        if ((game === 'valorant' || game === 'both') && player.riot_name && player.riot_tag) {
-          // Fetch fresh rank from Valorant API
-          const valorantData = await fetchValorantRank(
-            player.riot_name, 
-            player.riot_tag, 
+        if ((game === 'valorant' || game === 'both') && player.riot_puuid) {
+          // Use stored PUUID to fetch fresh rank from Valorant API
+          const valorantData = await fetchValorantMMR(
+            player.riot_puuid,
             player.riot_region || 'na'
           )
           
           if (!valorantData) {
-            skipped.push(`${player.discord_username}: Could not fetch Valorant data`)
+            skipped.push(`${player.discord_username} (${player.riot_name}#${player.riot_tag}): Could not fetch Valorant data`)
             continue
           }
           
@@ -238,8 +247,8 @@ export async function POST(request: NextRequest) {
           
           // Rate limit - wait 500ms between API calls to avoid hitting rate limits
           await new Promise(resolve => setTimeout(resolve, 500))
-        } else if (!player.riot_name || !player.riot_tag) {
-          skipped.push(`${player.discord_username}: No Riot ID linked`)
+        } else if (!player.riot_puuid) {
+          skipped.push(`${player.discord_username}: No PUUID stored`)
         }
       } catch (err) {
         errors.push(`Error processing ${player.discord_username}: ${err instanceof Error ? err.message : String(err)}`)
