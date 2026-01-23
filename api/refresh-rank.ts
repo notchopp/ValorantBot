@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-import { validateEnv } from './_shared/vercel-config';
 
 interface RefreshRankRequest {
   userId: string;

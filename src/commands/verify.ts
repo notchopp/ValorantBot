@@ -16,22 +16,28 @@ import { RankCardService } from '../services/RankCardService';
 import { RankProfileImageService } from '../services/RankProfileImageService';
 
 // Marvel Rivals rank options for manual selection
+// Values must be unique for Discord, so we use format "RANK:source_rank"
 const MARVEL_RIVALS_RANK_CHOICES = [
-  { label: 'Bronze I', value: 'GRNDS I', description: 'Bronze I → GRNDS I' },
-  { label: 'Bronze II', value: 'GRNDS I', description: 'Bronze II → GRNDS I' },
-  { label: 'Bronze III', value: 'GRNDS II', description: 'Bronze III → GRNDS II' },
-  { label: 'Silver I', value: 'GRNDS II', description: 'Silver I → GRNDS II' },
-  { label: 'Silver II', value: 'GRNDS III', description: 'Silver II → GRNDS III' },
-  { label: 'Silver III', value: 'GRNDS III', description: 'Silver III → GRNDS III' },
-  { label: 'Gold I', value: 'GRNDS III', description: 'Gold I → GRNDS III' },
-  { label: 'Gold II', value: 'GRNDS IV', description: 'Gold II → GRNDS IV' },
-  { label: 'Gold III', value: 'GRNDS IV', description: 'Gold III → GRNDS IV' },
-  { label: 'Platinum I', value: 'GRNDS IV', description: 'Platinum I → GRNDS IV' },
-  { label: 'Platinum II', value: 'GRNDS V', description: 'Platinum II → GRNDS V' },
-  { label: 'Platinum III', value: 'GRNDS V', description: 'Platinum III → GRNDS V' },
-  { label: 'Diamond+', value: 'GRNDS V', description: 'Diamond or higher → GRNDS V (capped)' },
-  { label: 'Unranked', value: 'GRNDS I', description: 'Haven\'t played ranked → GRNDS I' },
+  { label: 'Bronze I', value: 'GRNDS I:bronze1', description: 'Bronze I → GRNDS I' },
+  { label: 'Bronze II', value: 'GRNDS I:bronze2', description: 'Bronze II → GRNDS I' },
+  { label: 'Bronze III', value: 'GRNDS II:bronze3', description: 'Bronze III → GRNDS II' },
+  { label: 'Silver I', value: 'GRNDS II:silver1', description: 'Silver I → GRNDS II' },
+  { label: 'Silver II', value: 'GRNDS III:silver2', description: 'Silver II → GRNDS III' },
+  { label: 'Silver III', value: 'GRNDS III:silver3', description: 'Silver III → GRNDS III' },
+  { label: 'Gold I', value: 'GRNDS III:gold1', description: 'Gold I → GRNDS III' },
+  { label: 'Gold II', value: 'GRNDS IV:gold2', description: 'Gold II → GRNDS IV' },
+  { label: 'Gold III', value: 'GRNDS IV:gold3', description: 'Gold III → GRNDS IV' },
+  { label: 'Platinum I', value: 'GRNDS IV:plat1', description: 'Platinum I → GRNDS IV' },
+  { label: 'Platinum II', value: 'GRNDS V:plat2', description: 'Platinum II → GRNDS V' },
+  { label: 'Platinum III', value: 'GRNDS V:plat3', description: 'Platinum III → GRNDS V' },
+  { label: 'Diamond+', value: 'GRNDS V:diamond', description: 'Diamond or higher → GRNDS V (capped)' },
+  { label: 'Unranked', value: 'GRNDS I:unranked', description: 'Haven\'t played ranked → GRNDS I' },
 ];
+
+// Helper to extract rank from value (removes the unique suffix)
+function parseManualRankValue(value: string): string {
+  return value.split(':')[0];
+}
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -159,7 +165,8 @@ export async function execute(
 
           await selectInteraction.deferUpdate();
 
-          const selectedRank = selectInteraction.values[0];
+          // Parse the rank from the unique value (format: "GRNDS X:source")
+          const selectedRank = parseManualRankValue(selectInteraction.values[0]);
           
           // Re-verify with the manual rank
           verifyResult = await vercelAPI.verifyMarvelRivals({
