@@ -120,16 +120,18 @@ export interface RankThreshold {
 }
 
 // Helper function to get rank info from MMR
+// Rank thresholds match database migration 014
 export function getRankFromMMR(mmr: number): { rank: string; tier: string; color: string } {
   if (mmr >= 3000) return { rank: 'X', tier: '', color: '#ffffff' }
-  if (mmr >= 2600) return { rank: 'CHALLENGER', tier: 'III', color: '#ff0000' }
-  if (mmr >= 2500) return { rank: 'CHALLENGER', tier: 'II', color: '#ff0000' }
-  if (mmr >= 2400) return { rank: 'CHALLENGER', tier: 'I', color: '#ff0000' }
-  if (mmr >= 2300) return { rank: 'BREAKPOINT', tier: 'V', color: '#000000' }
-  if (mmr >= 2100) return { rank: 'BREAKPOINT', tier: 'IV', color: '#000000' }
-  if (mmr >= 1900) return { rank: 'BREAKPOINT', tier: 'III', color: '#000000' }
-  if (mmr >= 1700) return { rank: 'BREAKPOINT', tier: 'II', color: '#000000' }
-  if (mmr >= 1500) return { rank: 'BREAKPOINT', tier: 'I', color: '#000000' }
+  // Note: ABSOLUTE is position-based (#11-#20 with 2600+ MMR), handled separately
+  if (mmr >= 2600) return { rank: 'CHALLENGER', tier: 'III', color: '#dc2626' }
+  if (mmr >= 2500) return { rank: 'CHALLENGER', tier: 'II', color: '#dc2626' }
+  if (mmr >= 2400) return { rank: 'CHALLENGER', tier: 'I', color: '#dc2626' }
+  if (mmr >= 2300) return { rank: 'BREAKPOINT', tier: 'V', color: '#888888' }
+  if (mmr >= 2100) return { rank: 'BREAKPOINT', tier: 'IV', color: '#888888' }
+  if (mmr >= 1900) return { rank: 'BREAKPOINT', tier: 'III', color: '#888888' }
+  if (mmr >= 1700) return { rank: 'BREAKPOINT', tier: 'II', color: '#888888' }
+  if (mmr >= 1500) return { rank: 'BREAKPOINT', tier: 'I', color: '#888888' }
   if (mmr >= 1200) return { rank: 'GRNDS', tier: 'V', color: '#ff8c00' }
   if (mmr >= 900) return { rank: 'GRNDS', tier: 'IV', color: '#ff8c00' }
   if (mmr >= 600) return { rank: 'GRNDS', tier: 'III', color: '#ff8c00' }
@@ -137,7 +139,21 @@ export function getRankFromMMR(mmr: number): { rank: string; tier: string; color
   return { rank: 'GRNDS', tier: 'I', color: '#ff8c00' }
 }
 
+// Get rank with position-based ABSOLUTE support
+export function getRankFromMMRWithPosition(mmr: number, leaderboardPosition?: number): { rank: string; tier: string; color: string } {
+  // X rank: top 10 with 3000+ MMR
+  if (mmr >= 3000 && leaderboardPosition !== undefined && leaderboardPosition <= 10) {
+    return { rank: 'X', tier: '', color: '#ffffff' }
+  }
+  // ABSOLUTE rank: #11-#20 with 2600+ MMR
+  if (mmr >= 2600 && leaderboardPosition !== undefined && leaderboardPosition >= 11 && leaderboardPosition <= 20) {
+    return { rank: 'ABSOLUTE', tier: '', color: '#f59e0b' }
+  }
+  return getRankFromMMR(mmr)
+}
+
 // Helper function to get next rank info
+// Uses database thresholds from migration 014
 export function getNextRank(mmr: number): { rank: string; tier: string; mmrNeeded: number } | null {
   const thresholds = [
     { mmr: 300, rank: 'GRNDS', tier: 'II' },
@@ -166,4 +182,10 @@ export function getNextRank(mmr: number): { rank: string; tier: string; mmrNeede
   }
 
   return null // Already at max rank
+}
+
+// Get the correct rank label from MMR (without relying on database discord_rank)
+export function calculateRankLabel(mmr: number): string {
+  const rankInfo = getRankFromMMR(mmr)
+  return rankInfo.tier ? `${rankInfo.rank} ${rankInfo.tier}` : rankInfo.rank
 }

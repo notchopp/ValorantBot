@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
 import { TerminalMMRBar } from '@/components/TerminalMMRBar'
-import { ActivityFeed as ActivityFeedType } from '@/lib/types'
+import { ActivityFeed as ActivityFeedType, calculateRankLabel } from '@/lib/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -382,7 +382,7 @@ function DashboardContent({
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="text-right">
               <div className="text-[10px] text-[var(--term-muted)] mb-1 uppercase tracking-wider">RANK</div>
-              <RankBadge mmr={playerDataToUse.current_mmr} size="lg" rankLabel={playerDataToUse.discord_rank} />
+              <RankBadge mmr={playerDataToUse.current_mmr} size="lg" rankLabel={calculateRankLabel(playerDataToUse.current_mmr)} />
             </div>
             <div className="text-right hidden sm:block">
               <div className="text-[10px] text-[var(--term-muted)] mb-1 uppercase tracking-wider">POS</div>

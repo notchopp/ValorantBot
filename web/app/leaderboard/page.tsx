@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
-import { Player } from '@/lib/types'
+import { Player, calculateRankLabel } from '@/lib/types'
 import Link from 'next/link'
 
 // Force dynamic rendering
@@ -77,9 +77,8 @@ export default async function LeaderboardPage({
       const peakMMR = selectedGame === 'marvel_rivals'
         ? (player.marvel_rivals_peak_mmr ?? 0)
         : (player.valorant_peak_mmr ?? player.peak_mmr ?? 0)
-      const rankLabel = selectedGame === 'marvel_rivals'
-        ? (player.marvel_rivals_rank ?? 'Unranked')
-        : (player.valorant_rank ?? 'Unranked')
+      // Calculate rank from MMR rather than using potentially outdated database value
+      const rankLabel = calculateRankLabel(currentMMR)
 
       return {
         ...player,
