@@ -198,8 +198,15 @@ async function registerCommands() {
       await rest.put(Routes.applicationCommands(appConfig.bot.clientId), { body: commands });
       console.log(`✅ Successfully reloaded ${commands.length} global commands.`);
     }
-  } catch (error) {
-    console.error('❌ Error registering commands:', error);
+  } catch (error: any) {
+    console.error('❌ Error registering commands:', {
+      message: error?.message,
+      code: error?.code,
+      status: error?.status,
+      errors: error?.rawError?.errors,
+    });
+    // Log individual command names for debugging
+    console.log('Commands being registered:', commands.map((c: any) => c.name).join(', '));
   }
 }
 

@@ -9,7 +9,7 @@ import { RoleUpdateService } from './RoleUpdateService';
  */
 export class RoleSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
-  private static readonly SYNC_INTERVAL_MS = 5 * 60 * 1000; // Every 5 minutes
+  private static readonly SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // Every 24 hours
   private static readonly BATCH_SIZE = 50; // Process players in batches
   private static readonly DELAY_BETWEEN_PLAYERS_MS = 500; // Rate limit protection
   // Protected roles that should never be touched by role sync
@@ -30,7 +30,7 @@ export class RoleSyncService {
       return;
     }
 
-    console.log('🔄 Starting role sync service (5 min interval)');
+    console.log('🔄 Starting role sync service (24 hour interval)');
 
     // Run immediately on start (delayed to not overwhelm on startup)
     setTimeout(() => {

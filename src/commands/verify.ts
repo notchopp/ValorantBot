@@ -76,9 +76,14 @@ export async function execute(
         return;
       }
 
-      if (existingPlayer.marvel_rivals_rank && existingPlayer.marvel_rivals_rank !== 'Unranked' && (existingPlayer.marvel_rivals_mmr || 0) > 0) {
+      // Fetch fresh data from database to avoid stale cache
+      const freshPlayer = await databaseService.getPlayer(userId);
+      const marvelRank = freshPlayer?.marvel_rivals_rank;
+      const marvelMMR = freshPlayer?.marvel_rivals_mmr || 0;
+
+      if (marvelRank && marvelRank !== 'Unranked' && marvelMMR > 0) {
         await interaction.editReply(
-          `❌ You are already placed at **${existingPlayer.marvel_rivals_rank}** (${existingPlayer.marvel_rivals_mmr} MMR) for Marvel Rivals.`
+          `❌ You are already placed at **${marvelRank}** (${marvelMMR} MMR) for Marvel Rivals.`
         );
         return;
       }
@@ -202,9 +207,10 @@ export async function execute(
       return;
     }
 
-    // Check if already placed for Valorant
-    const existingValorantRank = existingPlayer.valorant_rank || existingPlayer.discord_rank;
-    const existingValorantMMR = existingPlayer.valorant_mmr || existingPlayer.current_mmr || 0;
+    // Fetch fresh data from database to avoid stale cache
+    const freshValorantPlayer = await databaseService.getPlayer(userId);
+    const existingValorantRank = freshValorantPlayer?.valorant_rank || freshValorantPlayer?.discord_rank;
+    const existingValorantMMR = freshValorantPlayer?.valorant_mmr || freshValorantPlayer?.current_mmr || 0;
     if (existingValorantRank && existingValorantRank !== 'Unranked' && existingValorantMMR > 0) {
       await interaction.editReply(
         `❌ You are already placed at **${existingValorantRank}** (${existingValorantMMR} MMR). Use \`/riot unlink\` and \`/riot link\` to change your account.`
