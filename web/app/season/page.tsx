@@ -104,6 +104,64 @@ export default async function SeasonPage({
   
   const players = (leaderboard as (Player & { discord_avatar_url?: string | null })[]) || []
   
+  // Get current queue for selected game
+  interface QueueEntry {
+    id: string
+    player_id: string
+    joined_at: string
+    game: 'valorant' | 'marvel_rivals'
+    player: {
+      id: string
+      discord_user_id: string
+      discord_username: string | null
+      discord_avatar_url?: string | null
+      valorant_mmr: number | null
+      marvel_rivals_mmr: number | null
+      valorant_rank: string | null
+      marvel_rivals_rank: string | null
+    }
+  }
+  
+  const { data: queueData } = await supabaseAdmin
+    .from('queue')
+    .select('id, player_id, joined_at, game, player:players(id, discord_user_id, discord_username, discord_avatar_url, valorant_mmr, marvel_rivals_mmr, valorant_rank, marvel_rivals_rank)')
+    .eq('game', selectedGame)
+    .order('joined_at', { ascending: true })
+  
+  const queuePlayers = (queueData as QueueEntry[] | null) || []
+  
+  // Get live matches (pending or in-progress)
+  interface LiveMatch {
+    id: string
+    match_id: string
+    match_type: 'custom' | 'valorant' | 'marvel_rivals'
+    match_date: string
+    map: string | null
+    status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
+    team_a: { discord_username?: string; discord_user_id?: string }[]
+    team_b: { discord_username?: string; discord_user_id?: string }[]
+    host: {
+      discord_username: string | null
+      discord_user_id: string
+    } | null
+  }
+  
+  let liveMatchesQuery = supabaseAdmin
+    .from('matches')
+    .select('id, match_id, match_type, match_date, map, status, team_a, team_b, host:players!matches_host_id_fkey(discord_username, discord_user_id)')
+    .in('status', ['pending', 'in-progress'])
+    .order('match_date', { ascending: false })
+    .limit(10)
+  
+  if (selectedGame === 'marvel_rivals') {
+    liveMatchesQuery = liveMatchesQuery.eq('match_type', 'marvel_rivals')
+  } else {
+    liveMatchesQuery = liveMatchesQuery.in('match_type', ['custom', 'valorant'])
+  }
+  
+  const { data: liveMatchesData } = await liveMatchesQuery
+  const liveMatches = (liveMatchesData as LiveMatch[] | null) || []
+  
   // Calculate season stats for each player (matches, win rate, etc.)
   // Only calculate if season has started
   interface SeasonMatchStat {
@@ -276,13 +334,174 @@ export default async function SeasonPage({
           </div>
         </div>
         
+        {/* Live Matches & Queue Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
+          {/* Current Queue */}
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">QUEUE</span><span className="text-white/40">::</span><span className="text-white">ACTIVE</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-[var(--term-accent)] rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-mono text-[var(--term-muted)]">{queuePlayers.length}/10 PLAYERS</span>
+              </div>
+            </div>
+            
+            {queuePlayers.length > 0 ? (
+              <div className="space-y-2">
+                {queuePlayers.map((entry, index) => {
+                  const mmr = selectedGame === 'marvel_rivals' 
+                    ? (entry.player?.marvel_rivals_mmr ?? 0)
+                    : (entry.player?.valorant_mmr ?? 0)
+                  const rank = selectedGame === 'marvel_rivals'
+                    ? (entry.player?.marvel_rivals_rank ?? 'Unranked')
+                    : (entry.player?.valorant_rank ?? 'Unranked')
+                  const joinedAgo = Math.floor((Date.now() - new Date(entry.joined_at).getTime()) / 60000)
+                  
+                  return (
+                    <Link
+                      key={entry.id}
+                      href={`/profile/${entry.player?.discord_user_id}`}
+                      className="flex items-center gap-3 p-3 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/50 transition-all group"
+                    >
+                      <span className="text-[var(--term-muted)] font-mono text-sm w-6">{index + 1}.</span>
+                      {entry.player?.discord_avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={entry.player.discord_avatar_url}
+                          alt={entry.player.discord_username || 'Player'}
+                          className="w-8 h-8 rounded-sm border border-[var(--term-border)]"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-sm bg-[var(--term-bg)] border border-[var(--term-border)] flex items-center justify-center text-[var(--term-muted)] text-xs font-mono">
+                          {(entry.player?.discord_username || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono font-bold text-white text-sm truncate">{entry.player?.discord_username || 'Unknown'}</div>
+                        <div className="text-[10px] text-[var(--term-muted)] font-mono">{mmr} MMR</div>
+                      </div>
+                      <RankBadge mmr={mmr} size="sm" rankLabel={rank} />
+                      <span className="text-[10px] text-[var(--term-muted)] font-mono">{joinedAgo}m</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-[var(--term-muted)] font-mono text-sm mb-2">[QUEUE_EMPTY]</div>
+                <div className="text-[10px] text-[var(--term-muted)]">No players in queue. Join via Discord!</div>
+              </div>
+            )}
+            
+            {/* Queue Progress Bar */}
+            <div className="mt-4 pt-4 border-t border-[var(--term-border)]">
+              <div className="flex items-center justify-between text-[10px] font-mono text-[var(--term-muted)] mb-2">
+                <span>QUEUE_FILL</span>
+                <span>{queuePlayers.length}/10</span>
+              </div>
+              <div className="h-2 bg-[var(--term-bg)] border border-[var(--term-border)]">
+                <div 
+                  className="h-full bg-[var(--term-accent)] transition-all duration-500"
+                  style={{ width: `${(queuePlayers.length / 10) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Live Matches */}
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">MATCHES</span><span className="text-white/40">::</span><span className="text-white">LIVE</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {liveMatches.length > 0 && (
+                  <>
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span className="text-[10px] font-mono text-[var(--term-muted)]">{liveMatches.length} ACTIVE</span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {liveMatches.length > 0 ? (
+              <div className="space-y-3">
+                {liveMatches.map((match) => {
+                  const isInProgress = match.status === 'in-progress'
+                  const teamANames = (match.team_a || []).slice(0, 3).map(p => p.discord_username?.split('#')[0] || 'Player').join(', ')
+                  const teamBNames = (match.team_b || []).slice(0, 3).map(p => p.discord_username?.split('#')[0] || 'Player').join(', ')
+                  const matchAge = Math.floor((Date.now() - new Date(match.match_date).getTime()) / 60000)
+                  
+                  return (
+                    <div
+                      key={match.id}
+                      className="p-4 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/30 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${isInProgress ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></span>
+                          <span className="text-[10px] font-mono font-bold text-white uppercase">
+                            {isInProgress ? '[IN_PROGRESS]' : '[PENDING]'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[var(--term-muted)]">
+                          {match.map || 'TBD'} • {matchAge}m ago
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                        <div className="text-right">
+                          <div className="text-[10px] font-mono text-[var(--term-accent)] mb-1">TEAM_A</div>
+                          <div className="text-xs font-mono text-white truncate" title={teamANames}>
+                            {teamANames}{(match.team_a?.length || 0) > 3 ? '...' : ''}
+                          </div>
+                        </div>
+                        <div className="text-center px-4">
+                          <div className="text-lg font-mono font-black text-[var(--term-muted)]">VS</div>
+                        </div>
+                        <div className="text-left">
+                          <div className="text-[10px] font-mono text-[var(--term-accent)] mb-1">TEAM_B</div>
+                          <div className="text-xs font-mono text-white truncate" title={teamBNames}>
+                            {teamBNames}{(match.team_b?.length || 0) > 3 ? '...' : ''}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {match.host && (
+                        <div className="mt-3 pt-3 border-t border-[var(--term-border)] flex items-center gap-2 text-[10px] font-mono text-[var(--term-muted)]">
+                          <span>HOST:</span>
+                          <Link 
+                            href={`/profile/${match.host.discord_user_id}`}
+                            className="text-white hover:text-[var(--term-accent)] transition-colors"
+                          >
+                            {match.host.discord_username || 'Unknown'}
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-[var(--term-muted)] font-mono text-sm mb-2">[NO_ACTIVE_MATCHES]</div>
+                <div className="text-[10px] text-[var(--term-muted)]">No live matches. Start a game via Discord!</div>
+              </div>
+            )}
+          </div>
+        </div>
+        
         {/* Top 10 & X Watch Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
           {/* Top 10 (X Rank) */}
-          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">Top 10 (X Rank)</h2>
-              <div className="text-xs text-white/40">{top10.length} players</div>
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">TOP_10</span><span className="text-white/40">::</span><span className="text-white">X_RANK</span>
+              </div>
+              <div className="text-[10px] font-mono text-[var(--term-muted)]">{top10.length} PLAYERS</div>
             </div>
             <div className="space-y-2">
               {top10.length > 0 ? (
@@ -290,9 +509,9 @@ export default async function SeasonPage({
                   <Link
                     key={player.id}
                     href={`/profile/${player.discord_user_id}`}
-                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
+                    className="flex items-center gap-3 p-3 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/50 transition-all group"
                   >
-                    <div className="text-xl font-black text-red-500 w-8">#{index + 1}</div>
+                    <div className="text-lg font-mono font-black text-[var(--term-accent)] w-8">#{index + 1}</div>
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
                       {player.discord_avatar_url ? (
@@ -300,43 +519,39 @@ export default async function SeasonPage({
                         <img
                           src={player.discord_avatar_url}
                           alt={player.discord_username || 'Player'}
-                          className="w-10 h-10 rounded-full border border-white/10 group-hover:border-red-500/50 transition-colors"
+                          className="w-8 h-8 rounded-sm border border-[var(--term-border)] group-hover:border-[var(--term-accent)]/50 transition-colors"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-xs font-black group-hover:border-red-500/50 transition-colors">
+                        <div className="w-8 h-8 rounded-sm bg-[var(--term-bg)] border border-[var(--term-border)] flex items-center justify-center text-[var(--term-muted)] text-xs font-mono group-hover:border-[var(--term-accent)]/50 transition-colors">
                           {(player.discord_username || 'U').charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
-                      <div className="text-xs text-white/40">
-                        {player.currentMMR} MMR • {player.seasonMatches || 0} matches • {player.seasonWinRate || 0}% WR
+                      <div className="font-mono font-bold text-white text-sm truncate">{player.discord_username || 'Unknown'}</div>
+                      <div className="text-[10px] text-[var(--term-muted)] font-mono">
+                        {player.currentMMR} MMR • {player.seasonMatches || 0}M • {player.seasonWinRate || 0}%WR
                       </div>
                     </div>
                     <RankBadge mmr={player.currentMMR} size="sm" rankLabel={player.rankLabel} />
-                    <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
                   </Link>
                 ))
               ) : (
-                <div className="text-center py-12 text-white/40">
-                  <p className="text-sm font-light mb-2">No one has hit X rank yet</p>
-                  <p className="text-xs text-white/30">Be the first to reach 3000+ MMR!</p>
+                <div className="text-center py-12">
+                  <div className="text-[var(--term-muted)] font-mono text-sm mb-2">[NO_X_RANK]</div>
+                  <div className="text-[10px] text-[var(--term-muted)]">Be the first to reach 3000+ MMR!</div>
                 </div>
               )}
             </div>
           </div>
           
           {/* X Watch */}
-          <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-black text-white uppercase tracking-tight mb-1">X Watch</h2>
-                <p className="text-xs text-white/40">Players chasing Top 10</p>
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">X_WATCH</span><span className="text-white/40">::</span><span className="text-white">CONTENDERS</span>
               </div>
-              <div className="text-xs text-white/40">{xWatch.length} players</div>
+              <div className="text-[10px] font-mono text-[var(--term-muted)]">{xWatch.length} PLAYERS</div>
             </div>
             <div className="space-y-2">
               {xWatch.length > 0 ? (
@@ -344,9 +559,9 @@ export default async function SeasonPage({
                   <Link
                     key={player.id}
                     href={`/profile/${player.discord_user_id}`}
-                    className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-red-500/30 transition-all group"
+                    className="flex items-center gap-3 p-3 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/50 transition-all group"
                   >
-                    <div className="text-base font-black text-white/40 w-8">#{index + 11}</div>
+                    <div className="text-sm font-mono font-bold text-[var(--term-muted)] w-8">#{index + 11}</div>
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
                       {player.discord_avatar_url ? (
@@ -354,33 +569,32 @@ export default async function SeasonPage({
                         <img
                           src={player.discord_avatar_url}
                           alt={player.discord_username || 'Player'}
-                          className="w-10 h-10 rounded-full border border-white/10 group-hover:border-red-500/50 transition-colors"
+                          className="w-8 h-8 rounded-sm border border-[var(--term-border)] group-hover:border-[var(--term-accent)]/50 transition-colors"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/60 text-xs font-black group-hover:border-red-500/50 transition-colors">
+                        <div className="w-8 h-8 rounded-sm bg-[var(--term-bg)] border border-[var(--term-border)] flex items-center justify-center text-[var(--term-muted)] text-xs font-mono group-hover:border-[var(--term-accent)]/50 transition-colors">
                           {(player.discord_username || 'U').charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-black text-white mb-1 tracking-tight truncate">{player.discord_username || 'Unknown'}</div>
-                      <div className="text-xs text-white/40">
+                      <div className="font-mono font-bold text-white text-sm truncate">{player.discord_username || 'Unknown'}</div>
+                      <div className="text-[10px] text-[var(--term-muted)] font-mono">
                         {player.currentMMR} MMR
                         {top10.length > 0 && top10[top10.length - 1] && (
-                          <span className="ml-2 text-white/30">
-                            (-{top10[top10.length - 1].currentMMR - player.currentMMR} from #10)
+                          <span className="ml-2 text-[var(--term-accent)]">
+                            [-{top10[top10.length - 1].currentMMR - player.currentMMR} TO #10]
                           </span>
                         )}
                       </div>
                     </div>
                     <RankBadge mmr={player.currentMMR} size="sm" rankLabel={player.rankLabel} />
-                    <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
                   </Link>
                 ))
               ) : (
-                <div className="text-center py-8 text-white/40 text-sm">No players in X Watch</div>
+                <div className="text-center py-8">
+                  <div className="text-[var(--term-muted)] font-mono text-sm">[NO_CONTENDERS]</div>
+                </div>
               )}
             </div>
           </div>
@@ -390,15 +604,17 @@ export default async function SeasonPage({
         <div className="text-center mb-8 md:mb-12">
           <Link
             href={`/leaderboard?game=${selectedGame}`}
-            className="inline-block px-8 py-4 bg-red-500 text-white font-black uppercase tracking-wider text-xs rounded-xl hover:bg-red-600 transition-all shadow-xl"
+            className="inline-block px-8 py-3 bg-[var(--term-accent)] text-black font-mono font-bold uppercase tracking-wider text-xs hover:bg-white transition-all border border-[var(--term-accent)]"
           >
-            View Full Leaderboard
+            [VIEW_FULL_LEADERBOARD]
           </Link>
         </div>
         
         {/* Season Comments */}
-        <div className="glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-          <h2 className="text-lg font-black text-white uppercase tracking-tight mb-6">Season Discussion</h2>
+        <div className="terminal-panel p-6 md:p-8">
+          <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+            <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">SEASON</span><span className="text-white/40">::</span><span className="text-white">DISCUSSION</span>
+          </div>
           <CommentSectionWrapper
             targetType="season"
             targetId={currentSeason.id}
