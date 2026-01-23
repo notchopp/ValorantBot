@@ -192,19 +192,52 @@ function mapTierToRank(options: string[], tier: number): string {
 }
 
 function mapMarvelRankToDiscord(rank: string, tier: number): string | null {
-  const normalized = rank.toLowerCase();
+  const normalized = rank.toLowerCase().trim();
+  
+  // Log the rank being mapped for debugging
+  console.log('Mapping Marvel Rivals rank to Discord', { rank, normalized, tier });
+  
+  // Handle top ranks (capped at GRNDS V for initial placement per guardrails)
   if (normalized.includes('one above all')) return 'GRNDS V';
   if (normalized.includes('eternity')) return 'GRNDS V';
+  if (normalized.includes('celestial')) return 'GRNDS V';
+  if (normalized.includes('grandmaster')) return 'GRNDS V';
+  
+  // Handle unranked
+  if (normalized.includes('unranked') || normalized === '' || normalized === 'none') {
+    return 'GRNDS I';
+  }
 
+  // Standard ranks with tier mapping
   if (normalized.includes('bronze')) return mapTierToRank(['GRNDS I', 'GRNDS II', 'GRNDS III'], tier);
   if (normalized.includes('silver')) return mapTierToRank(['GRNDS II', 'GRNDS III', 'GRNDS IV'], tier);
   if (normalized.includes('gold')) return mapTierToRank(['GRNDS II', 'GRNDS III', 'GRNDS IV'], tier);
   if (normalized.includes('platinum')) return mapTierToRank(['GRNDS III', 'GRNDS IV', 'GRNDS V'], tier);
   if (normalized.includes('diamond')) return mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
-  if (normalized.includes('grandmaster')) return mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
-  if (normalized.includes('celestial')) return mapTierToRank(['GRNDS V', 'GRNDS V', 'GRNDS V'], tier);
+  
+  // Fallback: try to extract a known rank pattern
+  // Check if it contains any known rank keywords
+  const rankPatterns = [
+    { pattern: /bronze/i, ranks: ['GRNDS I', 'GRNDS II', 'GRNDS III'] },
+    { pattern: /silver/i, ranks: ['GRNDS II', 'GRNDS III', 'GRNDS IV'] },
+    { pattern: /gold/i, ranks: ['GRNDS II', 'GRNDS III', 'GRNDS IV'] },
+    { pattern: /plat/i, ranks: ['GRNDS III', 'GRNDS IV', 'GRNDS V'] },
+    { pattern: /diamond/i, ranks: ['GRNDS V', 'GRNDS V', 'GRNDS V'] },
+    { pattern: /grand/i, ranks: ['GRNDS V', 'GRNDS V', 'GRNDS V'] },
+    { pattern: /celestial/i, ranks: ['GRNDS V', 'GRNDS V', 'GRNDS V'] },
+    { pattern: /eternity/i, ranks: ['GRNDS V', 'GRNDS V', 'GRNDS V'] },
+  ];
+  
+  for (const { pattern, ranks } of rankPatterns) {
+    if (pattern.test(rank)) {
+      return mapTierToRank(ranks, tier);
+    }
+  }
 
-  return null;
+  // Ultimate fallback: if we have ANY rank string, default to GRNDS I
+  // This ensures players can always verify even with unknown ranks
+  console.warn('Unknown Marvel Rivals rank, defaulting to GRNDS I', { rank, normalized, tier });
+  return 'GRNDS I';
 }
 
 function computeDiscordRank(params: {
@@ -328,17 +361,32 @@ export default async function handler(
       return;
     }
 
-    const rank = extractRank(stats);
-    if (!rank) {
-      res.status(400).json({ success: false, error: 'Could not parse Marvel Rivals rank from API response.' });
-      return;
-    }
+    // Log the raw stats for debugging
+    console.log('Marvel Rivals API response keys:', Object.keys(stats));
+    console.log('Marvel Rivals raw rank data:', {
+      rank: stats.rank,
+      tier: stats.tier,
+      division: stats.division,
+      ranked_rank: stats.ranked_rank,
+      competitive_rank: stats.competitive_rank,
+    });
 
-    const tierValue = parseTierValue(extractTier(stats), rank);
-    const discordRank = mapMarvelRankToDiscord(rank, tierValue);
-    if (!discordRank) {
-      res.status(400).json({ success: false, error: 'Could not map Marvel Rivals rank to Discord rank.' });
-      return;
+    const rank = extractRank(stats);
+    console.log('Extracted rank:', rank);
+    
+    // Determine the Discord rank from Marvel Rivals rank
+    let discordRank: string;
+    let tierValue = 0;
+    
+    if (!rank) {
+      // If no rank found, treat as unranked and assign GRNDS I
+      console.log('No rank found in stats, treating as unranked');
+      discordRank = 'GRNDS I';
+    } else {
+      tierValue = parseTierValue(extractTier(stats), rank);
+      const mappedRank = mapMarvelRankToDiscord(rank, tierValue);
+      // mapMarvelRankToDiscord now always returns a value (defaults to GRNDS I)
+      discordRank = mappedRank || 'GRNDS I';
     }
 
     const marvelRankValue = getRankValue(discordRank);
@@ -347,7 +395,7 @@ export default async function handler(
 
     const { data: player, error: playerError } = await supabase
       .from('players')
-      .select('id, discord_rank, discord_rank_value, current_mmr, peak_mmr, role_mode, primary_game, valorant_rank, valorant_rank_value, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_rank_value, marvel_rivals_mmr, marvel_rivals_peak_mmr')
+      .select('id, discord_rank, discord_rank_value, current_mmr, peak_mmr, role_mode, primary_game, valorant_rank, valorant_rank_value, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_rank_value, marvel_rivals_mmr, marvel_rivals_peak_mmr, marvel_rivals_username')
       .eq('discord_user_id', userId)
       .single();
 
