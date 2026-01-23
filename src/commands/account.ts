@@ -225,7 +225,7 @@ async function handleRiotUnlink(
   }
   
   if (unlinked) {
-    await safeEditReply(interaction, '✅ Successfully unlinked your Riot ID.');
+    await safeEditReply(interaction, '✅ Successfully unlinked your Riot ID.\n\n🗑️ Your Valorant rank and MMR have been cleared. Use `/verify game:valorant` to re-verify after linking a new account.');
   } else {
     await safeEditReply(interaction, '❌ You do not have a Riot ID linked.');
   }
@@ -479,7 +479,7 @@ async function handleMarvelUnlink(
   }
 
   playerService.invalidateCache(userId);
-  await safeEditReply(interaction, '✅ Marvel Rivals account unlinked.');
+  await safeEditReply(interaction, '✅ Marvel Rivals account unlinked.\n\n🗑️ Your Marvel Rivals rank and MMR have been cleared. Use `/verify game:marvel_rivals` to re-verify after linking a new account.');
 }
 
 async function handleMarvelInfo(

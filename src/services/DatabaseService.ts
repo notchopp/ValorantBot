@@ -224,6 +224,7 @@ export class DatabaseService {
 
   /**
    * Unlink/clear Riot ID from a player in the database
+   * Also clears Valorant rank and MMR so user can re-verify
    */
   async unlinkPlayerRiotID(discordUserId: string): Promise<boolean> {
     const supabase = this.getSupabase();
@@ -235,6 +236,9 @@ export class DatabaseService {
         riot_puuid: null,
         riot_region: null,
         verified_at: null,
+        valorant_rank: null,
+        valorant_mmr: null,
+        valorant_peak_mmr: null,
       })
       .eq('discord_user_id', discordUserId);
 
@@ -243,6 +247,7 @@ export class DatabaseService {
 
   /**
    * Unlink/clear Marvel Rivals account from a player in the database
+   * Also clears Marvel Rivals rank and MMR so user can re-verify
    */
   async unlinkPlayerMarvelRivalsID(discordUserId: string): Promise<boolean> {
     const supabase = this.getSupabase();
@@ -251,6 +256,9 @@ export class DatabaseService {
       .update({
         marvel_rivals_uid: null,
         marvel_rivals_username: null,
+        marvel_rivals_rank: null,
+        marvel_rivals_mmr: null,
+        marvel_rivals_peak_mmr: null,
       })
       .eq('discord_user_id', discordUserId);
 
