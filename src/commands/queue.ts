@@ -477,6 +477,15 @@ async function handleJoin(
   const userId = interaction.user.id;
   const username = interaction.user.username;
 
+  // TEMPORARY: Queue is closed for maintenance
+  const QUEUE_CLOSED = true;
+  if (QUEUE_CLOSED) {
+    await interaction.editReply({
+      content: '🔧 **Queue is temporarily closed for maintenance.**\n\nWe\'re making improvements to the system. Check back soon!',
+    });
+    return;
+  }
+
   try {
     const { queueService, playerService, rankService, matchService, databaseService, valorantAPI, skillGapAnalyzer, config } = services;
 
@@ -544,7 +553,7 @@ async function handleJoin(
       }
     }
 
-    // VALIDATION 3: Check Valorant activity (not super strict)
+    // VALIDATION 3: Check Valorant activity (not super strict, non-blocking on API errors)
     try {
       if (selectedGame === 'valorant' && valorantAPI) {
         const riotName = dbPlayer.riot_name;
@@ -553,9 +562,23 @@ async function handleJoin(
           await interaction.editReply(' Riot ID is missing. Please relink your account.');
           return;
         }
-        const account = await valorantAPI.getAccount(riotName, riotTag);
+        
+        // Try to fetch account but don't block if API fails
+        let account;
+        try {
+          account = await valorantAPI.getAccount(riotName, riotTag);
+        } catch (apiError: any) {
+          // If 404 (account not found), allow join anyway - account might be renamed
+          console.warn('Valorant API account lookup failed, allowing queue join anyway', {
+            userId,
+            riotName,
+            riotTag,
+            error: apiError instanceof Error ? apiError.message : String(apiError),
+          });
+          account = null;
+        }
 
-        // Check account level (minimum 20)
+        // Check account level (minimum 20) - only if we got account data
         if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
           await interaction.editReply({
             content:
@@ -566,20 +589,33 @@ async function handleJoin(
           return;
         }
 
-        // Optional: Check recent match activity (past 30 days)
-        const matches = await valorantAPI.getMatches(
-          dbPlayer.riot_region || config.valorantAPI.defaultRegion,
-          riotName,
-          riotTag,
-          'competitive'
-        );
+        // Skip match check if account lookup failed
+        if (!account) {
+          // Continue to queue join without match check
+        } else {
+          // Optional: Check recent match activity (past 30 days)
+          try {
+            const matches = await valorantAPI.getMatches(
+              dbPlayer.riot_region || config.valorantAPI.defaultRegion,
+              riotName,
+              riotTag,
+              'competitive'
+            );
 
-        if (matches && matches.length === 0) {
-          // Warning but allow join
-          await interaction.followUp({
-            content: ' No recent competitive matches found. Consider playing some Valorant!',
-            flags: MessageFlags.Ephemeral,
-          });
+            if (matches && matches.length === 0) {
+              // Warning but allow join
+              await interaction.followUp({
+                content: ' No recent competitive matches found. Consider playing some Valorant!',
+                flags: MessageFlags.Ephemeral,
+              });
+            }
+          } catch (matchError) {
+            // Ignore match lookup errors
+            console.warn('Could not fetch Valorant matches', {
+              userId,
+              error: matchError instanceof Error ? matchError.message : String(matchError),
+            });
+          }
         }
       }
     } catch (error) {
@@ -616,21 +652,7 @@ async function handleJoin(
   const queue = await queueService.getStatus(selectedGame);
   const queueSize = queue.players.length;
 
-  // Ping @everyone when first person joins the queue (only once, not spam)
-  if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
-    const playerRank = getRankDisplayForGame(dbPlayer, selectedGame).rank;
-    try {
-      await (interaction.channel as any).send({
-        content: `@everyone **${playerRank}** joined the queue.`,
-      });
-    } catch (error) {
-      // Non-critical - continue even if ping fails (e.g., missing permissions)
-      console.warn('Could not send queue ping message', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
+  // Removed @everyone ping - was too spammy
 
   // Update persistent queue message if it exists
   const { persistentQueueService } = services;
@@ -1143,6 +1165,22 @@ async function handleJoinButton(
   try {
     const { queueService, playerService, rankService, matchService, databaseService, voiceChannelService, valorantAPI, skillGapAnalyzer, config } = services;
 
+    // TEMPORARY: Queue is closed for maintenance
+    const QUEUE_CLOSED = true;
+    if (QUEUE_CLOSED) {
+      try {
+        await interaction.followUp({
+          content: '🔧 **Queue is temporarily closed for maintenance.**\n\nWe\'re making improvements to the system. Check back soon!',
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (error: any) {
+        if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+          console.error('Error sending follow-up message', { userId, error: error.message });
+        }
+      }
+      return;
+    }
+
     // Check if there's an active match
     const currentMatch = matchService.getCurrentMatch();
     if (currentMatch && currentMatch.status === 'in-progress') {
@@ -1239,7 +1277,7 @@ async function handleJoinButton(
       }
     }
 
-    // VALIDATION 3: Check Valorant activity (not super strict)
+    // VALIDATION 3: Check Valorant activity (not super strict, non-blocking on API errors)
     try {
       if (selectedGame === 'valorant' && valorantAPI) {
         const riotName = dbPlayer.riot_name;
@@ -1257,9 +1295,23 @@ async function handleJoinButton(
           }
           return;
         }
-        const account = await valorantAPI.getAccount(riotName, riotTag);
+        
+        // Try to fetch account but don't block if API fails
+        let account;
+        try {
+          account = await valorantAPI.getAccount(riotName, riotTag);
+        } catch (apiError: any) {
+          // If 404 (account not found), allow join anyway - account might be renamed
+          console.warn('Valorant API account lookup failed, allowing queue join anyway', {
+            userId,
+            riotName,
+            riotTag,
+            error: apiError instanceof Error ? apiError.message : String(apiError),
+          });
+          account = null;
+        }
 
-        // Check account level (minimum 20)
+        // Check account level (minimum 20) - only if we got account data
         if (account && account.account_level < MIN_VALORANT_ACCOUNT_LEVEL) {
           try {
             await interaction.followUp({
@@ -1280,25 +1332,36 @@ async function handleJoinButton(
           return;
         }
 
-        // Optional: Check recent match activity (past 30 days)
-        const matches = await valorantAPI.getMatches(
-          dbPlayer.riot_region || config.valorantAPI.defaultRegion,
-          riotName,
-          riotTag,
-          'competitive'
-        );
-
-        if (matches && matches.length === 0) {
-          // Warning but allow join
+        // Skip match check if account lookup failed
+        if (account) {
+          // Optional: Check recent match activity (past 30 days)
           try {
-            await interaction.followUp({
-              content: ' No recent competitive matches found. Consider playing some Valorant!',
-              flags: MessageFlags.Ephemeral,
-            });
-          } catch (error: any) {
-            if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
-              console.error('Error sending follow-up message', { userId, error: error.message });
+            const matches = await valorantAPI.getMatches(
+              dbPlayer.riot_region || config.valorantAPI.defaultRegion,
+              riotName,
+              riotTag,
+              'competitive'
+            );
+
+            if (matches && matches.length === 0) {
+              // Warning but allow join
+              try {
+                await interaction.followUp({
+                  content: ' No recent competitive matches found. Consider playing some Valorant!',
+                  flags: MessageFlags.Ephemeral,
+                });
+              } catch (error: any) {
+                if (error?.code !== DISCORD_ERROR_UNKNOWN_INTERACTION && error?.code !== DISCORD_ERROR_INTERACTION_EXPIRED) {
+                  console.error('Error sending follow-up message', { userId, error: error.message });
+                }
+              }
             }
+          } catch (matchError) {
+            // Ignore match lookup errors
+            console.warn('Could not fetch Valorant matches', {
+              userId,
+              error: matchError instanceof Error ? matchError.message : String(matchError),
+            });
           }
         }
       }
@@ -1367,21 +1430,7 @@ async function handleJoinButton(
     const queue = await queueService.getStatus(selectedGame);
     const queueSize = queue.players.length;
 
-    // Ping @everyone when first person joins the queue (only once, not spam)
-    if (queueSize === 1 && interaction.channel && 'send' in interaction.channel) {
-      const playerRank = getRankDisplayForGame(dbPlayer, selectedGame).rank;
-      try {
-        await interaction.channel.send({
-          content: `@everyone **${playerRank}** joined the queue.`,
-        });
-      } catch (error) {
-        // Non-critical - continue even if ping fails (e.g., missing permissions)
-        console.warn('Could not send queue ping message', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    // Removed @everyone ping - was too spammy
 
     // Check if queue is full (async)
     if (await queueService.isFull(selectedGame)) {

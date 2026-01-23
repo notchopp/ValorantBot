@@ -12,6 +12,8 @@ export class RoleSyncService {
   private static readonly SYNC_INTERVAL_MS = 5 * 60 * 1000; // Every 5 minutes
   private static readonly BATCH_SIZE = 50; // Process players in batches
   private static readonly DELAY_BETWEEN_PLAYERS_MS = 500; // Rate limit protection
+  // Protected roles that should never be touched by role sync
+  private static readonly PROTECTED_ROLES = ['#grndskeeper', '#grndsbooster', '#grndsmaker', 'keeper', 'booster', 'maker'];
 
   constructor(
     private client: Client,
@@ -151,6 +153,16 @@ export class RoleSyncService {
         member = await guild.members.fetch(player.discord_user_id);
       } catch {
         // Member not in guild (left or banned)
+        return { synced: false, skipped: true };
+      }
+
+      // Skip members with protected roles (KEEPER, BOOSTER, MAKER)
+      const hasProtectedRole = member.roles.cache.some((role: any) => {
+        if (!role?.name) return false;
+        const roleNameLower = role.name.toLowerCase();
+        return RoleSyncService.PROTECTED_ROLES.some((pr) => roleNameLower.includes(pr));
+      });
+      if (hasProtectedRole) {
         return { synced: false, skipped: true };
       }
 
