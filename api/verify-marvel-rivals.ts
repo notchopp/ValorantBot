@@ -19,6 +19,9 @@ export interface VerifyMarvelResponse {
   error?: string;
 }
 
+// Maximum MMR for initial placement (cap at GRNDS V)
+const GRNDS_V_MAX_MMR = 1499;
+
 const RANK_VALUE_MAP: Record<string, number> = {
   'GRNDS I': 1,
   'GRNDS II': 2,
@@ -339,7 +342,8 @@ export default async function handler(
     }
 
     const marvelRankValue = getRankValue(discordRank);
-    const marvelMMR = getRankMMR(discordRank);
+    // Cap MMR at GRNDS V (1499) for initial placement
+    const marvelMMR = Math.min(getRankMMR(discordRank), GRNDS_V_MAX_MMR);
 
     const { data: player, error: playerError } = await supabase
       .from('players')
