@@ -28,13 +28,17 @@ interface RefreshResult {
   success: boolean
   message: string
   totalPlayers: number
-  updatedRanks: number
-  updates: { id: string; oldRank: string; newRank: string; mmr: number; game: string }[]
+  updatedRanks?: number
+  updated?: number
+  skipped?: number
+  updates: { id: string; username?: string; oldRank: string; newRank: string; mmr?: number; oldMMR?: number; newMMR?: number; valorantRank?: string; game: string }[]
+  skippedDetails?: string[]
   errors?: string[]
 }
 
 export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRecalculating, setIsRecalculating] = useState(false)
   const [refreshResult, setRefreshResult] = useState<RefreshResult | null>(null)
   const [selectedGame, setSelectedGame] = useState<'valorant' | 'marvel_rivals' | 'both'>('both')
   const [showMismatchesOnly, setShowMismatchesOnly] = useState(false)
@@ -76,6 +80,45 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
     }
   }
 
+  const handleRecalculateMMR = async () => {
+    if (!confirm('This will pull fresh rank data from Valorant API and recalculate MMR for all players. This may take several minutes due to rate limiting. Continue?')) {
+      return
+    }
+    
+    setIsRecalculating(true)
+    setRefreshResult(null)
+    
+    try {
+      const response = await fetch('/api/admin/recalculate-mmr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game: selectedGame })
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        setRefreshResult({
+          success: false,
+          message: result.error || 'Failed to recalculate MMR',
+          totalPlayers: 0,
+          updates: []
+        })
+      } else {
+        setRefreshResult(result)
+      }
+    } catch (error) {
+      setRefreshResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        totalPlayers: 0,
+        updates: []
+      })
+    } finally {
+      setIsRecalculating(false)
+    }
+  }
+
   const filteredPlayers = showMismatchesOnly 
     ? initialPlayers.filter(p => p.rankMismatch)
     : initialPlayers
@@ -101,20 +144,36 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
             </select>
           </div>
           
-          {/* Refresh Button */}
+          {/* Refresh Button (labels only) */}
           <motion.button
             onClick={handleRefreshRanks}
-            disabled={isRefreshing}
+            disabled={isRefreshing || isRecalculating}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className={`flex items-center gap-2 px-6 py-3 rounded-lg font-mono text-sm font-bold uppercase tracking-wider transition-all ${
-              isRefreshing 
+              isRefreshing || isRecalculating
+                ? 'bg-white/10 text-white/40 cursor-not-allowed' 
+                : 'bg-white/20 hover:bg-white/30 text-white'
+            }`}
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'REFRESHING...' : 'FIX RANK LABELS'}
+          </motion.button>
+          
+          {/* Recalculate MMR Button (from APIs) */}
+          <motion.button
+            onClick={handleRecalculateMMR}
+            disabled={isRefreshing || isRecalculating}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-mono text-sm font-bold uppercase tracking-wider transition-all ${
+              isRefreshing || isRecalculating
                 ? 'bg-white/10 text-white/40 cursor-not-allowed' 
                 : 'bg-red-600 hover:bg-red-500 text-white'
             }`}
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'REFRESHING...' : 'REFRESH ALL RANKS'}
+            <Zap className={`w-4 h-4 ${isRecalculating ? 'animate-pulse' : ''}`} />
+            {isRecalculating ? 'PULLING FROM API...' : 'RECALCULATE ALL MMR'}
           </motion.button>
         </div>
         
@@ -143,23 +202,46 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
             {refreshResult.success && (
               <div className="text-sm text-white/60 font-mono space-y-1">
                 <div>Total Players: {refreshResult.totalPlayers}</div>
-                <div>Ranks Updated: {refreshResult.updatedRanks}</div>
+                <div>Updated: {refreshResult.updatedRanks ?? refreshResult.updated ?? 0}</div>
+                {refreshResult.skipped !== undefined && (
+                  <div>Skipped: {refreshResult.skipped}</div>
+                )}
                 
                 {refreshResult.updates.length > 0 && (
                   <div className="mt-3 max-h-40 overflow-y-auto">
                     <div className="text-[10px] text-white/40 uppercase mb-2">CHANGES:</div>
                     {refreshResult.updates.slice(0, 20).map((update, i) => (
                       <div key={i} className="text-xs py-1 border-b border-white/5">
+                        <span className="text-white/60">{update.username || 'Unknown'}: </span>
                         <span className="text-white/80">{update.oldRank}</span>
                         <span className="text-white/40"> → </span>
                         <span className="text-green-500">{update.newRank}</span>
-                        <span className="text-white/30 ml-2">({update.mmr} MMR, {update.game})</span>
+                        {update.oldMMR !== undefined && update.newMMR !== undefined ? (
+                          <span className="text-white/30 ml-2">({update.oldMMR} → {update.newMMR} MMR)</span>
+                        ) : update.mmr !== undefined ? (
+                          <span className="text-white/30 ml-2">({update.mmr} MMR)</span>
+                        ) : null}
+                        {update.valorantRank && (
+                          <span className="text-yellow-500/60 ml-2">[{update.valorantRank}]</span>
+                        )}
                       </div>
                     ))}
                     {refreshResult.updates.length > 20 && (
                       <div className="text-xs text-white/40 mt-2">
                         ...and {refreshResult.updates.length - 20} more
                       </div>
+                    )}
+                  </div>
+                )}
+                
+                {refreshResult.skippedDetails && refreshResult.skippedDetails.length > 0 && (
+                  <div className="mt-3 max-h-32 overflow-y-auto">
+                    <div className="text-[10px] text-white/40 uppercase mb-2">SKIPPED:</div>
+                    {refreshResult.skippedDetails.slice(0, 10).map((msg, i) => (
+                      <div key={i} className="text-xs text-white/40 py-1">{msg}</div>
+                    ))}
+                    {refreshResult.skippedDetails.length > 10 && (
+                      <div className="text-xs text-white/30 mt-1">...and {refreshResult.skippedDetails.length - 10} more</div>
                     )}
                   </div>
                 )}
