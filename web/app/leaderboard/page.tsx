@@ -106,106 +106,113 @@ export default async function LeaderboardPage({
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="mb-8 md:mb-12">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-white mb-4 tracking-tighter leading-none uppercase">
-            Global
+          <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-2">
+            <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">QUERY</span><span className="text-white/40">::</span><span className="text-white">GLOBAL_RANKINGS</span>
+          </div>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-mono font-black text-white mb-4 tracking-tighter leading-none uppercase">
+            <span className="text-[var(--term-muted)]">[</span>LEAD<span className="text-[var(--term-muted)]">]</span>
             <br />
-            <span className="text-red-500">Leaderboard</span>
+            <span className="text-[var(--term-accent)]">_ERBOARD</span>
           </h1>
-          <p className="text-base md:text-lg text-white/60 font-light mb-8 max-w-2xl">
-            Top players ranked by MMR. Real stats from competitive matches.
+          <p className="text-sm md:text-base text-[var(--term-muted)] font-mono mb-8 max-w-2xl">
+            <span className="text-[var(--term-accent)]">#</span> Top players ranked by MMR. Real stats from competitive matches.
           </p>
 
-          <div className="inline-flex items-center gap-2 mb-8 rounded-full border border-white/10 bg-white/[0.04] p-1">
+          <div className="flex flex-wrap items-center gap-2 mb-8">
             <Link
               href="/leaderboard?game=valorant"
-              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+                selectedGame === 'valorant'
+                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
               Valorant
             </Link>
             <Link
               href="/leaderboard?game=marvel_rivals"
-              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+                selectedGame === 'marvel_rivals'
+                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
               Marvel Rivals
             </Link>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
+            <span className="text-[10px] font-mono text-[var(--term-muted)] px-2">[{gameLabel.toUpperCase()}]</span>
           </div>
           
           {/* Stats Bar */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl">
-            <div className="glass rounded-2xl p-6 border border-white/5">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Total Players</div>
-              <div className="text-3xl md:text-5xl font-black text-white tracking-tighter">{totalPlayers}</div>
+            <div className="terminal-panel p-6">
+              <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-2 font-mono">TOTAL_PLAYERS</div>
+              <div className="text-3xl md:text-5xl font-mono font-black text-white tabular-nums">{totalPlayers}</div>
             </div>
-            <div className="glass rounded-2xl p-6 border border-white/5">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Average MMR</div>
-              <div className="text-3xl md:text-5xl font-black text-red-500 tracking-tighter">{averageMMR}</div>
+            <div className="terminal-panel p-6">
+              <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-2 font-mono">AVG_MMR</div>
+              <div className="text-3xl md:text-5xl font-mono font-black text-[var(--term-accent)] tabular-nums">{averageMMR}</div>
             </div>
-            <div className="glass rounded-2xl p-6 border border-white/5">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Top Player</div>
-              <div className="text-xl md:text-2xl font-black text-white tracking-tighter truncate">
+            <div className="terminal-panel p-6">
+              <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-2 font-mono">TOP_PLAYER</div>
+              <div className="text-xl md:text-2xl font-mono font-black text-white truncate">
                 {topPlayer?.discord_username || 'N/A'}
               </div>
               {topPlayer && (
-                <div className="text-sm text-red-500 font-black mt-1">{topPlayer.currentMMR} MMR</div>
+                <div className="text-sm text-[var(--term-accent)] font-mono font-black mt-1">{topPlayer.currentMMR} MMR</div>
               )}
             </div>
           </div>
         </div>
         
         {/* Leaderboard Table */}
-        <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+        <div className="terminal-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-white/[0.02] border-b border-white/5">
+            <table className="w-full font-mono">
+              <thead className="bg-[var(--term-panel)] border-b border-[var(--term-border)]">
                 <tr>
-                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-                    Rank
+                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)]">
+                    POS
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-                    Player
+                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)]">
+                    PLAYER
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-                    Tier
+                  <th className="px-4 md:px-8 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)]">
+                    TIER
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
+                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)]">
                     MMR
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hidden md:table-cell">
+                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)] hidden md:table-cell">
                     K/D
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-white/40 hidden md:table-cell">
-                    Win Rate
+                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)] hidden md:table-cell">
+                    WIN%
                   </th>
-                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-white/40">
-                    Peak
+                  <th className="px-4 md:px-8 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-[var(--term-muted)]">
+                    PEAK
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--term-border)]">
                 {playersWithStats.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-8 py-16 text-center text-white/40 font-light">
-                      No players found. Be the first to join!
+                    <td colSpan={7} className="px-8 py-16 text-center text-[var(--term-muted)]">
+                      [NO_DATA] No players found. Be the first to join!
                     </td>
                   </tr>
                 ) : (
                   playersWithStats.map((player, index) => (
                     <tr
                       key={player.id}
-                      className="group hover:bg-white/[0.02] transition-colors"
+                      className="group hover:bg-[var(--term-panel)] transition-colors"
                     >
                       <td className="px-4 md:px-8 py-4">
                         <div className="flex items-center gap-3">
-                          <span className={`text-lg md:text-xl font-black tracking-tighter ${
-                            index === 0 ? 'text-red-500' : 
-                            index < 3 ? 'text-red-500/80' : 
-                            index < 10 ? 'text-red-500/60' : 
-                            'text-white/40'
+                          <span className={`text-lg md:text-xl font-black tabular-nums ${
+                            index === 0 ? 'text-[var(--term-accent)]' : 
+                            index < 3 ? 'text-[var(--term-accent)]/80' : 
+                            index < 10 ? 'text-[var(--term-accent)]/60' : 
+                            'text-[var(--term-muted)]'
                           }`}>
                             #{index + 1}
                           </span>

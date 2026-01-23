@@ -200,71 +200,78 @@ export default async function SeasonPage({
         <div className="mb-8 md:mb-12">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-red-500 mb-2 tracking-tighter leading-none">
-                {currentSeason.name}
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-2">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">SEASON</span><span className="text-white/40">::</span><span className="text-white">ACTIVE_INSTANCE</span>
+              </div>
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-mono font-black text-[var(--term-accent)] mb-2 tracking-tighter leading-none">
+                <span className="text-[var(--term-muted)]">[</span>{currentSeason.name}<span className="text-[var(--term-muted)]\">]</span>
               </h1>
               {currentSeason.description && (
-                <p className="text-base md:text-lg text-white/60 font-light max-w-2xl">
-                  {currentSeason.description}
+                <p className="text-sm md:text-base text-[var(--term-muted)] font-mono max-w-2xl">
+                  <span className="text-[var(--term-accent)]">#</span> {currentSeason.description}
                 </p>
               )}
             </div>
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Status</div>
-              <div className="text-lg font-black text-white">
-                {isBeforeStart ? 'Starting Soon' : 'Active'}
+            <div className="text-right hidden sm:block terminal-panel p-4">
+              <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-2">STATUS</div>
+              <div className="text-lg font-mono font-black text-[var(--term-accent)]">
+                {isBeforeStart ? '[PENDING]' : '[ACTIVE]'}
               </div>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 mb-8 rounded-full border border-white/10 bg-white/[0.04] p-1">
+          <div className="flex flex-wrap items-center gap-2 mb-8">
             <Link
               href="/season?game=valorant"
-              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+                selectedGame === 'valorant'
+                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
               Valorant
             </Link>
             <Link
               href="/season?game=marvel_rivals"
-              className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+              className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+                selectedGame === 'marvel_rivals'
+                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
               Marvel Rivals
             </Link>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
+            <span className="text-[10px] font-mono text-[var(--term-muted)] px-2">[{gameLabel.toUpperCase()}]</span>
           </div>
           
           {/* Countdown & Stats */}
-          <div className="glass rounded-2xl p-6 border border-white/5 mb-8">
+          <div className="terminal-panel p-6 mb-8">
             {isBeforeStart ? (
               <>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Starting</div>
+                <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">&gt; COUNTDOWN_TO_START</div>
                 <SeasonCountdown endDate={currentSeason.start_date} />
               </>
             ) : (
               <>
-                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-3">Season Ends</div>
+                <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">&gt; TIME_REMAINING</div>
                 <SeasonCountdown endDate={currentSeason.end_date} />
               </>
             )}
-            <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-white/5">
+            <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-[var(--term-border)]">
               <div>
-                <div className="text-xs text-white/40 mb-1">Total Matches</div>
-                <div className="text-2xl font-black text-red-500">{totalSeasonMatches}</div>
+                <div className="text-[10px] text-[var(--term-muted)] mb-1 font-mono uppercase">MATCHES</div>
+                <div className="text-2xl font-mono font-black text-[var(--term-accent)]">{totalSeasonMatches}</div>
               </div>
               <div>
-                <div className="text-xs text-white/40 mb-1">Active Players</div>
-                <div className="text-2xl font-black text-white">{players.length}</div>
+                <div className="text-[10px] text-[var(--term-muted)] mb-1 font-mono uppercase">PLAYERS</div>
+                <div className="text-2xl font-mono font-black text-white">{players.length}</div>
               </div>
               <div>
-                <div className="text-xs text-white/40 mb-1">Average MMR</div>
-                <div className="text-2xl font-black text-white">{averageMMR}</div>
+                <div className="text-[10px] text-[var(--term-muted)] mb-1 font-mono uppercase">AVG_MMR</div>
+                <div className="text-2xl font-mono font-black text-white">{averageMMR}</div>
               </div>
             </div>
-            <div className="text-xs text-white/40 mt-3 font-light">
-              {new Date(currentSeason.start_date).toLocaleDateString()} - {new Date(currentSeason.end_date).toLocaleDateString()}
+            <div className="text-[10px] text-[var(--term-muted)] mt-3 font-mono">
+              [{new Date(currentSeason.start_date).toLocaleDateString()}] → [{new Date(currentSeason.end_date).toLocaleDateString()}]
             </div>
           </div>
         </div>

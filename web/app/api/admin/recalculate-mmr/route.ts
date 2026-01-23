@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
               skipped.push(`${player.discord_username} (${player.riot_name}#${player.riot_tag}): ${valorantData?.error || 'Unknown error'}`)
             }
             
-            await new Promise(resolve => setTimeout(resolve, 500))
+            await new Promise(resolve => setTimeout(resolve, 2000))
             continue
           }
           
@@ -411,7 +411,7 @@ export async function POST(request: NextRequest) {
             skipped.push(`${player.discord_username}: MMR unchanged (${oldMMR})`)
           }
           
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 2000))
         } else if ((game === 'valorant' || game === 'both') && !player.riot_puuid) {
           if (game === 'valorant') {
             skipped.push(`${player.discord_username}: No PUUID stored`)
@@ -424,7 +424,7 @@ export async function POST(request: NextRequest) {
           
           if (!mrData || mrData.error || !mrData.rank) {
             skipped.push(`${player.discord_username} (MR: ${player.marvel_rivals_username}): ${mrData?.error || 'No rank data'}`)
-            await new Promise(resolve => setTimeout(resolve, 500))
+            await new Promise(resolve => setTimeout(resolve, 2000))
             continue
           }
           
@@ -463,7 +463,7 @@ export async function POST(request: NextRequest) {
             skipped.push(`${player.discord_username} (MR): MMR unchanged (${oldMMR})`)
           }
           
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 2000))
         } else if ((game === 'marvel_rivals' || game === 'both') && !player.marvel_rivals_uid) {
           if (game === 'marvel_rivals') {
             skipped.push(`${player.discord_username}: No Marvel Rivals UID stored`)

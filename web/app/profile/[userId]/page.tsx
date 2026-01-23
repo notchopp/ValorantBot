@@ -190,24 +190,31 @@ export default async function ProfilePage({
   <div className="mb-12 md:mb-20">
     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
       <div className="flex-1">
-        <div className="inline-flex items-center gap-2 mb-4 rounded-full border border-white/10 bg-white/[0.04] p-1">
+        <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">
+          <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">PLAYER</span><span className="text-white/40">::</span><span className="text-white">PROFILE_VIEW</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <Link
             href={`/profile/${userId}?game=valorant`}
-            className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-              selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+              selectedGame === 'valorant'
+                ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
             }`}
           >
             Valorant
           </Link>
           <Link
             href={`/profile/${userId}?game=marvel_rivals`}
-            className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-              selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
+              selectedGame === 'marvel_rivals'
+                ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
             }`}
           >
             Marvel Rivals
           </Link>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-2">{gameLabel}</span>
+          <span className="text-[10px] font-mono text-[var(--term-muted)] px-2">[{gameLabel.toUpperCase()}]</span>
         </div>
               <div className="flex items-center gap-4 md:gap-6 mb-4 md:mb-6">
                 {/* Avatar */}
@@ -217,10 +224,10 @@ export default async function ProfilePage({
                     <img
                       src={playerData.discord_avatar_url}
                       alt={displayName}
-                      className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-white/10"
+                      className="w-20 h-20 md:w-24 md:h-24 rounded-sm border-2 border-[var(--term-border)]"
                     />
                   ) : (
-                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border-2 border-white/10 flex items-center justify-center text-white/60 text-2xl md:text-3xl font-black">
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-sm bg-[var(--term-panel)] border-2 border-[var(--term-border)] flex items-center justify-center text-[var(--term-muted)] text-2xl md:text-3xl font-mono font-black">
                       {displayName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -229,17 +236,17 @@ export default async function ProfilePage({
                 {/* Name and Edit */}
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-2">
-                    <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white tracking-tighter leading-[0.9]">
-                      {displayName}
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-mono font-black text-white tracking-tighter leading-[0.9]">
+                      <span className="text-[var(--term-muted)]">[</span>{displayName}<span className="text-[var(--term-muted)]\">]</span>
                     </h1>
                     {isOwnProfile && (
                       <Link
                         href={`/profile/${userId}/edit`}
-                        className="p-2 md:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-[var(--profile-accent-color)]/50 transition-all group"
+                        className="p-2 md:p-3 border border-[var(--term-border)] bg-[var(--term-panel)] hover:border-[var(--profile-accent-color)]/50 transition-all group"
                         style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
                         title="Edit Profile"
                       >
-                        <svg className="w-5 h-5 md:w-6 md:h-6 text-white/60 group-hover:text-[var(--profile-accent-color)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 md:w-6 md:h-6 text-[var(--term-muted)] group-hover:text-[var(--profile-accent-color)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </Link>

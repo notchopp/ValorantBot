@@ -131,14 +131,16 @@ export default async function HeadquartersPage() {
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <div className="mb-8 md:mb-12">
-          <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-2">&gt; ADMIN_HEADQUARTERS</div>
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-white mb-4 tracking-tighter leading-none uppercase">
-            Head
+          <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-2">
+            <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">SYSTEM</span><span className="text-white/40">::</span><span className="text-white">ADMIN_HEADQUARTERS</span>
+          </div>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-mono font-black text-white mb-4 tracking-tighter leading-none uppercase">
+            <span className="text-[var(--term-muted)]">[</span>HQ<span className="text-[var(--term-muted)]">]</span>
             <br />
-            <span className="text-red-500">quarters</span>
+            <span className="text-[var(--term-accent)]">_CONTROL</span>
           </h1>
-          <p className="text-base md:text-lg text-white/60 font-light mb-8 max-w-2xl font-mono">
-            Admin controls for the GRNDS rank system. Manage players and sync ranks.
+          <p className="text-sm md:text-base text-[var(--term-muted)] font-mono mb-8 max-w-2xl">
+            <span className="text-[var(--term-accent)]">#</span> Root access granted. Manage player data and sync ranks from external APIs.
           </p>
         </div>
         
