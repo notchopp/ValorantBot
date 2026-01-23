@@ -121,6 +121,16 @@ export async function execute(
         return;
       }
 
+      // Show loading state while we fetch from API
+      const marvelLoadingEmbed = new EmbedBuilder()
+        .setTitle('⏳ Fetching Your Marvel Rivals Rank...')
+        .setColor(0x5865f2)
+        .setDescription('Please wait while we look up your stats. This may take a moment...');
+
+      await interaction.editReply({
+        embeds: [marvelLoadingEmbed],
+      });
+
       let verifyResult = await vercelAPI.verifyMarvelRivals({
         userId,
         username,
@@ -168,6 +178,17 @@ export async function execute(
           // Parse the rank from the unique value (format: "GRNDS X:source")
           const selectedRank = parseManualRankValue(selectInteraction.values[0]);
           
+          // Show loading state while we process
+          const loadingEmbed = new EmbedBuilder()
+            .setTitle('⏳ Calculating Your Rank...')
+            .setColor(0x5865f2)
+            .setDescription('Please wait while we set up your placement. This may take a moment...');
+
+          await interaction.editReply({
+            embeds: [loadingEmbed],
+            components: [],
+          });
+
           // Re-verify with the manual rank
           verifyResult = await vercelAPI.verifyMarvelRivals({
             userId,
@@ -314,6 +335,16 @@ export async function execute(
       );
       return;
     }
+
+    // Show loading state while we fetch from API
+    const valorantLoadingEmbed = new EmbedBuilder()
+      .setTitle('⏳ Fetching Your Valorant Rank...')
+      .setColor(0x5865f2)
+      .setDescription('Please wait while we look up your stats. This may take a moment...');
+
+    await interaction.editReply({
+      embeds: [valorantLoadingEmbed],
+    });
 
     // Call Vercel Cloud Agent to handle verification
     console.log('Calling Vercel API for verification', {
