@@ -5,17 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  LayoutDashboard, Trophy, Users, User, LogOut, Menu, X
+  LayoutDashboard, Trophy, Users, User, LogOut, Menu, X, Shield
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PlayerSearch } from "./PlayerSearch";
 import { useAccentColor } from "@/lib/AccentColorContext";
 import { NotificationsBell } from "./NotificationsBell";
 
-type Tab = "dashboard" | "season" | "leaderboard" | "profile";
+type Tab = "dashboard" | "season" | "leaderboard" | "profile" | "hq";
 
 interface GRNDSTopNavProps {
   discordUserId?: string;
+  isAdmin?: boolean;
 }
 
 interface TabItem { 
@@ -24,6 +25,7 @@ interface TabItem {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: React.ComponentType<any>; 
   href: string;
+  adminOnly?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,12 +38,17 @@ const tabs: TabItem[] = [
   { id: "leaderboard", label: "Leaderboard", icon: Users as React.ComponentType<any>, href: "/leaderboard" },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   { id: "profile", label: "Profile", icon: User as React.ComponentType<any>, href: "" }, // href set dynamically
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { id: "hq", label: "HQ", icon: Shield as React.ComponentType<any>, href: "/hq", adminOnly: true },
 ];
 
-export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
+export function GRNDSTopNav({ discordUserId, isAdmin = false }: GRNDSTopNavProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { accentColor } = useAccentColor();
+
+  // Filter tabs based on admin status
+  const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin);
 
   // Determine active tab based on pathname
   const getActiveTab = (): Tab => {
@@ -49,6 +56,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
     if (pathname?.startsWith("/season")) return "season";
     if (pathname?.startsWith("/leaderboard")) return "leaderboard";
     if (pathname?.startsWith("/profile")) return "profile";
+    if (pathname?.startsWith("/hq")) return "hq";
     return "dashboard";
   };
 
@@ -106,7 +114,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
           </div>
           
           <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
             const href = tab.id === "profile" && discordUserId ? `/profile/${discordUserId}` : tab.href;
@@ -202,7 +210,7 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
                 </div>
                 
                 <div className="space-y-2">
-                  {tabs.map((tab) => {
+                  {visibleTabs.map((tab) => {
                     const isActive = activeTab === tab.id;
                     const Icon = tab.icon;
                     const href = tab.id === "profile" && discordUserId ? `/profile/${discordUserId}` : tab.href;
