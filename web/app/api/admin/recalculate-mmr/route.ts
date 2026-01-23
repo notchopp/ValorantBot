@@ -63,7 +63,7 @@ function calculateInitialMMR(valorantRank: string, valorantELO: number): number 
 /**
  * Fetch Valorant MMR using PUUID (v3 API like verify-account.ts)
  */
-async function fetchValorantMMR(puuid: string, region: string): Promise<{ rank: string; elo: number } | null> {
+async function fetchValorantMMR(puuid: string, region: string): Promise<{ rank: string; elo: number; error?: string } | null> {
   try {
     const apiRegion = region === 'latam' || region === 'br' ? 'na' : region
     const platform = 'pc'
@@ -78,21 +78,24 @@ async function fetchValorantMMR(puuid: string, region: string): Promise<{ rank: 
       headers['Authorization'] = process.env.VALORANT_API_KEY
     }
     
-    const response = await fetch(
-      `https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/${apiRegion}/${platform}/${puuid}`,
-      { headers, next: { revalidate: 0 } }
-    )
+    const url = `https://api.henrikdev.xyz/valorant/v3/by-puuid/mmr/${apiRegion}/${platform}/${puuid}`
+    console.log(`Fetching MMR from: ${url}`)
+    
+    const response = await fetch(url, { headers, cache: 'no-store' })
     
     if (!response.ok) {
-      console.error(`MMR API error: ${response.status}`)
-      return null
+      const errorText = await response.text()
+      console.error(`MMR API error: ${response.status} - ${errorText}`)
+      return { rank: '', elo: 0, error: `API ${response.status}: ${errorText.substring(0, 100)}` }
     }
     
     const data = await response.json()
+    console.log(`API Response for ${puuid.substring(0,8)}:`, JSON.stringify(data).substring(0, 200))
+    
     const mmrData = data?.data
     
     if (!mmrData) {
-      return null
+      return { rank: '', elo: 0, error: 'No data in response' }
     }
     
     // Map v3 response structure
@@ -101,13 +104,13 @@ async function fetchValorantMMR(puuid: string, region: string): Promise<{ rank: 
     
     // Check if unrated
     if (!rank || rank.toLowerCase().includes('unrated')) {
-      return null
+      return { rank: '', elo: 0, error: `Player is unrated: ${rank}` }
     }
     
     return { rank, elo }
   } catch (error) {
     console.error('Error fetching Valorant MMR:', error)
-    return null
+    return { rank: '', elo: 0, error: `Exception: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
 
@@ -203,8 +206,8 @@ export async function POST(request: NextRequest) {
             player.riot_region || 'na'
           )
           
-          if (!valorantData) {
-            skipped.push(`${player.discord_username} (${player.riot_name}#${player.riot_tag}): Could not fetch Valorant data`)
+          if (!valorantData || valorantData.error) {
+            skipped.push(`${player.discord_username} (${player.riot_name}#${player.riot_tag}): ${valorantData?.error || 'Unknown error'}`)
             continue
           }
           
