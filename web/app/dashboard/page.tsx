@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { RankBadge } from '@/components/RankBadge'
-import { MMRProgressBar } from '@/components/MMRProgressBar'
-import { ActivityFeed } from '@/components/ActivityFeed'
+import { TerminalMMRBar } from '@/components/TerminalMMRBar'
 import { ActivityFeed as ActivityFeedType } from '@/lib/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -292,7 +291,7 @@ export default async function DashboardPage({
   )
 }
 
-// Dashboard content component
+// Dashboard content – terminal-style UI
 function DashboardContent({
   playerDataToUse,
   totalMatches,
@@ -331,152 +330,170 @@ function DashboardContent({
   gameLabel: string
 }) {
   const displayName = userProfile?.display_name || playerDataToUse.discord_username || 'Player'
-  
+  const termAccent = userAccentColor || '#22c55e'
+
   return (
-    <div className="min-h-screen py-8 md:py-12 px-4 md:px-8 relative z-10" style={{ '--user-accent-color': userAccentColor } as React.CSSProperties}>
-      <div className="max-w-[1600px] mx-auto">
-        {/* Live Header */}
-        <div className="mb-8 md:mb-12 flex items-center justify-between">
+    <div
+      className="terminal-dashboard min-h-screen py-6 md:py-10 px-4 md:px-6 lg:px-8 relative z-10 font-mono bg-[var(--term-bg)]"
+      style={{ '--term-prompt': termAccent } as React.CSSProperties}
+    >
+      <div className="max-w-[1400px] mx-auto">
+        {/* Header: GRNDS_TERMINAL — USER */}
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 mb-4 rounded-full border border-white/10 bg-white/[0.04] p-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="terminal-prompt text-sm font-semibold">&gt; GRNDS_TERMINAL</span>
+              <span className="text-[var(--term-muted)] text-xs">—</span>
+              <span className="text-[var(--term-text)] text-sm">USER: {displayName}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <Link
                 href="/dashboard?game=valorant"
-                className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                  selectedGame === 'valorant' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                  selectedGame === 'valorant'
+                    ? 'bg-[var(--term-green)] text-black border-[var(--term-green)]'
+                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-green)] hover:text-[var(--term-text)]'
                 }`}
               >
                 Valorant
               </Link>
               <Link
                 href="/dashboard?game=marvel_rivals"
-                className={`px-3 py-1 text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all ${
-                  selectedGame === 'marvel_rivals' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                  selectedGame === 'marvel_rivals'
+                    ? 'bg-[var(--term-green)] text-black border-[var(--term-green)]'
+                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-green)] hover:text-[var(--term-text)]'
                 }`}
               >
                 Marvel Rivals
               </Link>
+              <span className="text-[var(--term-muted)] text-[10px]">{gameLabel}</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white mb-2 tracking-tighter leading-none">
-              {displayName}
-            </h1>
-            <p className="text-sm md:text-base text-white/40 font-light">
+            <p className="text-[10px] text-[var(--term-muted)]">
               {selectedGame === 'marvel_rivals'
                 ? (playerDataToUse.marvel_rivals_username
-                    ? `${playerDataToUse.marvel_rivals_username} • ${playerDataToUse.marvel_rivals_uid || 'UID pending'} • Linked`
-                    : 'Link Marvel Rivals in Discord')
+                    ? `${playerDataToUse.marvel_rivals_username} · ${playerDataToUse.marvel_rivals_uid || 'UID pending'} · LINKED`
+                    : 'LINK MARVEL RIVALS IN DISCORD')
                 : (playerDataToUse.riot_name && playerDataToUse.riot_tag
-                    ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag} • Linked`
-                    : 'Link Riot ID in Discord')
-              }
+                    ? `${playerDataToUse.riot_name}#${playerDataToUse.riot_tag} · LINKED`
+                    : 'LINK RIOT ID IN DISCORD')}
             </p>
-            <div className="mt-2 text-xs font-black uppercase tracking-[0.3em] text-white/30">
-              {gameLabel}
-            </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className="text-right">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Discord Rank</div>
+              <div className="text-[10px] text-[var(--term-muted)] mb-1 uppercase tracking-wider">RANK</div>
               <RankBadge mmr={playerDataToUse.current_mmr} size="lg" rankLabel={playerDataToUse.discord_rank} />
             </div>
             <div className="text-right hidden sm:block">
-              <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-1">Position</div>
-              <div className="text-2xl md:text-3xl font-black" style={{ color: userAccentColor }}>#{leaderboardPosition}</div>
+              <div className="text-[10px] text-[var(--term-muted)] mb-1 uppercase tracking-wider">POS</div>
+              <div className="text-xl font-bold" style={{ color: termAccent }}>#{leaderboardPosition}</div>
             </div>
           </div>
         </div>
-        
-        {/* MMR Card - Main Focus */}
-        <div className="glass rounded-3xl p-8 md:p-12 border border-white/5 mb-8 md:mb-12 hover:border-red-500/20 transition-all group">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Current MMR</div>
-              <div className="text-6xl md:text-8xl font-black tracking-tighter leading-none" style={{ color: userAccentColor }}>
+
+        {/* MMR readout */}
+        <div className="terminal-panel p-6 md:p-8 mb-6 md:mb-8">
+          <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">&gt; MMR_READOUT</div>
+          <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+            <div className="flex items-baseline gap-3">
+              <span className="text-4xl md:text-6xl font-bold tabular-nums" style={{ color: termAccent }}>
                 {playerDataToUse.current_mmr}
-              </div>
+              </span>
+              {netMMR !== 0 && (
+                <span
+                  className="text-lg md:text-xl font-bold tabular-nums"
+                  style={{ color: netMMR > 0 ? 'var(--term-green)' : 'var(--term-red)' }}
+                >
+                  {netMMR > 0 ? '+' : ''}{netMMR}
+                </span>
+              )}
             </div>
-            {netMMR !== 0 && (
-              <div className="text-2xl md:text-3xl font-black" style={{ color: netMMR > 0 ? '#22c55e' : userAccentColor }}>
-                {netMMR > 0 ? '+' : ''}{netMMR}
-              </div>
-            )}
+            <div className="text-[10px] text-[var(--term-muted)]">
+              PEAK: <span style={{ color: termAccent }}>{playerDataToUse.peak_mmr}</span>
+              {playerDataToUse.current_mmr > 0 && (
+                <> · {3000 - playerDataToUse.current_mmr} TO X</>
+              )}
+            </div>
           </div>
-          <MMRProgressBar currentMMR={playerDataToUse.current_mmr} accentColor={userAccentColor} />
-          <div className="mt-6 flex items-center justify-between text-sm">
-            <span className="text-white/40">
-              Peak: <span className="font-black" style={{ color: userAccentColor }}>{playerDataToUse.peak_mmr}</span>
-            </span>
-            <span className="text-white/40">
-              {playerDataToUse.current_mmr > 0
-                ? `${3000 - playerDataToUse.current_mmr} to X Rank`
-                : `Link ${gameLabel} to start`}
-            </span>
-          </div>
+          <TerminalMMRBar currentMMR={playerDataToUse.current_mmr} accentColor={termAccent} />
         </div>
-        
-        {/* Competitive Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
-          <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Matches</div>
-            <div className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-1">{totalMatches}</div>
-            <div className="text-xs text-white/40">{wins}W / {losses}L</div>
+
+        {/* Stats */}
+        <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">&gt; STATS</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="terminal-panel p-4 md:p-5">
+            <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-1">MATCHES</div>
+            <div className="text-2xl md:text-3xl font-bold text-[var(--term-text)] tabular-nums">{totalMatches}</div>
+            <div className="text-[10px] text-[var(--term-muted)] mt-1">{wins}W / {losses}L</div>
           </div>
-          
-          <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">Win Rate</div>
-            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: winRate >= 50 ? '#22c55e' : winRate > 0 ? userAccentColor : 'rgba(255, 255, 255, 0.4)' }}>
+          <div className="terminal-panel p-4 md:p-5">
+            <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-1">WIN_RATE</div>
+            <div
+              className="text-2xl md:text-3xl font-bold tabular-nums"
+              style={{
+                color: winRate >= 50 ? 'var(--term-green)' : winRate > 0 ? termAccent : 'var(--term-muted)'
+              }}
+            >
               {winRate}%
             </div>
-            <div className="text-xs text-white/40">Last 10 matches</div>
+            <div className="text-[10px] text-[var(--term-muted)] mt-1">LAST 10</div>
           </div>
-          
-          <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">K/D Ratio</div>
-            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: parseFloat(kdRatio) >= 1.0 ? '#22c55e' : parseFloat(kdRatio) > 0 ? userAccentColor : 'rgba(255, 255, 255, 0.4)' }}>
+          <div className="terminal-panel p-4 md:p-5">
+            <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-1">K/D</div>
+            <div
+              className="text-2xl md:text-3xl font-bold tabular-nums"
+              style={{
+                color: parseFloat(kdRatio) >= 1 ? 'var(--term-green)' : parseFloat(kdRatio) > 0 ? termAccent : 'var(--term-muted)'
+              }}
+            >
               {kdRatio}
             </div>
-            <div className="text-xs text-white/40">Overall stats</div>
+            <div className="text-[10px] text-[var(--term-muted)] mt-1">OVERALL</div>
           </div>
-          
-          <div className="glass rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-all group">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-3">MVP Count</div>
-            <div className="text-4xl md:text-5xl font-black tracking-tighter mb-1" style={{ color: userAccentColor }}>{mvpCount}</div>
-            <div className="text-xs text-white/40">Match MVPs</div>
+          <div className="terminal-panel p-4 md:p-5">
+            <div className="text-[10px] text-[var(--term-muted)] uppercase tracking-wider mb-1">MVP</div>
+            <div className="text-2xl md:text-3xl font-bold tabular-nums" style={{ color: termAccent }}>{mvpCount}</div>
+            <div className="text-[10px] text-[var(--term-muted)] mt-1">MATCH MVPS</div>
           </div>
         </div>
-        
-        {/* Main Content Grid - Match History, Rank Progression, Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12">
-          {/* Match History */}
-          <div className="lg:col-span-1 glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">Match History</h2>
-              <div className="text-xs text-white/40">{matchHistory.length} matches</div>
+
+        {/* Match history, rank progression, activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="terminal-panel p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="terminal-prompt text-[10px] uppercase tracking-wider">&gt; MATCH_HISTORY</span>
+              <span className="text-[10px] text-[var(--term-muted)]">{matchHistory.length} ENTRIES</span>
             </div>
             {matchHistory.length > 0 ? (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {matchHistory.slice(0, 10).map((match) => {
                   const isWin = match.winner === match.team
                   const mmrChange = match.mmr_after - match.mmr_before
                   return (
                     <div
                       key={match.id}
-                      className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
+                      className="p-3 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/30 transition-colors"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs font-black" style={{ color: isWin ? '#22c55e' : userAccentColor }}>
-                          {isWin ? 'WIN' : 'LOSS'}
-                        </div>
-                        <div className="text-xs font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : userAccentColor }}>
-                          {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
-                        </div>
+                      <div className="flex justify-between items-center gap-2 mb-1">
+                        <span
+                          className="text-[10px] font-bold uppercase"
+                          style={{ color: isWin ? 'var(--term-green)' : 'var(--term-red)' }}
+                        >
+                          [{isWin ? 'WIN' : 'LOSS'}]
+                        </span>
+                        <span
+                          className="text-[10px] font-bold tabular-nums"
+                          style={{ color: mmrChange >= 0 ? 'var(--term-green)' : 'var(--term-red)' }}
+                        >
+                          {mmrChange >= 0 ? '+' : ''}{mmrChange}
+                        </span>
                       </div>
-                      <div className="text-xs text-white/60 mb-1">
-                        {match.map || 'Unknown Map'}
+                      <div className="text-[11px] text-[var(--term-text)]">{match.map || 'UNKNOWN'}</div>
+                      <div className="text-[10px] text-[var(--term-muted)]">
+                        {match.kills}/{match.deaths}/{match.assists}
+                        {match.mvp && <span className="ml-1" style={{ color: termAccent }}>MVP</span>}
                       </div>
-                      <div className="text-xs text-white/40">
-                        {match.kills}/{match.deaths}/{match.assists} {match.mvp && <span style={{ color: userAccentColor }}>MVP</span>}
-                      </div>
-                      <div className="text-xs text-white/30 mt-1">
+                      <div className="text-[9px] text-[var(--term-muted)] mt-0.5">
                         {new Date(match.match_date).toLocaleDateString()}
                       </div>
                     </div>
@@ -484,37 +501,38 @@ function DashboardContent({
                 })}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <div className="text-white/20 text-sm font-light">No matches yet</div>
-                <div className="text-white/10 text-xs mt-2">Play matches to see history</div>
+              <div className="py-10 text-center text-[var(--term-muted)] text-sm">
+                NO MATCHES · PLAY TO POPULATE
               </div>
             )}
           </div>
-          
-          {/* Rank Progression */}
-          <div className="lg:col-span-1 glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">Rank Progression</h2>
-              <div className="text-xs text-white/40">{rankProgression.length} changes</div>
+
+          <div className="terminal-panel p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="terminal-prompt text-[10px] uppercase tracking-wider">&gt; RANK_PROGRESSION</span>
+              <span className="text-[10px] text-[var(--term-muted)]">{rankProgression.length} CHANGES</span>
             </div>
             {rankProgression.length > 0 ? (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto">
                 {rankProgression.slice(0, 10).map((entry) => {
                   const mmrChange = entry.new_mmr - entry.old_mmr
                   return (
                     <div
                       key={entry.id}
-                      className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all"
+                      className="p-3 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/30 transition-colors"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-black text-white">
-                          {entry.old_rank || 'Unranked'} → {entry.new_rank}
-                        </div>
-                        <div className="text-xs font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : userAccentColor }}>
-                          {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
-                        </div>
+                      <div className="flex justify-between items-center gap-2 mb-1">
+                        <span className="text-[11px] font-bold text-[var(--term-text)]">
+                          {entry.old_rank || 'UNRANKED'} → {entry.new_rank}
+                        </span>
+                        <span
+                          className="text-[10px] font-bold tabular-nums"
+                          style={{ color: mmrChange >= 0 ? 'var(--term-green)' : 'var(--term-red)' }}
+                        >
+                          {mmrChange >= 0 ? '+' : ''}{mmrChange}
+                        </span>
                       </div>
-                      <div className="text-xs text-white/40">
+                      <div className="text-[9px] text-[var(--term-muted)]">
                         {new Date(entry.created_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -522,108 +540,111 @@ function DashboardContent({
                 })}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <div className="text-white/20 text-sm font-light">No rank changes yet</div>
-                <div className="text-white/10 text-xs mt-2">Rank up to see progression</div>
+              <div className="py-10 text-center text-[var(--term-muted)] text-sm">
+                NO RANK CHANGES · RANK UP TO RECORD
               </div>
             )}
           </div>
-          
-          {/* Activity Feed */}
-          <div className="lg:col-span-1 glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-            <h2 className="text-lg font-black text-white uppercase tracking-tight mb-6">Recent Activity</h2>
+
+          <div className="terminal-panel p-4 md:p-6">
+            <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">&gt; ACTIVITY</div>
             {activityFeed.length > 0 ? (
-              <ActivityFeed activities={activityFeed} limit={8} />
+              <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                {activityFeed.slice(0, 8).map((a) => {
+                  const tag = a.activity_type === 'rank_up' ? 'RANK_UP' : a.activity_type === 'rank_down' ? 'RANK_DOWN' : a.activity_type === 'mvp' ? 'MVP' : a.activity_type === 'big_mmr_gain' ? 'MMR_GAIN' : a.activity_type === 'big_mmr_loss' ? 'MMR_LOSS' : 'EVENT'
+                  const color = a.activity_type === 'rank_up' || a.activity_type === 'big_mmr_gain' ? 'var(--term-green)' : a.activity_type === 'rank_down' || a.activity_type === 'big_mmr_loss' ? 'var(--term-red)' : 'var(--term-amber)'
+                  return (
+                    <div
+                      key={a.id}
+                      className="p-3 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/30 transition-colors"
+                    >
+                      <div className="flex justify-between items-start gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase" style={{ color }}>[{tag}]</span>
+                        <span className="text-[9px] text-[var(--term-muted)] whitespace-nowrap">
+                          {new Date(a.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-semibold text-[var(--term-text)]">{a.title}</div>
+                      {a.description && (
+                        <div className="text-[10px] text-[var(--term-muted)] mt-0.5">{a.description}</div>
+                      )}
+                      {a.metadata && (a.metadata as { mmr_change?: number }).mmr_change != null && (
+                        <div className="text-[10px] mt-1" style={{ color: 'var(--term-green)' }}>
+                          +{(a.metadata as { mmr_change: number }).mmr_change} MMR
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
-              <div className="text-center py-12">
-                <div className="text-white/20 text-sm font-light">No activity yet</div>
-                <div className="text-white/10 text-xs mt-2">Play matches to see your journey</div>
+              <div className="py-10 text-center text-[var(--term-muted)] text-sm">
+                NO ACTIVITY · PLAY TO POPULATE
               </div>
             )}
           </div>
         </div>
-        
-        {/* Bottom Row - Season & Navigation */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Season Progress */}
+
+        {/* Season + Nav */}
+        <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">&gt; NAV</div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {season && (
-            <div className="lg:col-span-1 glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-black text-white uppercase tracking-tight">Season</h2>
-                <Link href="/season" className="text-xs text-white/40 hover:text-red-500 transition-colors">
-                  View →
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] text-[var(--term-muted)] uppercase">SEASON</span>
+                <Link href="/season" className="text-[10px] hover:underline" style={{ color: termAccent }}>
+                  VIEW →
                 </Link>
               </div>
-              <div className="space-y-4">
+              <div className="text-lg font-bold text-[var(--term-text)] mb-3">{season.name}</div>
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-[var(--term-border)]">
                 <div>
-                  <div className="text-xs text-white/40 mb-1">{season.name}</div>
-                  <div className="text-2xl font-black text-white">{season.name}</div>
+                  <div className="text-xl font-bold tabular-nums" style={{ color: termAccent }}>{totalMatches}</div>
+                  <div className="text-[10px] text-[var(--term-muted)]">MATCHES</div>
                 </div>
-                <div className="pt-4 border-t border-white/5">
-                  <div className="text-xs text-white/40 mb-2">Season Stats</div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-2xl font-black" style={{ color: userAccentColor }}>{totalMatches}</div>
-                      <div className="text-xs text-white/40 mt-1">Matches</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-black text-white">{winRate}%</div>
-                      <div className="text-xs text-white/40 mt-1">Win Rate</div>
-                    </div>
-                  </div>
+                <div>
+                  <div className="text-xl font-bold text-[var(--term-text)] tabular-nums">{winRate}%</div>
+                  <div className="text-[10px] text-[var(--term-muted)]">WIN RATE</div>
                 </div>
               </div>
             </div>
           )}
-          
-          {/* Quick Navigation */}
-          <div className={`glass rounded-2xl p-6 md:p-8 border border-white/5 hover:border-red-500/20 transition-all ${season ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-            <h2 className="text-lg font-black text-white uppercase tracking-tight mb-6">Navigation</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Link
-                href="/leaderboard"
-                className="block p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.04] transition-all group"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-black text-white mb-1">Leaderboard</div>
-                    <div className="text-xs text-white/40">Top players</div>
-                  </div>
-                  <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
-              {season && (
+          <div className={season ? 'lg:col-span-2' : 'lg:col-span-3'}>
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Link
-                  href="/season"
-                  className="block p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.04] transition-all group"
+                  href="/leaderboard"
+                  className="flex items-center justify-between p-4 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/50 transition-colors group"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-black text-white mb-1">Season</div>
-                      <div className="text-xs text-white/40">Current season</div>
-                    </div>
-                    <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </Link>
-              )}
-              <Link
-                href={`/profile/${playerDataToUse.discord_user_id}`}
-                className="block p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-white/[0.04] transition-all group"
-              >
-                <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-black text-white mb-1">Profile</div>
-                    <div className="text-xs text-white/40">View your profile</div>
+                    <div className="text-sm font-bold text-[var(--term-text)]">LEADERBOARD</div>
+                    <div className="text-[10px] text-[var(--term-muted)]">TOP PLAYERS</div>
                   </div>
-                  <svg className="w-4 h-4 text-white/20 group-hover:text-red-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
+                  <span className="text-[var(--term-muted)] group-hover:text-[var(--term-green)] transition-colors">→</span>
+                </Link>
+                {season && (
+                  <Link
+                    href="/season"
+                    className="flex items-center justify-between p-4 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/50 transition-colors group"
+                  >
+                    <div>
+                      <div className="text-sm font-bold text-[var(--term-text)]">SEASON</div>
+                      <div className="text-[10px] text-[var(--term-muted)]">CURRENT</div>
+                    </div>
+                    <span className="text-[var(--term-muted)] group-hover:text-[var(--term-green)] transition-colors">→</span>
+                  </Link>
+                )}
+                <Link
+                  href={`/profile/${playerDataToUse.discord_user_id}`}
+                  className="flex items-center justify-between p-4 border border-[var(--term-border)] bg-[var(--term-bg)] hover:border-[var(--term-green)]/50 transition-colors group"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-[var(--term-text)]">PROFILE</div>
+                    <div className="text-[10px] text-[var(--term-muted)]">VIEW PROFILE</div>
+                  </div>
+                  <span className="text-[var(--term-muted)] group-hover:text-[var(--term-green)] transition-colors">→</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

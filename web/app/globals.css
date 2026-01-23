@@ -202,3 +202,55 @@ h3 {
   color: var(--accent) !important;
   display: inline-block;
 }
+
+/* Terminal dashboard - competitive computer terminal feel */
+.terminal-dashboard {
+  --term-bg: #0a0a0b;
+  --term-surface: #0f0f11;
+  --term-border: #1e1e22;
+  --term-green: #22c55e;
+  --term-green-dim: #16a34a;
+  --term-amber: #f59e0b;
+  --term-red: #ef4444;
+  --term-muted: #6b7280;
+  --term-text: #e5e7eb;
+  --term-prompt: #22c55e;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+
+.terminal-panel {
+  background: var(--term-surface);
+  border: 1px solid var(--term-border);
+  border-radius: 6px;
+}
+
+.terminal-prompt {
+  color: var(--term-prompt);
+  font-weight: 600;
+}
+
+.terminal-scanline {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  opacity: 0.5;
+}
+
+@keyframes terminal-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.terminal-cursor::after {
+  content: "_";
+  animation: terminal-blink 1s step-end infinite;
+  color: var(--term-prompt);
+}
