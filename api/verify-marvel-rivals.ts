@@ -140,8 +140,52 @@ function findValueByKeys(obj: Record<string, unknown>, keys: string[], maxDepth:
 }
 
 function extractRank(stats: Record<string, unknown>): string | null {
+  // First check direct rank field
   const direct = normalizeRankValue(stats.rank);
-  if (direct) return direct;
+  if (direct && !direct.toLowerCase().includes('invalid')) return direct;
+  
+  // Check nested player object (common in Marvel Rivals API v2)
+  const player = stats.player as Record<string, unknown> | undefined;
+  if (player) {
+    // Check player.rank
+    const playerRank = normalizeRankValue(player.rank);
+    if (playerRank && !playerRank.toLowerCase().includes('invalid')) return playerRank;
+    
+    // Check player.rank_info or player.ranked_info
+    const rankInfo = (player.rank_info || player.ranked_info || player.competitive) as Record<string, unknown> | undefined;
+    if (rankInfo) {
+      const infoRank = normalizeRankValue(rankInfo.rank || rankInfo.name || rankInfo.tier_name);
+      if (infoRank && !infoRank.toLowerCase().includes('invalid')) return infoRank;
+    }
+  }
+  
+  // Check overall_stats for rank
+  const overallStats = stats.overall_stats as Record<string, unknown> | undefined;
+  if (overallStats) {
+    const osRank = normalizeRankValue(overallStats.rank || overallStats.current_rank);
+    if (osRank && !osRank.toLowerCase().includes('invalid')) return osRank;
+  }
+  
+  // Check heroes_ranked for rank info (might have highest rank)
+  const heroesRanked = stats.heroes_ranked as Array<Record<string, unknown>> | undefined;
+  if (heroesRanked && Array.isArray(heroesRanked) && heroesRanked.length > 0) {
+    // Look for rank in the heroes ranked data
+    for (const hero of heroesRanked) {
+      const heroRank = normalizeRankValue(hero.rank || hero.tier);
+      if (heroRank && !heroRank.toLowerCase().includes('invalid')) return heroRank;
+    }
+  }
+  
+  // Check rank_history for most recent rank
+  const rankHistory = stats.rank_history as Array<Record<string, unknown>> | undefined;
+  if (rankHistory && Array.isArray(rankHistory) && rankHistory.length > 0) {
+    // Get the most recent rank from history
+    const latestRank = rankHistory[0];
+    const histRank = normalizeRankValue(latestRank.rank || latestRank.tier || latestRank.name);
+    if (histRank && !histRank.toLowerCase().includes('invalid')) return histRank;
+  }
+  
+  // Fallback: search with keys
   const keys = [
     'rank',
     'rank_name',
@@ -151,8 +195,12 @@ function extractRank(stats: Record<string, unknown>): string | null {
     'tier_name',
     'division',
     'tier',
+    'rank_tier',
   ];
-  return normalizeRankValue(findValueByKeys(stats, keys, 4));
+  const found = normalizeRankValue(findValueByKeys(stats, keys, 5));
+  if (found && !found.toLowerCase().includes('invalid')) return found;
+  
+  return null;
 }
 
 function extractTier(stats: Record<string, unknown>): unknown {
@@ -363,6 +411,19 @@ export default async function handler(
 
     // Log the raw stats for debugging
     console.log('Marvel Rivals API response keys:', Object.keys(stats));
+    
+    // Log nested structures to find rank
+    const player = stats.player as Record<string, unknown> | undefined;
+    const overallStats = stats.overall_stats as Record<string, unknown> | undefined;
+    console.log('Marvel Rivals nested data:', {
+      playerKeys: player ? Object.keys(player) : 'none',
+      playerRank: player?.rank,
+      playerRankInfo: player?.rank_info,
+      overallStatsKeys: overallStats ? Object.keys(overallStats) : 'none',
+      overallStatsRank: overallStats?.rank,
+      rankHistoryLength: Array.isArray(stats.rank_history) ? stats.rank_history.length : 0,
+      rankHistoryFirst: Array.isArray(stats.rank_history) && stats.rank_history.length > 0 ? stats.rank_history[0] : 'none',
+    });
     console.log('Marvel Rivals raw rank data:', {
       rank: stats.rank,
       tier: stats.tier,
