@@ -65,7 +65,8 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="max-w-[1920px] mx-auto flex items-center justify-between px-2 sm:px-4 md:px-8 py-2 sm:py-3 rounded-xl sm:rounded-[2rem] md:rounded-[2.5rem] bg-black/60 backdrop-blur-3xl border border-white/10 glass-strong shadow-2xl"
+        className="max-w-[1920px] mx-auto flex items-center justify-between px-2 sm:px-4 md:px-8 py-2 sm:py-3 rounded-lg sm:rounded-xl border border-white/20 bg-black/80 backdrop-blur-xl shadow-2xl font-mono"
+        style={{ boxShadow: `0 0 30px ${accentColor}10, inset 0 1px 0 rgba(255,255,255,0.05)` }}
       >
         {/* Mobile Menu Button */}
         <button 
@@ -76,29 +77,35 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
           <Menu className="w-5 h-5 text-white/60 hover:text-[var(--accent-color)] transition-colors" />
         </button>
 
-        {/* Logo & Brand */}
-        <Link href="/dashboard" className="flex items-center gap-3 sm:gap-4">
+        {/* Logo & Brand - Terminal Style */}
+        <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3">
           <motion.div
             whileHover={{ scale: 1.05 }}
             className="relative cursor-pointer"
           >
-            <div className="text-2xl sm:text-3xl font-black tracking-tighter" style={{ color: accentColor }}>G</div>
-            <div className="absolute inset-0 blur-xl rounded-full -z-10" style={{ backgroundColor: `${accentColor}20` }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/grnds-logo-3d.gif" 
+              alt="GRNDS" 
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+            />
           </motion.div>
-          <div className="hidden sm:flex flex-col">
-            <span className="text-xs sm:text-sm font-black tracking-tighter text-red-500 uppercase leading-none">GRNDS</span>
-            <span className="text-[8px] sm:text-[10px] font-medium text-white/40 uppercase tracking-wider">Ranked Hub</span>
+          <div className="hidden sm:flex items-center gap-2 font-mono">
+            <span className="text-white/30">$</span>
+            <span className="text-xs sm:text-sm font-bold tracking-tight uppercase" style={{ color: accentColor }}>grnds</span>
+            <span className="text-white/30">--hub</span>
+            <span className="animate-pulse text-white/60">_</span>
           </div>
         </Link>
 
-        {/* Tab Navigation - Desktop */}
+        {/* Tab Navigation - Desktop - Terminal Style */}
         <div className="hidden md:flex items-center gap-3 flex-1 max-w-4xl mx-4 md:mx-8">
           {/* Search */}
           <div className="flex-1 max-w-xs">
             <PlayerSearch />
           </div>
           
-          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5">
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -108,23 +115,25 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
               <Link
                 key={tab.id}
                 href={href}
-                className="relative flex items-center gap-2 px-4 py-2 rounded-xl transition-all flex-1 justify-center group"
+                className="relative flex items-center gap-2 px-3 py-2 rounded-md transition-all flex-1 justify-center group"
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 rounded-xl"
+                    className="absolute inset-0 rounded-md border"
                     style={{ 
-                      backgroundColor: `${accentColor}1a`,
-                      border: `1px solid ${accentColor}4d`
+                      backgroundColor: `${accentColor}15`,
+                      borderColor: `${accentColor}40`
                     }}
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                <Icon className={`w-3.5 h-3.5 relative z-10 transition-colors ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined} />
-                <span className={`text-[9px] font-black uppercase tracking-widest relative z-10 transition-colors ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined}>
+                <span className="text-white/30 relative z-10">[</span>
+                <Icon className={`w-3 h-3 relative z-10 transition-colors ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined} />
+                <span className={`text-[9px] font-bold uppercase tracking-wide relative z-10 transition-colors font-mono ${isActive ? "" : "text-white/40 group-hover:text-white/60"}`} style={isActive ? { color: accentColor } : undefined}>
                   {tab.label}
                 </span>
+                <span className="text-white/30 relative z-10">]</span>
               </Link>
             );
           })}
@@ -168,13 +177,19 @@ export function GRNDSTopNav({ discordUserId }: GRNDSTopNavProps) {
               className="fixed top-0 left-0 bottom-0 w-[280px] bg-black border-r border-white/10 p-8 z-[120] glass-strong"
             >
               <div className="flex items-center justify-between mb-12">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl font-black tracking-tighter" style={{ color: accentColor }}>G</div>
-                  <span className="text-sm font-black tracking-tighter text-red-500 uppercase">GRNDS</span>
+                <div className="flex items-center gap-3 font-mono">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src="/grnds-logo-3d.gif" 
+                    alt="GRNDS" 
+                    className="w-8 h-8 object-contain"
+                  />
+                  <span className="text-white/30">$</span>
+                  <span className="text-sm font-bold tracking-tight uppercase" style={{ color: accentColor }}>grnds</span>
                 </div>
                 <button 
                   onClick={() => setMobileMenuOpen(false)} 
-                  className="p-2 rounded-full hover:bg-white/5 text-white/20 transition-colors"
+                  className="p-2 rounded-lg hover:bg-white/5 text-white/40 transition-colors border border-white/10"
                 >
                   <X className="w-5 h-5" />
                 </button>

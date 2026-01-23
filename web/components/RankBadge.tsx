@@ -13,20 +13,20 @@ export function RankBadge({ mmr, size = 'md', showTier = true, rankLabel }: Rank
   const rankKey = rankLabel ? rankLabel.split(' ')[0] : rankInfo.rank
   
   const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1.5 text-sm',
-    lg: 'px-4 py-2 text-base',
-    xl: 'px-6 py-3 text-xl'
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base',
+    xl: 'text-xl'
   }
   
-  const getRankColor = (rank: string) => {
-    // GRNDS rank colors - grey and red theme
-    if (rank === 'X') return 'bg-white text-black border border-white/10'
-    if (rank === 'ABSOLUTE') return 'bg-[#f59e0b] text-black'
-    if (rank === 'CHALLENGER') return 'bg-[#dc2626] text-white'
-    if (rank === 'BREAKPOINT') return 'bg-[#2a2a2a] text-white border border-white/20'
-    if (rank === 'GRNDS') return 'bg-[#ff8c00] text-black'
-    return 'bg-gray-700 text-white'
+  // Terminal style - colored text, transparent background
+  const getRankTextColor = (rank: string) => {
+    if (rank === 'X') return '#ffffff'
+    if (rank === 'ABSOLUTE') return '#f59e0b'
+    if (rank === 'CHALLENGER') return '#dc2626'
+    if (rank === 'BREAKPOINT') return '#888888'
+    if (rank === 'GRNDS') return '#ff8c00'
+    return '#666666'
   }
   
   const displayText = showTier ? label : rankKey
@@ -35,14 +35,13 @@ export function RankBadge({ mmr, size = 'md', showTier = true, rankLabel }: Rank
     <span 
       className={`
         inline-flex items-center justify-center
-        font-black tracking-wider uppercase
-        rounded-lg
+        font-black tracking-wider uppercase font-mono
         ${sizeClasses[size]}
-        ${getRankColor(rankKey)}
         transition-all duration-200
       `}
+      style={{ color: getRankTextColor(rankKey) }}
     >
-      {displayText}
+      [{displayText}]
     </span>
   )
 }
