@@ -1,7 +1,7 @@
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { RankBadge } from '@/components/RankBadge'
-import { MMRProgressBar } from '@/components/MMRProgressBar'
+import { TerminalMMRBar } from '@/components/TerminalMMRBar'
 import { CommentSectionWrapper } from '@/components/CommentSectionWrapper'
 import { ProfileAccentColor } from '@/components/ProfileAccentColor'
 import { Player, Comment } from '@/lib/types'
@@ -281,22 +281,30 @@ export default async function ProfilePage({
           </div>
           
           {/* MMR Progress */}
-          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5 mb-8 md:mb-12">
-            <div className="mb-6 md:mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Current MMR</span>
-                <span className="text-5xl md:text-7xl font-black tracking-tighter" style={{ color: profileAccentColor }}>
+          <div className="terminal-panel p-6 md:p-8 mb-8 md:mb-12">
+            <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+              <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">MMR</span><span className="text-white/40">::</span><span className="text-white">READOUT</span>
+            </div>
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl md:text-6xl font-mono font-bold tabular-nums text-[var(--term-accent)]">
                   {currentMMR}
                 </span>
               </div>
+              <div className="text-[10px] text-[var(--term-muted)] font-mono">
+                PEAK: <span className="text-[var(--term-accent)]">{peakMMR}</span>
+                {currentMMR > 0 && currentMMR < 3000 && (
+                  <> · {3000 - currentMMR} TO X</>
+                )}
+              </div>
             </div>
-            <MMRProgressBar currentMMR={currentMMR} accentColor={profileAccentColor} />
-            <div className="mt-6 flex items-center justify-between text-sm md:text-base">
-              <span className="text-white/40 font-light">
-                Peak: <span className="font-black" style={{ color: profileAccentColor }}>{peakMMR} MMR</span>
+            <TerminalMMRBar currentMMR={currentMMR} accentColor="var(--term-accent)" />
+            <div className="mt-4 flex items-center justify-between text-[10px] font-mono text-[var(--term-muted)]">
+              <span>
+                {gameLabel.toUpperCase()}_RANK: <span className="text-white">{rankLabel}</span>
               </span>
-              <span className="text-white/40 font-light">
-                {gameLabel} Rank: <span className="font-black">{rankLabel}</span>
+              <span>
+                POSITION: <span className="text-white">#{leaderboardPosition}</span>
               </span>
             </div>
           </div>
