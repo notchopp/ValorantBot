@@ -22,6 +22,8 @@ import { AutoMatchDetectionService } from './services/AutoMatchDetectionService'
 import { DiscordLogger } from './services/DiscordLogger';
 import { PersistentQueueService } from './services/PersistentQueueService';
 import { PersistentLeaderboardService } from './services/PersistentLeaderboardService';
+import { QueueCleanupService } from './services/QueueCleanupService';
+import { RoleSyncService } from './services/RoleSyncService';
 import { initializeLogger } from './utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -121,6 +123,8 @@ let autoMatchDetectionService: AutoMatchDetectionService | null = null;
 let discordLogger: DiscordLogger | null = null;
 let persistentQueueService: PersistentQueueService | null = null;
 let persistentLeaderboardService: PersistentLeaderboardService | null = null;
+let queueCleanupService: QueueCleanupService | null = null;
+let roleSyncService: RoleSyncService | null = null;
 
 // Create Discord client
 const client = new Client({
@@ -459,6 +463,24 @@ client.once('ready', async () => {
   } catch (error) {
     console.error('Failed to initialize persistent leaderboard service', { error });
   }
+
+  // Initialize queue cleanup service (auto-kicks after 30 mins)
+  try {
+    queueCleanupService = new QueueCleanupService(client, databaseService, queueService, persistentQueueService);
+    queueCleanupService.start();
+    console.log('✅ Queue cleanup service started (30 min timeout)');
+  } catch (error) {
+    console.error('Failed to start queue cleanup service', { error });
+  }
+
+  // Initialize role sync service (syncs Discord roles with database ranks)
+  try {
+    roleSyncService = new RoleSyncService(client, databaseService, roleUpdateService);
+    roleSyncService.start();
+    console.log('✅ Role sync service started (5 min interval)');
+  } catch (error) {
+    console.error('Failed to start role sync service', { error });
+  }
   
   registerCommands();
 });
@@ -486,6 +508,8 @@ process.on('SIGINT', () => {
   // Stop background services
   if (hostTimeoutService) hostTimeoutService.stop();
   if (autoMatchDetectionService) autoMatchDetectionService.stop();
+  if (queueCleanupService) queueCleanupService.stop();
+  if (roleSyncService) roleSyncService.stop();
   client.destroy();
   process.exit(0);
 });
@@ -495,6 +519,8 @@ process.on('SIGTERM', () => {
   // Stop background services
   if (hostTimeoutService) hostTimeoutService.stop();
   if (autoMatchDetectionService) autoMatchDetectionService.stop();
+  if (queueCleanupService) queueCleanupService.stop();
+  if (roleSyncService) roleSyncService.stop();
   client.destroy();
   process.exit(0);
 });

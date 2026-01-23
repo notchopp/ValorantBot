@@ -350,4 +350,15 @@ export class QueueService {
   private getState(game: QueueGame): QueueState {
     return this.queueStates[game];
   }
+
+  /**
+   * Remove a player from in-memory cache (used by cleanup service)
+   */
+  removeFromMemoryCache(userId: string, game: QueueGame = 'valorant'): void {
+    const state = this.getState(game);
+    const index = state.queue.players.findIndex((p) => p.userId === userId);
+    if (index !== -1) {
+      state.queue.players.splice(index, 1);
+    }
+  }
 }
