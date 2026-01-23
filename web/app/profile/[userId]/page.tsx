@@ -198,7 +198,7 @@ export default async function ProfilePage({
             href={`/profile/${userId}?game=valorant`}
             className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
               selectedGame === 'valorant'
-                ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                 : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
             }`}
           >
@@ -208,7 +208,7 @@ export default async function ProfilePage({
             href={`/profile/${userId}?game=marvel_rivals`}
             className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
               selectedGame === 'marvel_rivals'
-                ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                 : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
             }`}
           >
@@ -302,56 +302,57 @@ export default async function ProfilePage({
           </div>
           
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
-            <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Matches</div>
-              <div className="text-3xl md:text-4xl font-black text-white tracking-tighter">{totalMatches}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8 md:mb-12">
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-2">MATCHES</div>
+              <div className="text-2xl md:text-3xl font-mono font-black text-white tabular-nums">{totalMatches}</div>
             </div>
-            <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">Win Rate</div>
-              <div className={`text-3xl md:text-4xl font-black tracking-tighter`} style={{ color: winRate >= 50 ? '#22c55e' : profileAccentColor }}>
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-2">WIN_RATE</div>
+              <div className={`text-2xl md:text-3xl font-mono font-black tabular-nums`} style={{ color: winRate >= 50 ? '#22c55e' : 'var(--term-accent)' }}>
                 {winRate}%
               </div>
-              <div className="text-xs text-white/40 mt-1 font-light">{wins}W / {losses}L</div>
+              <div className="text-[10px] font-mono text-[var(--term-muted)] mt-1">{wins}W/{losses}L</div>
             </div>
-            <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">K/D Ratio</div>
-              <div className={`text-3xl md:text-4xl font-black tracking-tighter`} style={{ color: parseFloat(kd) >= 1.0 ? '#22c55e' : profileAccentColor }}>
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-2">K/D_RATIO</div>
+              <div className={`text-2xl md:text-3xl font-mono font-black tabular-nums`} style={{ color: parseFloat(kd) >= 1.0 ? '#22c55e' : 'var(--term-accent)' }}>
                 {kd}
               </div>
             </div>
-            <div className="glass rounded-2xl md:rounded-3xl p-6 md:p-8 border border-white/5 card-glow">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2">MVP Count</div>
-              <div className="text-3xl md:text-4xl font-black tracking-tighter" style={{ color: profileAccentColor }}>{mvpCount}</div>
+            <div className="terminal-panel p-4 md:p-6">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-2">MVP_COUNT</div>
+              <div className="text-2xl md:text-3xl font-mono font-black text-[var(--term-accent)] tabular-nums">{mvpCount}</div>
             </div>
           </div>
         </div>
         
         {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-12 md:mb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-12 md:mb-20">
           {/* Recent Games */}
-          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Recent Games</h2>
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+              <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">HISTORY</span><span className="text-white/40">::</span><span className="text-white">RECENT_GAMES</span>
+            </div>
             {stats.length > 0 ? (
-              <div className="space-y-3 md:space-y-4 max-h-[600px] overflow-y-auto">
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
                 {stats.slice(0, 10).map((stat) => {
                   const isWin = stat.match && stat.team ? stat.match.winner === stat.team : stat.mmr_after > stat.mmr_before
                   const mmrChange = stat.mmr_after - stat.mmr_before
                   return (
                     <div
                       key={stat.match?.match_date || stat.created_at}
-                      className="p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-[var(--profile-accent-color)]/30 transition-all"
-                      style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
+                      className="p-3 md:p-4 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/30 transition-all"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-black" style={{ color: isWin ? '#22c55e' : profileAccentColor }}>
-                          {isWin ? 'WIN' : 'LOSS'}
+                        <div className="text-sm font-mono font-bold" style={{ color: isWin ? '#22c55e' : 'var(--term-accent)' }}>
+                          [{isWin ? 'WIN' : 'LOSS'}]
                         </div>
-                        <div className="text-sm font-black" style={{ color: mmrChange >= 0 ? '#22c55e' : profileAccentColor }}>
+                        <div className="text-sm font-mono font-bold tabular-nums" style={{ color: mmrChange >= 0 ? '#22c55e' : 'var(--term-accent)' }}>
                           {mmrChange >= 0 ? '+' : ''}{mmrChange} MMR
                         </div>
                       </div>
-                      <div className="text-xs text-white/60 mb-1">
+                      <div className="text-[10px] font-mono text-[var(--term-muted)] mb-1">
                         {stat.match?.map || 'Unknown Map'} • {stat.match?.match_date ? new Date(stat.match.match_date).toLocaleDateString() : 'Unknown Date'} • {(() => {
                           const type = stat.match?.match_type
                           if (type === 'marvel_rivals') return 'Marvel Rivals'
@@ -360,106 +361,119 @@ export default async function ProfilePage({
                           return 'Match'
                         })()}
                       </div>
-                      <div className="text-xs text-white/40">
-                        {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="font-black" style={{ color: profileAccentColor }}>MVP</span>}
+                      <div className="text-[10px] font-mono text-[var(--term-muted)]">
+                        {stat.kills}/{stat.deaths} K/D {stat.mvp && <span className="font-bold text-[var(--term-accent)]">[MVP]</span>}
                       </div>
                     </div>
                   )
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 text-white/40">
-                <p className="font-light">No recent games yet</p>
+              <div className="text-center py-12">
+                <div className="text-[var(--term-muted)] font-mono text-sm">[NO_GAMES]</div>
+                <div className="text-[10px] text-[var(--term-muted)] font-mono mt-1">No recent games yet</div>
               </div>
             )}
           </div>
           
           {/* Comments Left by User on Other Profiles */}
-          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Recent Comments</h2>
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+              <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">USER</span><span className="text-white/40">::</span><span className="text-white">RECENT_COMMENTS</span>
+            </div>
             {userComments.length > 0 ? (
-              <div className="space-y-3 md:space-y-4 max-h-[600px] overflow-y-auto">
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
                 {userComments.map((comment) => {
                   const targetPlayer = comment.target_player
                   return (
                     <Link
                       key={comment.id}
                       href={`/profile/${targetPlayer?.discord_user_id || ''}`}
-                      className="block p-4 md:p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.04] hover:border-[var(--profile-accent-color)]/30 transition-all group"
-                      style={{ '--profile-accent-color': profileAccentColor } as React.CSSProperties}
+                      className="block p-3 md:p-4 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/30 transition-all group"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs text-white/40">
-                          On <span className="text-white/60 font-medium group-hover:text-[var(--profile-accent-color)] transition-colors">{targetPlayer?.discord_username || 'Unknown'}&apos;s profile</span>
+                        <div className="text-[10px] font-mono text-[var(--term-muted)]">
+                          ON <span className="text-white group-hover:text-[var(--term-accent)] transition-colors">@{targetPlayer?.discord_username || 'Unknown'}</span>
                         </div>
-                        <span className="text-xs text-white/40">
-                          {new Date(comment.created_at).toLocaleDateString()}
+                        <span className="text-[10px] font-mono text-[var(--term-muted)]">
+                          [{new Date(comment.created_at).toLocaleDateString()}]
                         </span>
                       </div>
-                      <p className="text-sm text-white/80 font-light leading-relaxed line-clamp-2">{comment.content}</p>
+                      <p className="text-sm font-mono text-white/80 line-clamp-2">{comment.content}</p>
                     </Link>
                   )
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 text-white/40">
-                <p className="font-light">No comments yet</p>
+              <div className="text-center py-12">
+                <div className="text-[var(--term-muted)] font-mono text-sm">[NO_COMMENTS]</div>
+                <div className="text-[10px] text-[var(--term-muted)] font-mono mt-1">No comments yet</div>
               </div>
             )}
           </div>
         </div>
         
         {/* Valorant Info & Comments on This Profile */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-12 md:mb-20">
-          <div className="space-y-6">
-            <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-              <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Valorant Info</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-12 md:mb-20">
+          <div className="space-y-4">
+            <div className="terminal-panel p-6 md:p-8">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">ACCOUNT</span><span className="text-white/40">::</span><span className="text-white">VALORANT</span>
+              </div>
               <div className="space-y-4">
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Riot ID</div>
-                  <div className="text-lg font-black text-white">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">RIOT_ID</div>
+                  <div className="text-base font-mono font-bold text-white">
                     {playerData.riot_name && playerData.riot_tag 
                       ? `${playerData.riot_name}#${playerData.riot_tag}`
-                      : 'Not linked'
+                      : '[NOT_LINKED]'
                     }
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Region</div>
-                  <div className="text-lg font-black text-white">{playerData.riot_region || 'N/A'}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">REGION</div>
+                  <div className="text-base font-mono font-bold text-white">{playerData.riot_region?.toUpperCase() || 'N/A'}</div>
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
-                  <div className="text-lg font-black text-white">{playerData.verified_at ? 'Yes' : 'No'}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">VERIFIED</div>
+                  <div className={`text-base font-mono font-bold ${playerData.verified_at ? 'text-green-500' : 'text-[var(--term-muted)]'}`}>
+                    {playerData.verified_at ? '[TRUE]' : '[FALSE]'}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-              <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Marvel Rivals Info</h2>
+            <div className="terminal-panel p-6 md:p-8">
+              <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+                <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">ACCOUNT</span><span className="text-white/40">::</span><span className="text-white">MARVEL_RIVALS</span>
+              </div>
               <div className="space-y-4">
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Username</div>
-                  <div className="text-lg font-black text-white">
-                    {playerData.marvel_rivals_username || 'Not linked'}
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">USERNAME</div>
+                  <div className="text-base font-mono font-bold text-white">
+                    {playerData.marvel_rivals_username || '[NOT_LINKED]'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">UID</div>
-                  <div className="text-lg font-black text-white">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">UID</div>
+                  <div className="text-base font-mono font-bold text-white">
                     {playerData.marvel_rivals_uid || 'N/A'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.3em] text-white/40 mb-2">Verified</div>
-                  <div className="text-lg font-black text-white">{playerData.marvel_rivals_rank ? 'Yes' : 'No'}</div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--term-muted)] mb-1">VERIFIED</div>
+                  <div className={`text-base font-mono font-bold ${playerData.marvel_rivals_rank ? 'text-green-500' : 'text-[var(--term-muted)]'}`}>
+                    {playerData.marvel_rivals_rank ? '[TRUE]' : '[FALSE]'}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           
           {/* Comments on This Profile */}
-          <div className="glass rounded-[2rem] md:rounded-[3rem] p-8 md:p-12 border border-white/5">
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-6 md:mb-8 tracking-tighter uppercase">Comments on Profile</h2>
+          <div className="terminal-panel p-6 md:p-8">
+            <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-4">
+              <span className="text-[var(--term-muted)]">&gt;</span> <span className="text-[var(--term-accent)]">PROFILE</span><span className="text-white/40">::</span><span className="text-white">COMMENTS</span>
+            </div>
             <CommentSectionWrapper
               targetType="profile"
               targetId={playerData.id}

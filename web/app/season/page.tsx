@@ -282,7 +282,7 @@ export default async function SeasonPage({
               href="/season?game=valorant"
               className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                 selectedGame === 'valorant'
-                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                   : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
@@ -292,7 +292,7 @@ export default async function SeasonPage({
               href="/season?game=marvel_rivals"
               className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                 selectedGame === 'marvel_rivals'
-                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                   : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
@@ -604,7 +604,7 @@ export default async function SeasonPage({
         <div className="text-center mb-8 md:mb-12">
           <Link
             href={`/leaderboard?game=${selectedGame}`}
-            className="inline-block px-8 py-3 bg-[var(--term-accent)] text-black font-mono font-bold uppercase tracking-wider text-xs hover:bg-white transition-all border border-[var(--term-accent)]"
+            className="inline-block px-8 py-3 border border-[var(--term-accent)] text-[var(--term-accent)] font-mono font-bold uppercase tracking-wider text-xs hover:bg-[var(--term-accent)] hover:text-black transition-all"
           >
             [VIEW_FULL_LEADERBOARD]
           </Link>

@@ -123,7 +123,7 @@ export default async function LeaderboardPage({
               href="/leaderboard?game=valorant"
               className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                 selectedGame === 'valorant'
-                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                   : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >
@@ -133,7 +133,7 @@ export default async function LeaderboardPage({
               href="/leaderboard?game=marvel_rivals"
               className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                 selectedGame === 'marvel_rivals'
-                  ? 'bg-[var(--term-accent)] text-black border-[var(--term-accent)]'
+                  ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
                   : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
               }`}
             >

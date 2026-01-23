@@ -349,25 +349,25 @@ function DashboardContent({
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <Link
                 href="/dashboard?game=valorant"
-                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                   selectedGame === 'valorant'
-                    ? 'bg-[var(--term-green)] text-black border-[var(--term-green)]'
-                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-green)] hover:text-[var(--term-text)]'
+                    ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
+                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
                 }`}
               >
                 Valorant
               </Link>
               <Link
                 href="/dashboard?game=marvel_rivals"
-                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border transition-all font-mono ${
                   selectedGame === 'marvel_rivals'
-                    ? 'bg-[var(--term-green)] text-black border-[var(--term-green)]'
-                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-green)] hover:text-[var(--term-text)]'
+                    ? 'border-[var(--term-accent)] text-[var(--term-accent)] bg-[var(--term-accent)]/10'
+                    : 'border-[var(--term-border)] text-[var(--term-muted)] hover:border-[var(--term-accent)] hover:text-white'
                 }`}
               >
                 Marvel Rivals
               </Link>
-              <span className="text-[var(--term-muted)] text-[10px]">{gameLabel}</span>
+              <span className="text-[var(--term-muted)] text-[10px] font-mono">[{gameLabel.toUpperCase()}]</span>
             </div>
             <p className="text-[10px] text-[var(--term-muted)]">
               {selectedGame === 'marvel_rivals'

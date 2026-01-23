@@ -34,12 +34,12 @@ export function SeasonCountdown({ endDate }: SeasonCountdownProps) {
   
   if (!mounted) {
     return (
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-2 md:gap-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="text-center">
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6">
-              <div className="text-4xl font-black text-[#ffd700] mb-2">--</div>
-              <div className="text-xs uppercase tracking-wider text-gray-500">Loading</div>
+            <div className="bg-[var(--term-panel)] border border-[var(--term-border)] p-4 md:p-6">
+              <div className="text-2xl md:text-4xl font-mono font-black text-[var(--term-accent)] mb-1">--</div>
+              <div className="text-[10px] uppercase tracking-wider text-[var(--term-muted)] font-mono">LOADING</div>
             </div>
           </div>
         ))}
@@ -48,29 +48,29 @@ export function SeasonCountdown({ endDate }: SeasonCountdownProps) {
   }
   
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-4 gap-2 md:gap-4">
       <div className="text-center">
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 backdrop-blur-xl">
-          <div className="text-4xl font-black text-[#ffd700] mb-2">{timeLeft.days}</div>
-          <div className="text-xs uppercase tracking-wider text-gray-500">Days</div>
+        <div className="bg-[var(--term-panel)] border border-[var(--term-border)] p-4 md:p-6">
+          <div className="text-2xl md:text-4xl font-mono font-black text-[var(--term-accent)] mb-1 tabular-nums">{String(timeLeft.days).padStart(2, '0')}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--term-muted)] font-mono">DAYS</div>
         </div>
       </div>
       <div className="text-center">
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 backdrop-blur-xl">
-          <div className="text-4xl font-black text-[#ffd700] mb-2">{timeLeft.hours}</div>
-          <div className="text-xs uppercase tracking-wider text-gray-500">Hours</div>
+        <div className="bg-[var(--term-panel)] border border-[var(--term-border)] p-4 md:p-6">
+          <div className="text-2xl md:text-4xl font-mono font-black text-[var(--term-accent)] mb-1 tabular-nums">{String(timeLeft.hours).padStart(2, '0')}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--term-muted)] font-mono">HOURS</div>
         </div>
       </div>
       <div className="text-center">
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 backdrop-blur-xl">
-          <div className="text-4xl font-black text-[#ffd700] mb-2">{timeLeft.minutes}</div>
-          <div className="text-xs uppercase tracking-wider text-gray-500">Minutes</div>
+        <div className="bg-[var(--term-panel)] border border-[var(--term-border)] p-4 md:p-6">
+          <div className="text-2xl md:text-4xl font-mono font-black text-[var(--term-accent)] mb-1 tabular-nums">{String(timeLeft.minutes).padStart(2, '0')}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--term-muted)] font-mono">MINS</div>
         </div>
       </div>
       <div className="text-center">
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 backdrop-blur-xl">
-          <div className="text-4xl font-black text-[#ffd700] mb-2">{timeLeft.seconds}</div>
-          <div className="text-xs uppercase tracking-wider text-gray-500">Seconds</div>
+        <div className="bg-[var(--term-panel)] border border-[var(--term-border)] p-4 md:p-6">
+          <div className="text-2xl md:text-4xl font-mono font-black text-[var(--term-accent)] mb-1 tabular-nums">{String(timeLeft.seconds).padStart(2, '0')}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--term-muted)] font-mono">SECS</div>
         </div>
       </div>
     </div>
