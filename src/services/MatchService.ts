@@ -17,7 +17,8 @@ export class MatchService {
   createMatch(
     players: Player[],
     mode: BalancingMode = 'auto',
-    map?: string
+    map?: string,
+    gameType: 'valorant' | 'marvel_rivals' = 'valorant'
   ): Match {
     const matchId = `match-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -30,7 +31,7 @@ export class MatchService {
     // Select host (random from team A)
     const host = teamA.players[Math.floor(Math.random() * teamA.players.length)];
 
-    const match = createMatch(matchId, teamA, teamB, selectedMap, host);
+    const match = createMatch(matchId, teamA, teamB, selectedMap, host, gameType);
     this.matches.set(matchId, match);
     this.currentMatch = match;
 

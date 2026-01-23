@@ -477,8 +477,8 @@ async function handleJoin(
   const userId = interaction.user.id;
   const username = interaction.user.username;
 
-  // TEMPORARY: Queue is closed for maintenance
-  const QUEUE_CLOSED = true;
+  // Queue open/closed toggle (controlled by environment variable)
+  const QUEUE_CLOSED = process.env.QUEUE_CLOSED === 'true';
   if (QUEUE_CLOSED) {
     await interaction.editReply({
       content: '🔧 **Queue is temporarily closed for maintenance.**\n\nWe\'re making improvements to the system. Check back soon!',
@@ -748,10 +748,12 @@ async function handleJoin(
       )).filter((p): p is NonNullable<typeof p> => p !== undefined);
 
       // Create in-memory match object for voice channels
+      const gameTypeForMatch = selectedGame === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
       const match = matchService.createMatch(
         [...teamAPlayers, ...teamBPlayers],
         config.teamBalancing.defaultMode,
-        processResult.match.map
+        processResult.match.map,
+        gameTypeForMatch
       );
 
       // Override match ID and teams with Vercel result
@@ -1165,8 +1167,8 @@ async function handleJoinButton(
   try {
     const { queueService, playerService, rankService, matchService, databaseService, voiceChannelService, valorantAPI, skillGapAnalyzer, config } = services;
 
-    // TEMPORARY: Queue is closed for maintenance
-    const QUEUE_CLOSED = true;
+    // Queue open/closed toggle (controlled by environment variable)
+    const QUEUE_CLOSED = process.env.QUEUE_CLOSED === 'true';
     if (QUEUE_CLOSED) {
       try {
         await interaction.followUp({
@@ -1248,7 +1250,7 @@ async function handleJoinButton(
           await interaction.followUp({
             content:
               ' You must link your Marvel Rivals account before joining queue.\n\n' +
-              'Use `/marvel link` to link your account, then `/verify game:marvel_rivals` to get placed.',
+              'Use `/account marvel link` to link your account, then `/verify game:marvel_rivals` to get placed',
             flags: MessageFlags.Ephemeral,
           });
         } catch (error: any) {
@@ -1538,10 +1540,12 @@ async function handleJoinButton(
       )).filter((p): p is NonNullable<typeof p> => p !== undefined);
 
       // Create in-memory match object for voice channels
+      const gameTypeForMatch = selectedGame === 'marvel_rivals' ? 'marvel_rivals' : 'valorant';
       const match = matchService.createMatch(
         [...teamAPlayers, ...teamBPlayers],
         config.teamBalancing.defaultMode,
-        processResult.match.map
+        processResult.match.map,
+        gameTypeForMatch
       );
 
       // Override match ID and teams with Vercel result

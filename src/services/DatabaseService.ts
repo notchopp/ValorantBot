@@ -309,6 +309,21 @@ export class DatabaseService {
   }
 
   /**
+   * Get player by Marvel Rivals username (case-insensitive)
+   */
+  async getPlayerByMarvelRivalsUsername(username: string): Promise<DatabasePlayer | null> {
+    const supabase = this.getSupabase();
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .ilike('marvel_rivals_username', username)
+      .single();
+
+    if (error || !data) return null;
+    return data;
+  }
+
+  /**
    * Update player's Discord rank and MMR
    */
   async updatePlayerRank(

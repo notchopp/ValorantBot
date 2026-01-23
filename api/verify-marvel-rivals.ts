@@ -7,6 +7,8 @@ interface VerifyMarvelRequest {
   username: string;
   marvelRivalsUid: string;
   marvelRivalsUsername?: string;
+  // When user manually selects their rank (fallback flow)
+  manualRank?: string;
 }
 
 export interface VerifyMarvelResponse {
@@ -17,6 +19,10 @@ export interface VerifyMarvelResponse {
   marvelRivalsRank?: string;
   message?: string;
   error?: string;
+  // When rank can't be auto-detected, prompt manual entry
+  requiresManualRank?: boolean;
+  playerFound?: boolean;
+  manualRank?: string; // The rank user entered manually
 }
 
 // Maximum MMR for initial placement (cap at GRNDS V)
@@ -144,18 +150,69 @@ function extractRank(stats: Record<string, unknown>): string | null {
   const direct = normalizeRankValue(stats.rank);
   if (direct && !direct.toLowerCase().includes('invalid')) return direct;
   
+  // Check rank_history FIRST - this is most reliable for current rank
+  const rankHistory = stats.rank_history as Array<Record<string, unknown>> | undefined;
+  if (rankHistory && Array.isArray(rankHistory) && rankHistory.length > 0) {
+    // Get the most recent rank from history (usually first or last entry)
+    // Try last entry first (most recent)
+    const latestRank = rankHistory[rankHistory.length - 1];
+    
+    // Look for rank_name, rank, tier, tier_name fields
+    const histRank = normalizeRankValue(
+      latestRank.rank_name || 
+      latestRank.rank || 
+      latestRank.tier_name || 
+      latestRank.tier || 
+      latestRank.name
+    );
+    if (histRank && !histRank.toLowerCase().includes('invalid') && !histRank.toLowerCase().includes('level')) {
+      return histRank;
+    }
+    
+    // Try first entry too
+    if (rankHistory.length > 1) {
+      const firstRank = rankHistory[0];
+      const firstHistRank = normalizeRankValue(
+        firstRank.rank_name || 
+        firstRank.rank || 
+        firstRank.tier_name || 
+        firstRank.tier || 
+        firstRank.name
+      );
+      if (firstHistRank && !firstHistRank.toLowerCase().includes('invalid') && !firstHistRank.toLowerCase().includes('level')) {
+        return firstHistRank;
+      }
+    }
+  }
+  
+  // Check heroes_ranked for highest rank
+  const heroesRanked = stats.heroes_ranked as Array<Record<string, unknown>> | undefined;
+  if (heroesRanked && Array.isArray(heroesRanked) && heroesRanked.length > 0) {
+    for (const hero of heroesRanked) {
+      // Check hero.rank, hero.tier, hero.rank_name
+      const heroRank = normalizeRankValue(hero.rank_name || hero.rank || hero.tier_name || hero.tier);
+      if (heroRank && !heroRank.toLowerCase().includes('invalid') && !heroRank.toLowerCase().includes('level')) {
+        return heroRank;
+      }
+    }
+  }
+  
   // Check nested player object (common in Marvel Rivals API v2)
   const player = stats.player as Record<string, unknown> | undefined;
   if (player) {
-    // Check player.rank
+    // Check player.rank but NOT player.level
     const playerRank = normalizeRankValue(player.rank);
-    if (playerRank && !playerRank.toLowerCase().includes('invalid')) return playerRank;
+    if (playerRank && !playerRank.toLowerCase().includes('invalid') && !playerRank.toLowerCase().includes('level')) {
+      return playerRank;
+    }
     
     // Check player.rank_info or player.ranked_info
     const rankInfo = (player.rank_info || player.ranked_info || player.competitive) as Record<string, unknown> | undefined;
     if (rankInfo) {
       const infoRank = normalizeRankValue(rankInfo.rank || rankInfo.name || rankInfo.tier_name);
-      if (infoRank && !infoRank.toLowerCase().includes('invalid')) return infoRank;
+      if (infoRank && !infoRank.toLowerCase().includes('invalid') && !infoRank.toLowerCase().includes('level')) {
+        return infoRank;
+      }
     }
   }
   
@@ -163,42 +220,24 @@ function extractRank(stats: Record<string, unknown>): string | null {
   const overallStats = stats.overall_stats as Record<string, unknown> | undefined;
   if (overallStats) {
     const osRank = normalizeRankValue(overallStats.rank || overallStats.current_rank);
-    if (osRank && !osRank.toLowerCase().includes('invalid')) return osRank;
-  }
-  
-  // Check heroes_ranked for rank info (might have highest rank)
-  const heroesRanked = stats.heroes_ranked as Array<Record<string, unknown>> | undefined;
-  if (heroesRanked && Array.isArray(heroesRanked) && heroesRanked.length > 0) {
-    // Look for rank in the heroes ranked data
-    for (const hero of heroesRanked) {
-      const heroRank = normalizeRankValue(hero.rank || hero.tier);
-      if (heroRank && !heroRank.toLowerCase().includes('invalid')) return heroRank;
+    if (osRank && !osRank.toLowerCase().includes('invalid') && !osRank.toLowerCase().includes('level')) {
+      return osRank;
     }
   }
   
-  // Check rank_history for most recent rank
-  const rankHistory = stats.rank_history as Array<Record<string, unknown>> | undefined;
-  if (rankHistory && Array.isArray(rankHistory) && rankHistory.length > 0) {
-    // Get the most recent rank from history
-    const latestRank = rankHistory[0];
-    const histRank = normalizeRankValue(latestRank.rank || latestRank.tier || latestRank.name);
-    if (histRank && !histRank.toLowerCase().includes('invalid')) return histRank;
-  }
-  
-  // Fallback: search with keys
+  // Fallback: search with keys but exclude 'level' fields
   const keys = [
-    'rank',
     'rank_name',
     'current_rank',
     'competitive_rank',
     'ranked_rank',
     'tier_name',
-    'division',
-    'tier',
     'rank_tier',
   ];
   const found = normalizeRankValue(findValueByKeys(stats, keys, 5));
-  if (found && !found.toLowerCase().includes('invalid')) return found;
+  if (found && !found.toLowerCase().includes('invalid') && !found.toLowerCase().includes('level')) {
+    return found;
+  }
   
   return null;
 }
@@ -374,7 +413,7 @@ export default async function handler(
       return;
     }
 
-    const { userId, username, marvelRivalsUid, marvelRivalsUsername } = req.body as VerifyMarvelRequest;
+    const { userId, username, marvelRivalsUid, marvelRivalsUsername, manualRank } = req.body as VerifyMarvelRequest;
 
     if (!userId || !username || !marvelRivalsUid) {
       res.status(400).json({ success: false, error: 'Missing required fields: userId, username, marvelRivalsUid' });
@@ -404,47 +443,77 @@ export default async function handler(
     });
 
     const stats = await fetchMarvelStats(marvelAPI, marvelRivalsUid);
-    if (!stats) {
-      res.status(404).json({ success: false, error: 'Could not fetch Marvel Rivals stats.' });
+    
+    // If stats can't be fetched but user provided manual rank, still allow verification
+    if (!stats && !manualRank) {
+      // No stats and no manual rank - prompt user to enter rank manually
+      console.log('Could not fetch Marvel Rivals stats, prompting for manual rank entry', { marvelRivalsUid });
+      res.status(200).json({
+        success: false,
+        requiresManualRank: true,
+        playerFound: false,
+        message: 'We couldn\'t load your stats right now (the API may be updating). Please select your current Marvel Rivals rank to get started.',
+      } as VerifyMarvelResponse);
       return;
     }
 
-    // Log the raw stats for debugging
-    console.log('Marvel Rivals API response keys:', Object.keys(stats));
-    
-    // Log nested structures to find rank
-    const player = stats.player as Record<string, unknown> | undefined;
-    const overallStats = stats.overall_stats as Record<string, unknown> | undefined;
-    console.log('Marvel Rivals nested data:', {
-      playerKeys: player ? Object.keys(player) : 'none',
-      playerRank: player?.rank,
-      playerRankInfo: player?.rank_info,
-      overallStatsKeys: overallStats ? Object.keys(overallStats) : 'none',
-      overallStatsRank: overallStats?.rank,
-      rankHistoryLength: Array.isArray(stats.rank_history) ? stats.rank_history.length : 0,
-      rankHistoryFirst: Array.isArray(stats.rank_history) && stats.rank_history.length > 0 ? stats.rank_history[0] : 'none',
-    });
-    console.log('Marvel Rivals raw rank data:', {
-      rank: stats.rank,
-      tier: stats.tier,
-      division: stats.division,
-      ranked_rank: stats.ranked_rank,
-      competitive_rank: stats.competitive_rank,
-    });
+    // If we have stats, log them for debugging
+    if (stats) {
+      console.log('Marvel Rivals API response keys:', Object.keys(stats));
+      
+      // Log nested structures to find rank
+      const statsPlayer = stats.player as Record<string, unknown> | undefined;
+      const overallStats = stats.overall_stats as Record<string, unknown> | undefined;
+      const heroesRanked = stats.heroes_ranked as Array<Record<string, unknown>> | undefined;
+      const rankHistory = stats.rank_history as Array<Record<string, unknown>> | undefined;
+      
+      console.log('Marvel Rivals nested data:', {
+        playerKeys: statsPlayer ? Object.keys(statsPlayer) : 'none',
+        playerRank: statsPlayer?.rank,
+        playerLevel: statsPlayer?.level,
+        playerInfo: statsPlayer?.info,
+        overallStatsKeys: overallStats ? Object.keys(overallStats) : 'none',
+        overallStatsRank: overallStats?.rank,
+        heroesRankedCount: heroesRanked?.length || 0,
+        firstHeroRanked: heroesRanked?.[0] ? Object.keys(heroesRanked[0]) : 'none',
+        firstHeroRankValue: heroesRanked?.[0]?.rank,
+        rankHistoryLength: rankHistory?.length || 0,
+        rankHistoryFull: rankHistory?.slice(0, 3),
+      });
+      console.log('Marvel Rivals raw rank data:', {
+        rank: stats.rank,
+        tier: stats.tier,
+        division: stats.division,
+        ranked_rank: stats.ranked_rank,
+        competitive_rank: stats.competitive_rank,
+      });
+    }
 
-    const rank = extractRank(stats);
+    const rank = stats ? extractRank(stats) : null;
     console.log('Extracted rank:', rank);
     
     // Determine the Discord rank from Marvel Rivals rank
     let discordRank: string;
     let tierValue = 0;
+    let usedManualRank = false;
     
-    if (!rank) {
-      // If no rank found, treat as unranked and assign GRNDS I
-      console.log('No rank found in stats, treating as unranked');
-      discordRank = 'GRNDS I';
+    // If user provided a manual rank, use that instead (fallback flow)
+    if (manualRank) {
+      console.log('Using manual rank provided by user:', manualRank);
+      discordRank = manualRank;
+      usedManualRank = true;
+    } else if (!rank) {
+      // No rank found and no manual rank - prompt user to enter rank
+      console.log('No rank found in stats, prompting for manual rank entry');
+      res.status(200).json({
+        success: false,
+        requiresManualRank: true,
+        playerFound: true,
+        message: 'We found your account but couldn\'t detect your rank. Please select your current Marvel Rivals rank to help us place you correctly.',
+      } as VerifyMarvelResponse);
+      return;
     } else {
-      tierValue = parseTierValue(extractTier(stats), rank);
+      tierValue = stats ? parseTierValue(extractTier(stats), rank) : 0;
       const mappedRank = mapMarvelRankToDiscord(rank, tierValue);
       // mapMarvelRankToDiscord now always returns a value (defaults to GRNDS I)
       discordRank = mappedRank || 'GRNDS I';
@@ -454,24 +523,24 @@ export default async function handler(
     // Cap MMR at GRNDS V (1499) for initial placement
     const marvelMMR = Math.min(getRankMMR(discordRank), GRNDS_V_MAX_MMR);
 
-    const { data: player, error: playerError } = await supabase
+    const { data: dbPlayer, error: playerError } = await supabase
       .from('players')
       .select('id, discord_rank, discord_rank_value, current_mmr, peak_mmr, role_mode, primary_game, valorant_rank, valorant_rank_value, valorant_mmr, valorant_peak_mmr, marvel_rivals_rank, marvel_rivals_rank_value, marvel_rivals_mmr, marvel_rivals_peak_mmr, marvel_rivals_username')
       .eq('discord_user_id', userId)
       .single();
 
-    if (playerError || !player) {
+    if (playerError || !dbPlayer) {
       res.status(404).json({ success: false, error: 'Player not found. Please link your account first.' });
       return;
     }
 
-    const valorantRank = player.valorant_rank || player.discord_rank || 'Unranked';
-    const valorantRankValue = player.valorant_rank_value ?? player.discord_rank_value ?? getRankValue(valorantRank);
-    const valorantMMR = player.valorant_mmr ?? player.current_mmr ?? 0;
+    const valorantRank = dbPlayer.valorant_rank || dbPlayer.discord_rank || 'Unranked';
+    const valorantRankValue = dbPlayer.valorant_rank_value ?? dbPlayer.discord_rank_value ?? getRankValue(valorantRank);
+    const valorantMMR = dbPlayer.valorant_mmr ?? dbPlayer.current_mmr ?? 0;
 
     const combined = computeDiscordRank({
-      roleMode: player.role_mode || 'highest',
-      primaryGame: player.primary_game || 'valorant',
+      roleMode: dbPlayer.role_mode || 'highest',
+      primaryGame: dbPlayer.primary_game || 'valorant',
       valorantRank,
       valorantRankValue,
       valorantMMR,
@@ -483,15 +552,15 @@ export default async function handler(
     const updated = {
       discord_username: username,
       marvel_rivals_uid: marvelRivalsUid,
-      marvel_rivals_username: marvelRivalsUsername || player.marvel_rivals_username,
+      marvel_rivals_username: marvelRivalsUsername || dbPlayer.marvel_rivals_username,
       marvel_rivals_rank: discordRank,
       marvel_rivals_rank_value: marvelRankValue,
       marvel_rivals_mmr: marvelMMR,
-      marvel_rivals_peak_mmr: Math.max(player.marvel_rivals_peak_mmr || 0, marvelMMR),
+      marvel_rivals_peak_mmr: Math.max(dbPlayer.marvel_rivals_peak_mmr || 0, marvelMMR),
       discord_rank: combined.discordRank,
       discord_rank_value: combined.discordRankValue,
       current_mmr: combined.currentMMR,
-      peak_mmr: Math.max(player.peak_mmr || 0, combined.currentMMR),
+      peak_mmr: Math.max(dbPlayer.peak_mmr || 0, combined.currentMMR),
       verified_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -508,12 +577,12 @@ export default async function handler(
     }
 
     await supabase.from('rank_history').insert({
-      player_id: player.id,
-      old_rank: player.marvel_rivals_rank || 'Unranked',
+      player_id: dbPlayer.id,
+      old_rank: dbPlayer.marvel_rivals_rank || 'Unranked',
       new_rank: discordRank,
-      old_mmr: player.marvel_rivals_mmr || 0,
+      old_mmr: dbPlayer.marvel_rivals_mmr || 0,
       new_mmr: marvelMMR,
-      reason: 'verification',
+      reason: usedManualRank ? 'manual_verification' : 'verification',
     });
 
     const response: VerifyMarvelResponse = {
@@ -522,7 +591,10 @@ export default async function handler(
       discordRankValue: combined.discordRankValue,
       startingMMR: combined.currentMMR,
       marvelRivalsRank: discordRank,
-      message: `Marvel Rivals rank verified: ${discordRank} (${marvelMMR} MMR).`,
+      manualRank: usedManualRank ? discordRank : undefined,
+      message: usedManualRank
+        ? `Marvel Rivals rank set: ${discordRank} (${marvelMMR} MMR). Your rank will sync automatically when the API updates.`
+        : `Marvel Rivals rank verified: ${discordRank} (${marvelMMR} MMR).`,
     };
 
     res.status(200).json(response);

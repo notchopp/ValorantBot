@@ -31,6 +31,7 @@ export interface VerifyMarvelRivalsRequest {
   username: string;
   marvelRivalsUid: string;
   marvelRivalsUsername?: string;
+  manualRank?: string; // When user manually selects their rank (fallback flow)
 }
 
 export interface VerifyMarvelRivalsResponse {
@@ -41,6 +42,10 @@ export interface VerifyMarvelRivalsResponse {
   marvelRivalsRank?: string;
   message?: string;
   error?: string;
+  // When rank can't be auto-detected, prompt manual entry
+  requiresManualRank?: boolean;
+  playerFound?: boolean;
+  manualRank?: string; // The rank user entered manually
 }
 
 export interface CalculateRankRequest {

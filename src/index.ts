@@ -133,6 +133,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // Needed for message content access
+    GatewayIntentBits.GuildVoiceStates, // Needed for voice channel operations
   ],
 }) as BotClient;
 
@@ -381,7 +382,7 @@ client.once('ready', async () => {
           },
           {
             name: 'Quick Start',
-            value: '1. Link your Riot ID: `/riot link`\n2. Get verified: `/verify`\n3. Join the queue: `/queue join`',
+            value: '1. Link your account: `/account riot link` or `/account marvel link`\n2. Get verified: `/verify`\n3. Join the queue: `/queue join`',
             inline: false,
           }
         )
@@ -439,6 +440,7 @@ client.once('ready', async () => {
       databaseService,
       matchService,
       valorantAPI,
+      marvelRivalsAPI,
       vercelAPI,
       playerService,
       client
@@ -447,6 +449,14 @@ client.once('ready', async () => {
       console.log('✅ Auto-match detection service started');
   } catch (error) {
     console.error('Failed to start auto-match detection service', { error });
+  }
+
+  // Start voice channel cleanup service
+  try {
+    voiceChannelService.startCleanupService(client);
+    console.log('✅ Voice channel cleanup service started');
+  } catch (error) {
+    console.error('Failed to start voice channel cleanup service', { error });
   }
 
   // Initialize persistent queue service
@@ -517,6 +527,7 @@ process.on('SIGINT', () => {
   if (autoMatchDetectionService) autoMatchDetectionService.stop();
   if (queueCleanupService) queueCleanupService.stop();
   if (roleSyncService) roleSyncService.stop();
+  voiceChannelService.stopCleanupService();
   client.destroy();
   process.exit(0);
 });
@@ -528,6 +539,7 @@ process.on('SIGTERM', () => {
   if (autoMatchDetectionService) autoMatchDetectionService.stop();
   if (queueCleanupService) queueCleanupService.stop();
   if (roleSyncService) roleSyncService.stop();
+  voiceChannelService.stopCleanupService();
   client.destroy();
   process.exit(0);
 });

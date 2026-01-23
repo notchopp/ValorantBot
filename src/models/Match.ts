@@ -13,6 +13,7 @@ export interface Match {
     teamB: Team;
   };
   map: string;
+  gameType: 'valorant' | 'marvel_rivals'; // Which game this match is for
   host: Player;
   hostInviteCode?: string; // Valorant custom game invite code
   hostConfirmed?: boolean; // Whether host has confirmed they're ready
@@ -42,12 +43,14 @@ export function createMatch(
   teamA: Team,
   teamB: Team,
   map: string,
-  host: Player
+  host: Player,
+  gameType: 'valorant' | 'marvel_rivals' = 'valorant'
 ): Match {
   return {
     matchId,
     teams: { teamA, teamB },
     map,
+    gameType,
     host,
     startTime: new Date(),
     status: 'pending',

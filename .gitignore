@@ -19,3 +19,4 @@ web/.env.*.local
 *.swo
 *~
 *.tsbuildinfo
+.vercel

@@ -105,14 +105,14 @@ export class PlayerService {
 
     if (game === 'marvel_rivals') {
       if (!player.marvelRivalsId) {
-        return { success: false, message: 'No Marvel Rivals account linked. Use /marvel link to link your account.' };
+        return { success: false, message: 'No Marvel Rivals account linked. Use /account marvel link to link your account.' };
       }
       if (!this.marvelRivalsAPI) {
         return { success: false, message: 'Marvel Rivals API service not available' };
       }
     } else {
       if (!player.riotId) {
-        return { success: false, message: 'No Riot ID linked. Use /riot link to link your account.' };
+        return { success: false, message: 'No Riot ID linked. Use /account riot link to link your account.' };
       }
       if (!this.valorantAPI) {
         return { success: false, message: 'Valorant API service not available' };

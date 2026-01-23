@@ -1,13 +1,14 @@
 import { DatabaseService } from './DatabaseService';
 import { MatchService } from './MatchService';
 import { ValorantAPIService } from './ValorantAPIService';
+import { MarvelRivalsAPIService } from './MarvelRivalsAPIService';
 import { VercelAPIService } from './VercelAPIService';
 import { PlayerService } from './PlayerService';
 import { Client } from 'discord.js';
 
 /**
- * Service to automatically detect when Valorant matches end
- * Polls Henrik's API for recent matches and auto-updates ranks
+ * Service to automatically detect when matches end (Valorant + Marvel Rivals)
+ * Polls game APIs for recent matches and auto-updates ranks
  * Follows guardrails: error handling, logging, rate limiting
  */
 export class AutoMatchDetectionService {
@@ -20,6 +21,7 @@ export class AutoMatchDetectionService {
     private databaseService: DatabaseService,
     _matchService: MatchService, // Reserved for future use
     private valorantAPI: ValorantAPIService | undefined,
+    private marvelRivalsAPI: MarvelRivalsAPIService | undefined,
     private vercelAPI: VercelAPIService,
     _playerService: PlayerService, // Reserved for future use
     private client: Client
@@ -118,6 +120,19 @@ export class AutoMatchDetectionService {
    * Check if a specific match has been completed
    */
   private async checkMatchCompletion(match: any): Promise<void> {
+    const matchType = match.match_type;
+    
+    if (matchType === 'marvel_rivals') {
+      await this.checkMarvelRivalsMatchCompletion(match);
+    } else {
+      await this.checkValorantMatchCompletion(match);
+    }
+  }
+
+  /**
+   * Check Valorant match completion
+   */
+  private async checkValorantMatchCompletion(match: any): Promise<void> {
     try {
       if (!this.valorantAPI) {
         return;
@@ -164,7 +179,7 @@ export class AutoMatchDetectionService {
                 valorantMatch.metadata.game_length > 0
               ) {
                 // This match appears to be completed!
-                await this.processCompletedMatch(match, valorantMatch);
+                await this.processCompletedValorantMatch(match, valorantMatch);
                 return; // Process once per match
               }
             }
@@ -179,7 +194,7 @@ export class AutoMatchDetectionService {
         }
       }
     } catch (error) {
-      console.error('Error checking match completion', {
+      console.error('Error checking Valorant match completion', {
         matchId: match.match_id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -187,16 +202,133 @@ export class AutoMatchDetectionService {
   }
 
   /**
-   * Process a completed match and auto-update ranks
+   * Check Marvel Rivals match completion
    */
-  private async processCompletedMatch(match: any, valorantMatch: any): Promise<void> {
+  private async checkMarvelRivalsMatchCompletion(match: any): Promise<void> {
+    try {
+      if (!this.marvelRivalsAPI) {
+        return;
+      }
+
+      const teamA: string[] = match.team_a || [];
+      const teamB: string[] = match.team_b || [];
+      const allPlayerIds = [...teamA, ...teamB];
+
+      // Build a map of all players with their Marvel Rivals usernames
+      const playerMap = new Map<string, any>(); // marvel_rivals_username -> player data
+      const discordToPlayer = new Map<string, any>(); // discord_user_id -> player data
+      
+      for (const playerId of allPlayerIds) {
+        const player = await this.databaseService.getPlayer(playerId);
+        if (player) {
+          discordToPlayer.set(playerId, player);
+          if (player.marvel_rivals_username) {
+            playerMap.set(player.marvel_rivals_username.toLowerCase(), player);
+          }
+        }
+      }
+
+      // Try to find match from any player whose API works
+      let foundMatch: any = null;
+      let matchPlayers: any[] = [];
+      
+      for (const playerId of allPlayerIds) {
+        const player = discordToPlayer.get(playerId);
+        if (!player?.marvel_rivals_uid) {
+          continue;
+        }
+
+        try {
+          const recentMatches = await this.marvelRivalsAPI.getMatchHistory(player.marvel_rivals_uid, {
+            game_mode: 'custom',
+          });
+
+          if (!recentMatches || recentMatches.length === 0) {
+            continue;
+          }
+
+          const matchStartTime = new Date(match.created_at).getTime();
+
+          for (const mrMatch of recentMatches) {
+            // Check if match timestamp is close to our match
+            const mrMatchTime = this.parseMarvelRivalsTimestamp(mrMatch);
+            if (!mrMatchTime) continue;
+            
+            const timeDiff = Math.abs(mrMatchTime - matchStartTime);
+
+            // If match started within 10 minutes of our match creation
+            if (timeDiff < 10 * 60 * 1000) {
+              foundMatch = mrMatch;
+              matchPlayers = this.extractMarvelRivalsPlayers(mrMatch);
+              break;
+            }
+          }
+
+          if (foundMatch) break;
+        } catch (error) {
+          console.warn('Error checking Marvel Rivals player matches', {
+            playerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          continue;
+        }
+      }
+
+      if (foundMatch && matchPlayers.length > 0) {
+        await this.processCompletedMarvelRivalsMatch(match, foundMatch, matchPlayers, playerMap, discordToPlayer);
+      }
+    } catch (error) {
+      console.error('Error checking Marvel Rivals match completion', {
+        matchId: match.match_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Parse Marvel Rivals match timestamp
+   */
+  private parseMarvelRivalsTimestamp(mrMatch: any): number | null {
+    // Try common timestamp field names
+    const timestamp = mrMatch.match_time || mrMatch.timestamp || mrMatch.created_at || mrMatch.date || mrMatch.start_time;
+    if (!timestamp) return null;
+    
+    if (typeof timestamp === 'number') {
+      // If it's a Unix timestamp in seconds, convert to ms
+      return timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+    }
+    if (typeof timestamp === 'string') {
+      const parsed = Date.parse(timestamp);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  }
+
+  /**
+   * Extract player data from Marvel Rivals match
+   */
+  private extractMarvelRivalsPlayers(mrMatch: any): any[] {
+    // Try common field names for players
+    const players = mrMatch.players || mrMatch.participants || mrMatch.team_players || [];
+    if (Array.isArray(players)) return players;
+    
+    // Some APIs nest players under teams
+    const team1 = mrMatch.team1?.players || mrMatch.team_a?.players || [];
+    const team2 = mrMatch.team2?.players || mrMatch.team_b?.players || [];
+    return [...team1, ...team2];
+  }
+
+  /**
+   * Process a completed Valorant match and auto-update ranks
+   */
+  private async processCompletedValorantMatch(match: any, valorantMatch: any): Promise<void> {
     try {
       const matchId = match.match_id;
 
       // Mark as processed to avoid duplicate processing
       this.processedMatches.add(matchId);
 
-      console.log('Auto-detected completed match', {
+      console.log('Auto-detected completed Valorant match', {
         matchId,
         valorantMatchId: valorantMatch.metadata.matchid,
         roundsPlayed: valorantMatch.metadata.rounds_played,
@@ -228,8 +360,10 @@ export class AutoMatchDetectionService {
         }
       }
 
-      // Extract player stats from Valorant match
+      // Extract player stats from Valorant match and determine MVP
       const playerStatsMap = new Map<string, any>();
+      let highestScore = 0;
+      let mvpPlayerId: string | null = null;
 
       if (valorantMatch.players?.all_players) {
         for (const valorantPlayer of valorantMatch.players.all_players) {
@@ -241,15 +375,47 @@ export class AutoMatchDetectionService {
 
           if (player) {
             const stats = valorantPlayer.stats || {};
+            const playerScore = stats.score || 0;
+            
+            // Track MVP - highest score in the match
+            if (playerScore > highestScore) {
+              highestScore = playerScore;
+              mvpPlayerId = player.discord_user_id;
+            }
+            
             playerStatsMap.set(player.discord_user_id, {
               kills: stats.kills || 0,
               deaths: stats.deaths || 0,
               assists: stats.assists || 0,
-              mvp: false, // MVP detection would need more logic
+              score: playerScore,
+              headshots: stats.headshots || 0,
+              bodyshots: stats.bodyshots || 0,
+              damage: valorantPlayer.damage_made || 0,
+              mvp: false, // Will be set after loop
             });
           }
         }
+        
+        // Set MVP for the highest scorer
+        if (mvpPlayerId && playerStatsMap.has(mvpPlayerId)) {
+          const mvpStats = playerStatsMap.get(mvpPlayerId);
+          mvpStats.mvp = true;
+          playerStatsMap.set(mvpPlayerId, mvpStats);
+        }
       }
+
+      // Log cross-reference success rate
+      const teamA: string[] = match.team_a || [];
+      const teamB: string[] = match.team_b || [];
+      const totalQueuePlayers = teamA.length + teamB.length;
+      const foundStats = playerStatsMap.size;
+      console.log('Valorant cross-reference results', {
+        matchId,
+        totalQueuePlayers,
+        playersWithStats: foundStats,
+        playersWithoutStats: totalQueuePlayers - foundStats,
+        mvp: mvpPlayerId,
+      });
 
       // Update match in database
       const supabase = this.databaseService.supabase;
@@ -266,9 +432,6 @@ export class AutoMatchDetectionService {
       }
 
       // Save player stats to database
-      const teamA: string[] = match.team_a || [];
-      const teamB: string[] = match.team_b || [];
-
       for (const playerId of [...teamA, ...teamB]) {
         const stats = playerStatsMap.get(playerId);
         if (stats) {
@@ -291,7 +454,7 @@ export class AutoMatchDetectionService {
       try {
         const calculateResult = await this.vercelAPI.calculateRank({ matchId });
         if (calculateResult.success) {
-          console.log('Auto-updated ranks for completed match', { matchId });
+          console.log('Auto-updated ranks for completed Valorant match', { matchId });
         } else {
           console.warn('Failed to auto-update ranks', {
             matchId,
@@ -316,12 +479,230 @@ export class AutoMatchDetectionService {
   }
 
   /**
+   * Process a completed Marvel Rivals match and auto-update ranks
+   * Tracks stats for all players, including those whose API doesn't work (via other players' match data)
+   * Cross-references match API data to find stats for ALL queue players
+   */
+  private async processCompletedMarvelRivalsMatch(
+    match: any,
+    mrMatch: any,
+    matchPlayers: any[],
+    playerMap: Map<string, any>,
+    discordToPlayer: Map<string, any>
+  ): Promise<void> {
+    try {
+      const matchId = match.match_id;
+
+      // Mark as processed to avoid duplicate processing
+      this.processedMatches.add(matchId);
+
+      console.log('Auto-detected completed Marvel Rivals match', {
+        matchId,
+        playersFound: matchPlayers.length,
+      });
+
+      // Build reverse lookup: normalize all possible username variations from match data
+      // This allows cross-referencing to find stats for players whose own API failed
+      const normalizeUsername = (name: string): string => {
+        return (name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+      };
+
+      // Extract player stats and determine winner/MVP
+      // Cross-reference ALL players from match data against our queue players
+      const playerStatsMap = new Map<string, any>();
+      let highestScore = 0;
+      let mvpPlayerId: string | null = null;
+      
+      // Track team scores for winner determination
+      let team1Score = 0;
+      let team2Score = 0;
+      
+      // Track which API players map to which game teams
+      const apiPlayerTeams = new Map<string, string>(); // discordId -> api team
+
+      for (const mrPlayer of matchPlayers) {
+        // Try multiple username fields from the API
+        const possibleUsernames = [
+          mrPlayer.username,
+          mrPlayer.player_name,
+          mrPlayer.name,
+          mrPlayer.display_name,
+          mrPlayer.nickname,
+        ].filter(Boolean).map(normalizeUsername);
+        
+        // Try to match against ANY player in our queue
+        let matchedPlayer: any = null;
+        for (const username of possibleUsernames) {
+          if (playerMap.has(username)) {
+            matchedPlayer = playerMap.get(username);
+            break;
+          }
+        }
+        
+        // Also try matching by UID if available
+        if (!matchedPlayer && mrPlayer.uid) {
+          for (const [, player] of discordToPlayer) {
+            if (player.marvel_rivals_uid === mrPlayer.uid) {
+              matchedPlayer = player;
+              break;
+            }
+          }
+        }
+
+        if (!matchedPlayer) {
+          // Log but continue - this player might not be in our queue
+          console.log('Marvel Rivals player not in queue', { 
+            usernames: possibleUsernames,
+            uid: mrPlayer.uid 
+          });
+          continue;
+        }
+
+        // Extract stats from the match player data
+        const kills = mrPlayer.kills || mrPlayer.eliminations || 0;
+        const deaths = mrPlayer.deaths || 0;
+        const assists = mrPlayer.assists || 0;
+        const damage = mrPlayer.damage || mrPlayer.damage_dealt || 0;
+        const healing = mrPlayer.healing || mrPlayer.healing_done || 0;
+        const score = mrPlayer.score || (kills * 100 + assists * 50) || 0;
+        const hero = mrPlayer.hero || mrPlayer.character || mrPlayer.hero_name || '';
+        const teamId = mrPlayer.team || mrPlayer.team_id || '';
+        
+        // Track which API team this player is on for team mapping
+        apiPlayerTeams.set(matchedPlayer.discord_user_id, String(teamId));
+        
+        // Track team scores
+        if (teamId === 1 || teamId === 'team1' || teamId === 'a') {
+          team1Score += score;
+        } else {
+          team2Score += score;
+        }
+
+        // Track MVP - highest score in the match
+        if (score > highestScore) {
+          highestScore = score;
+          mvpPlayerId = matchedPlayer.discord_user_id;
+        }
+
+        playerStatsMap.set(matchedPlayer.discord_user_id, {
+          kills,
+          deaths,
+          assists,
+          damage,
+          healing,
+          score,
+          hero,
+          mvp: false,
+        });
+      }
+
+      // Set MVP for the highest scorer
+      if (mvpPlayerId && playerStatsMap.has(mvpPlayerId)) {
+        const mvpStats = playerStatsMap.get(mvpPlayerId);
+        mvpStats.mvp = true;
+        playerStatsMap.set(mvpPlayerId, mvpStats);
+      }
+
+      // Log cross-reference success rate
+      const teamA: string[] = match.team_a || [];
+      const teamB: string[] = match.team_b || [];
+      const totalQueuePlayers = teamA.length + teamB.length;
+      const foundStats = playerStatsMap.size;
+      console.log('Marvel Rivals cross-reference results', {
+        matchId,
+        totalQueuePlayers,
+        playersWithStats: foundStats,
+        playersWithoutStats: totalQueuePlayers - foundStats,
+        mvp: mvpPlayerId,
+      });
+
+      // Determine winner (simplified - based on team total score)
+      let winner: 'A' | 'B' | null = null;
+      if (team1Score > team2Score) {
+        winner = 'A';
+      } else if (team2Score > team1Score) {
+        winner = 'B';
+      }
+      
+      // Check if match data has explicit winner
+      const matchWinner = mrMatch.winner || mrMatch.winning_team;
+      if (matchWinner) {
+        if (matchWinner === 1 || matchWinner === 'team1' || matchWinner === 'a' || matchWinner === 'A') {
+          winner = 'A';
+        } else {
+          winner = 'B';
+        }
+      }
+
+      // Update match in database
+      const supabase = this.databaseService.supabase;
+      if (supabase) {
+        await supabase
+          .from('matches')
+          .update({
+            status: 'completed',
+            winner: winner,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('match_id', matchId);
+      }
+
+      // Save player stats to database
+      for (const playerId of [...teamA, ...teamB]) {
+        const stats = playerStatsMap.get(playerId);
+        const player = discordToPlayer.get(playerId);
+        
+        if (player) {
+          const team = teamA.includes(playerId) ? 'A' : 'B';
+          
+          // Use stats if found, otherwise create basic entry (for players whose API failed)
+          await this.databaseService.createMatchPlayerStats(matchId, playerId, {
+            team: team as 'A' | 'B',
+            kills: stats?.kills || 0,
+            deaths: stats?.deaths || 0,
+            assists: stats?.assists || 0,
+            mvp: stats?.mvp || false,
+            mmrBefore: player.marvel_rivals_mmr || player.current_mmr || 0,
+          });
+        }
+      }
+
+      // Trigger rank calculation via Vercel
+      try {
+        const calculateResult = await this.vercelAPI.calculateRank({ matchId });
+        if (calculateResult.success) {
+          console.log('Auto-updated ranks for completed Marvel Rivals match', { matchId });
+        } else {
+          console.warn('Failed to auto-update ranks for Marvel Rivals match', {
+            matchId,
+            error: calculateResult.error,
+          });
+        }
+      } catch (error) {
+        console.error('Error calling calculate-rank API for Marvel Rivals', {
+          matchId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Notify in Discord
+      await this.notifyMatchCompletion(matchId, winner, undefined, 'Marvel Rivals');
+    } catch (error) {
+      console.error('Error processing completed Marvel Rivals match', {
+        matchId: match.match_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * Notify about match completion in Discord
    */
   private async notifyMatchCompletion(
     matchId: string,
     winner: 'A' | 'B' | null,
-    score?: { teamA: number; teamB: number }
+    score?: { teamA: number; teamB: number },
+    game: string = 'Valorant'
   ): Promise<void> {
     try {
       // Find a guild to send the notification
@@ -333,7 +714,7 @@ export class AutoMatchDetectionService {
 
           if (channel) {
             const embed = {
-              title: '✅ Match Auto-Completed',
+              title: `✅ ${game} Match Auto-Completed`,
               description: `Match **${matchId}** has been automatically detected as completed!`,
               color: 0x00ff00,
               fields: [

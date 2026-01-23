@@ -1,4 +1,4 @@
-import { Guild, VoiceChannel, Role, ChannelType, PermissionOverwriteOptions } from 'discord.js';
+import { Guild, VoiceChannel, Role, ChannelType, PermissionOverwriteOptions, Client } from 'discord.js';
 import { Match } from '../models/Match';
 
 /**
@@ -6,6 +6,106 @@ import { Match } from '../models/Match';
  * Follows guardrails: error handling, logging, type safety
  */
 export class VoiceChannelService {
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+  private readonly CHANNEL_MAX_AGE_MS = 30 * 60 * 1000; // Delete empty channels after 30 minutes
+  private client: Client | null = null;
+
+  /**
+   * Start automatic voice channel cleanup service
+   */
+  startCleanupService(client: Client): void {
+    if (this.cleanupInterval) {
+      console.warn('Voice channel cleanup service already running');
+      return;
+    }
+
+    this.client = client;
+    console.log('Starting voice channel cleanup service', {
+      checkInterval: `${this.CLEANUP_INTERVAL_MS / 1000 / 60} minutes`,
+      maxAge: `${this.CHANNEL_MAX_AGE_MS / 1000 / 60} minutes`,
+    });
+
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleChannels();
+    }, this.CLEANUP_INTERVAL_MS);
+  }
+
+  /**
+   * Stop automatic voice channel cleanup service
+   */
+  stopCleanupService(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      console.log('Voice channel cleanup service stopped');
+    }
+  }
+
+  /**
+   * Clean up stale/empty team voice channels across all guilds
+   */
+  private async cleanupStaleChannels(): Promise<void> {
+    if (!this.client) return;
+
+    try {
+      for (const [, guild] of this.client.guilds.cache) {
+        await this.cleanupGuildChannels(guild);
+      }
+    } catch (error) {
+      console.error('Error in voice channel cleanup', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Clean up stale team channels in a specific guild
+   */
+  private async cleanupGuildChannels(guild: Guild): Promise<void> {
+    try {
+      // Find team voice channels (match pattern: "🔵 VAL Team A" or "🔴 MR Team B" etc)
+      const teamChannels = guild.channels.cache.filter((ch: any) => {
+        if (ch.type !== ChannelType.GuildVoice) return false;
+        const name = ch.name || '';
+        return (name.includes('Team A') || name.includes('Team B')) && 
+               (name.startsWith('🔵') || name.startsWith('🔴'));
+      });
+
+      for (const [, channel] of teamChannels) {
+        const voiceChannel = channel as VoiceChannel;
+        
+        // Skip if channel has members
+        if (voiceChannel.members.size > 0) continue;
+
+        // Check channel age (created time)
+        const channelAge = Date.now() - voiceChannel.createdTimestamp;
+        
+        // Delete if empty and older than threshold
+        if (channelAge > this.CHANNEL_MAX_AGE_MS) {
+          try {
+            await voiceChannel.delete('Automatic cleanup - empty team channel');
+            console.log('Cleaned up stale voice channel', {
+              channelName: voiceChannel.name,
+              guildName: guild.name,
+              ageMinutes: Math.round(channelAge / 1000 / 60),
+            });
+          } catch (error) {
+            console.error('Error deleting stale channel', {
+              channelId: voiceChannel.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up guild channels', {
+        guildId: guild.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   /**
    * Create queue lobby voice channel
    * Follows guardrails: error handling, validation
@@ -109,18 +209,21 @@ export class VoiceChannelService {
       const teamARole = await this.getOrCreateTeamRole(guild, 'Team A', 0x3498db); // Blue
       const teamBRole = await this.getOrCreateTeamRole(guild, 'Team B', 0xe74c3c); // Red
 
-      // Create voice channels
+      // Format game name for display
+      const gameLabel = match.gameType === 'marvel_rivals' ? 'MR' : 'VAL';
+
+      // Create voice channels with game label
       const teamAChannel = await this.createTeamVoiceChannel(
         guild,
         category,
-        `🔵 Team A - ${match.map}`,
+        `🔵 ${gameLabel} Team A - ${match.map}`,
         teamARole
       );
 
       const teamBChannel = await this.createTeamVoiceChannel(
         guild,
         category,
-        `🔴 Team B - ${match.map}`,
+        `🔴 ${gameLabel} Team B - ${match.map}`,
         teamBRole
       );
 
@@ -381,8 +484,9 @@ export class VoiceChannelService {
    */
   async cleanupTeamChannels(
     guild: Guild,
-    _teamAChannel: VoiceChannel | null,
-    _teamBChannel: VoiceChannel | null
+    teamAChannel: VoiceChannel | null,
+    teamBChannel: VoiceChannel | null,
+    deleteChannels: boolean = true
   ): Promise<void> {
     try {
       // Remove team roles from all members
@@ -415,25 +519,44 @@ export class VoiceChannelService {
         }
       }
 
-      // Delete voice channels (optional - you might want to keep them)
-      // Uncomment if you want to delete channels after match
-      /*
-      if (teamAChannel) {
-        try {
-          await teamAChannel.delete('Match ended');
-        } catch (error) {
-          console.error('Error deleting Team A channel', { error });
+      // Delete voice channels if requested
+      if (deleteChannels) {
+        if (teamAChannel) {
+          try {
+            // Only delete if channel is empty
+            if (teamAChannel.members.size === 0) {
+              await teamAChannel.delete('Match ended - cleanup');
+              console.log('Deleted Team A voice channel', { channelName: teamAChannel.name });
+            } else {
+              console.log('Team A channel still has members, skipping deletion', { 
+                memberCount: teamAChannel.members.size 
+              });
+            }
+          } catch (error) {
+            console.error('Error deleting Team A channel', { 
+              error: error instanceof Error ? error.message : String(error) 
+            });
+          }
         }
-      }
 
-      if (teamBChannel) {
-        try {
-          await teamBChannel.delete('Match ended');
-        } catch (error) {
-          console.error('Error deleting Team B channel', { error });
+        if (teamBChannel) {
+          try {
+            // Only delete if channel is empty
+            if (teamBChannel.members.size === 0) {
+              await teamBChannel.delete('Match ended - cleanup');
+              console.log('Deleted Team B voice channel', { channelName: teamBChannel.name });
+            } else {
+              console.log('Team B channel still has members, skipping deletion', { 
+                memberCount: teamBChannel.members.size 
+              });
+            }
+          } catch (error) {
+            console.error('Error deleting Team B channel', { 
+              error: error instanceof Error ? error.message : String(error) 
+            });
+          }
         }
       }
-      */
     } catch (error) {
       console.error('Error cleaning up team channels', {
         guildId: guild.id,

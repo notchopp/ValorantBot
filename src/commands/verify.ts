@@ -4,12 +4,34 @@ import {
   EmbedBuilder,
   MessageFlags,
   AttachmentBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuInteraction,
+  ComponentType,
 } from 'discord.js';
 import { DatabaseService } from '../services/DatabaseService';
 import { PlayerService } from '../services/PlayerService';
 import { VercelAPIService } from '../services/VercelAPIService';
 import { RankCardService } from '../services/RankCardService';
 import { RankProfileImageService } from '../services/RankProfileImageService';
+
+// Marvel Rivals rank options for manual selection
+const MARVEL_RIVALS_RANK_CHOICES = [
+  { label: 'Bronze I', value: 'GRNDS I', description: 'Bronze I → GRNDS I' },
+  { label: 'Bronze II', value: 'GRNDS I', description: 'Bronze II → GRNDS I' },
+  { label: 'Bronze III', value: 'GRNDS II', description: 'Bronze III → GRNDS II' },
+  { label: 'Silver I', value: 'GRNDS II', description: 'Silver I → GRNDS II' },
+  { label: 'Silver II', value: 'GRNDS III', description: 'Silver II → GRNDS III' },
+  { label: 'Silver III', value: 'GRNDS III', description: 'Silver III → GRNDS III' },
+  { label: 'Gold I', value: 'GRNDS III', description: 'Gold I → GRNDS III' },
+  { label: 'Gold II', value: 'GRNDS IV', description: 'Gold II → GRNDS IV' },
+  { label: 'Gold III', value: 'GRNDS IV', description: 'Gold III → GRNDS IV' },
+  { label: 'Platinum I', value: 'GRNDS IV', description: 'Platinum I → GRNDS IV' },
+  { label: 'Platinum II', value: 'GRNDS V', description: 'Platinum II → GRNDS V' },
+  { label: 'Platinum III', value: 'GRNDS V', description: 'Platinum III → GRNDS V' },
+  { label: 'Diamond+', value: 'GRNDS V', description: 'Diamond or higher → GRNDS V (capped)' },
+  { label: 'Unranked', value: 'GRNDS I', description: 'Haven\'t played ranked → GRNDS I' },
+];
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -71,7 +93,7 @@ export async function execute(
     if (preferredGame === 'marvel_rivals') {
       if (!existingPlayer?.marvel_rivals_uid || !existingPlayer?.marvel_rivals_username) {
         await interaction.editReply(
-          `❌ Please link your Marvel Rivals account first using \`/marvel link\`.\n\n**Steps:**\n1. Use \`/marvel link username:<your_username>\`\n2. Then use \`/verify game:marvel_rivals\` to get your placement.`
+          `❌ Please link your Marvel Rivals account first.\n\n**Steps:**\n1. Use \`/account marvel link username:<your_username>\`\n2. Then use \`/verify game:marvel_rivals\` to get your placement.`
         );
         return;
       }
@@ -93,14 +115,79 @@ export async function execute(
         return;
       }
 
-      const verifyResult = await vercelAPI.verifyMarvelRivals({
+      let verifyResult = await vercelAPI.verifyMarvelRivals({
         userId,
         username,
         marvelRivalsUid: existingPlayer.marvel_rivals_uid,
         marvelRivalsUsername: existingPlayer.marvel_rivals_username || undefined,
       });
 
-      if (!verifyResult.success) {
+      // Handle manual rank selection flow when API can't detect rank
+      if (verifyResult.requiresManualRank) {
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId('manual_rank_select')
+          .setPlaceholder('Select your current Marvel Rivals rank')
+          .addOptions(MARVEL_RIVALS_RANK_CHOICES);
+
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+        // Different message based on whether we found the player
+        const descriptionText = verifyResult.playerFound
+          ? `We found your account **${existingPlayer.marvel_rivals_username}** but couldn't detect your current rank.\n\n` +
+            `**Select your Marvel Rivals rank below** to get placed correctly.\n\n` +
+            `⚠️ *Your rank will sync automatically once the API updates. If your selection doesn't match your actual rank, it will be corrected.*`
+          : `We couldn't load your stats right now (the API may be updating).\n\n` +
+            `**Select your current Marvel Rivals rank below** to get started playing!\n\n` +
+            `⚠️ *Your rank will sync automatically when the API is available. If your selection doesn't match, it will be corrected.*`;
+
+        const embed = new EmbedBuilder()
+          .setTitle('🎮 Help Us Place You')
+          .setColor(0xf5a623)
+          .setDescription(descriptionText);
+
+        const response = await interaction.editReply({
+          embeds: [embed],
+          components: [row],
+        });
+
+        try {
+          const selectInteraction = await response.awaitMessageComponent({
+            componentType: ComponentType.StringSelect,
+            filter: (i) => i.user.id === userId && i.customId === 'manual_rank_select',
+            time: 60000, // 60 second timeout
+          }) as StringSelectMenuInteraction;
+
+          await selectInteraction.deferUpdate();
+
+          const selectedRank = selectInteraction.values[0];
+          
+          // Re-verify with the manual rank
+          verifyResult = await vercelAPI.verifyMarvelRivals({
+            userId,
+            username,
+            marvelRivalsUid: existingPlayer.marvel_rivals_uid,
+            marvelRivalsUsername: existingPlayer.marvel_rivals_username || undefined,
+            manualRank: selectedRank,
+          });
+
+          if (!verifyResult.success) {
+            await interaction.editReply({
+              content: `❌ ${verifyResult.error || 'Failed to set rank. Please try again.'}`,
+              embeds: [],
+              components: [],
+            });
+            return;
+          }
+        } catch (error) {
+          // Timeout or error
+          await interaction.editReply({
+            content: '⏰ Selection timed out. Please run `/verify game:marvel_rivals` again.',
+            embeds: [],
+            components: [],
+          });
+          return;
+        }
+      } else if (!verifyResult.success) {
         await interaction.editReply(
           `❌ ${verifyResult.error || 'Failed to verify Marvel Rivals account. Please try again later.'}`
         );
@@ -113,9 +200,10 @@ export async function execute(
 
       services.playerService.invalidateCache(userId);
 
+      const wasManualRank = !!verifyResult.manualRank;
       const embed = new EmbedBuilder()
-        .setTitle('✅ Rank Placement Complete!')
-        .setColor(0x00ff00)
+        .setTitle(wasManualRank ? '✅ Rank Set Successfully!' : '✅ Rank Placement Complete!')
+        .setColor(wasManualRank ? 0xf5a623 : 0x00ff00)
         .addFields(
           {
             name: 'Marvel Rivals',
@@ -134,7 +222,9 @@ export async function execute(
           }
         )
         .setFooter({
-          text: 'Your Discord rank is based on your Marvel Rivals rank. Play customs to adjust your rank!',
+          text: wasManualRank 
+            ? '⚠️ Rank set manually. It will sync automatically when the API updates.'
+            : 'Your Discord rank is based on your Marvel Rivals rank. Play customs to adjust your rank!',
         });
 
       const attachments: AttachmentBuilder[] = [];
@@ -196,7 +286,7 @@ export async function execute(
         }
       }
 
-      await interaction.editReply({ embeds: [embed], files: attachments });
+      await interaction.editReply({ embeds: [embed], files: attachments, components: [] });
       return;
     }
 

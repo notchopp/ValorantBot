@@ -11,14 +11,14 @@ export const data = new SlashCommandBuilder()
   .setName('why')
   .setDescription('Get AI-powered analysis of why you might be losing or stuck at your rank')
   .addStringOption((option) =>
-    option.setName('game').setDescription('Which game to analyze').addChoices(...GAME_CHOICES)
-  )
-  .addStringOption((option) =>
     option
       .setName('mode')
       .setDescription('Analyze custom or ranked matches')
       .addChoices(...MODE_CHOICES)
       .setRequired(true)
+  )
+  .addStringOption((option) =>
+    option.setName('game').setDescription('Which game to analyze').addChoices(...GAME_CHOICES)
   );
 
 interface PerformanceAnalysis {
