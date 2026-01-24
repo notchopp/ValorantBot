@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft, Terminal, MessageSquare, Trophy, Zap, CheckCircle, ExternalLink } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Terminal, MessageSquare, Trophy, Zap, CheckCircle, ExternalLink, Gamepad2, TrendingUp, Swords, BarChart3, Target, Lightbulb, Palette, AlertTriangle, ArrowUp, ArrowDown, Star, Rocket } from 'lucide-react'
+
+// Consistent red accent color
+const ACCENT_COLOR = '#dc2626'
 
 interface InitiationGuideProps {
   username: string
@@ -12,37 +15,37 @@ const SECTIONS = [
     id: 'welcome',
     title: 'SYSTEM_INIT',
     icon: Terminal,
-    color: '#00ff88',
+    color: ACCENT_COLOR,
   },
   {
     id: 'what-is-grnds',
     title: 'ABOUT_GRNDS',
     icon: Zap,
-    color: '#ff8c00',
+    color: ACCENT_COLOR,
   },
   {
     id: 'discord-commands',
     title: 'DISCORD_CMD',
     icon: MessageSquare,
-    color: '#5865f2',
+    color: ACCENT_COLOR,
   },
   {
     id: 'rank-system',
     title: 'RANK_SYSTEM',
     icon: Trophy,
-    color: '#dc2626',
+    color: ACCENT_COLOR,
   },
   {
     id: 'web-ui',
     title: 'WEB_INTERFACE',
     icon: ExternalLink,
-    color: '#8b5cf6',
+    color: ACCENT_COLOR,
   },
   {
     id: 'getting-started',
     title: 'GET_STARTED',
     icon: CheckCircle,
-    color: '#10b981',
+    color: ACCENT_COLOR,
   },
 ]
 
@@ -112,8 +115,8 @@ export function InitiationGuide({ username }: InitiationGuideProps) {
         className="absolute inset-0 bg-black/95"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px)
+            linear-gradient(rgba(220, 38, 38, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(220, 38, 38, 0.03) 1px, transparent 1px)
           `,
           backgroundSize: '50px 50px',
         }}
@@ -136,7 +139,7 @@ export function InitiationGuide({ username }: InitiationGuideProps) {
               style={{ backgroundColor: currentSection.color }}
             />
             <h1 className="text-2xl md:text-4xl font-mono font-black text-white tracking-tighter">
-              <span className="text-[#ff8c00]">#</span>GRNDS <span className="text-white/40">INITIATION</span>
+              <span className="text-[#dc2626]">#</span>GRNDS <span className="text-white/40">INITIATION</span>
             </h1>
           </div>
           
@@ -149,7 +152,7 @@ export function InitiationGuide({ username }: InitiationGuideProps) {
         </div>
         
         {/* Typing intro */}
-        <div className="font-mono text-[#00ff88] text-lg mb-8 h-8">
+        <div className="font-mono text-[#dc2626] text-lg mb-8 h-8">
           {typingText}
           <span className="animate-pulse">_</span>
         </div>
@@ -241,7 +244,7 @@ export function InitiationGuide({ username }: InitiationGuideProps) {
               {activeSection === SECTIONS.length - 1 ? (
                 <button
                   onClick={handleClose}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-mono uppercase tracking-wider bg-[#00ff88] text-black rounded hover:bg-[#00ff88]/80 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-mono uppercase tracking-wider bg-[#dc2626] text-white rounded hover:bg-[#dc2626]/80 transition-colors"
                 >
                   <CheckCircle className="w-4 h-4" />
                   COMPLETE
@@ -279,29 +282,29 @@ function SectionContent({ section }: { section: string }) {
       return (
         <div className="space-y-6 font-mono">
           <div className="text-2xl font-black text-white">
-            Welcome to the <span className="text-[#ff8c00]">GRNDS</span> System
+            Welcome to the <span className="text-[#dc2626]">GRNDS</span> System
           </div>
           <p className="text-white/60 leading-relaxed">
             You&apos;ve successfully connected your Discord account. This initiation will guide you through everything you need to know to get started with GRNDS competitive customs.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
             <div className="p-4 border border-white/10 rounded bg-white/5">
-              <div className="text-3xl mb-2">🎮</div>
+              <Gamepad2 className="w-8 h-8 mb-2 text-[#dc2626]" />
               <div className="text-sm font-bold text-white">Competitive Customs</div>
               <div className="text-xs text-white/40 mt-1">Ranked 10-player matches</div>
             </div>
             <div className="p-4 border border-white/10 rounded bg-white/5">
-              <div className="text-3xl mb-2">📊</div>
+              <BarChart3 className="w-8 h-8 mb-2 text-[#dc2626]" />
               <div className="text-sm font-bold text-white">MMR System</div>
               <div className="text-xs text-white/40 mt-1">Performance-based rankings</div>
             </div>
             <div className="p-4 border border-white/10 rounded bg-white/5">
-              <div className="text-3xl mb-2">🏆</div>
+              <Trophy className="w-8 h-8 mb-2 text-[#dc2626]" />
               <div className="text-sm font-bold text-white">Leaderboards</div>
               <div className="text-xs text-white/40 mt-1">Compete for top spots</div>
             </div>
           </div>
-          <div className="text-xs text-[#00ff88] mt-6">
+          <div className="text-xs text-[#dc2626] mt-6">
             &gt; PROCEED TO NEXT SECTION TO LEARN MORE...
           </div>
         </div>
@@ -311,33 +314,33 @@ function SectionContent({ section }: { section: string }) {
       return (
         <div className="space-y-6 font-mono">
           <div className="text-xl font-black text-white">
-            What is <span className="text-[#ff8c00]">GRNDS</span>?
+            What is <span className="text-[#dc2626]">GRNDS</span>?
           </div>
           <p className="text-white/60 leading-relaxed">
             GRNDS (Grounds) is a competitive custom games platform for Valorant and Marvel Rivals. We organize balanced 5v5 matches using our custom MMR system.
           </p>
           
           <div className="space-y-4">
-            <div className="flex items-start gap-4 p-4 border border-[#ff8c00]/30 rounded bg-[#ff8c00]/5">
-              <div className="text-2xl">⚔️</div>
+            <div className="flex items-start gap-4 p-4 border border-[#dc2626]/30 rounded bg-[#dc2626]/5">
+              <Swords className="w-6 h-6 text-[#dc2626] flex-shrink-0" />
               <div>
-                <div className="text-sm font-bold text-[#ff8c00]">Balanced Matches</div>
+                <div className="text-sm font-bold text-[#dc2626]">Balanced Matches</div>
                 <div className="text-xs text-white/50 mt-1">Our algorithm creates fair teams based on player skill levels</div>
               </div>
             </div>
             
-            <div className="flex items-start gap-4 p-4 border border-[#ff8c00]/30 rounded bg-[#ff8c00]/5">
-              <div className="text-2xl">📈</div>
+            <div className="flex items-start gap-4 p-4 border border-[#dc2626]/30 rounded bg-[#dc2626]/5">
+              <TrendingUp className="w-6 h-6 text-[#dc2626] flex-shrink-0" />
               <div>
-                <div className="text-sm font-bold text-[#ff8c00]">Skill Progression</div>
+                <div className="text-sm font-bold text-[#dc2626]">Skill Progression</div>
                 <div className="text-xs text-white/50 mt-1">Climb the ranks by winning matches and performing well</div>
               </div>
             </div>
             
-            <div className="flex items-start gap-4 p-4 border border-[#ff8c00]/30 rounded bg-[#ff8c00]/5">
-              <div className="text-2xl">🎯</div>
+            <div className="flex items-start gap-4 p-4 border border-[#dc2626]/30 rounded bg-[#dc2626]/5">
+              <Target className="w-6 h-6 text-[#dc2626] flex-shrink-0" />
               <div>
-                <div className="text-sm font-bold text-[#ff8c00]">Stats Tracking</div>
+                <div className="text-sm font-bold text-[#dc2626]">Stats Tracking</div>
                 <div className="text-xs text-white/50 mt-1">All your matches, K/D, and performance are tracked</div>
               </div>
             </div>
@@ -397,8 +400,9 @@ function SectionContent({ section }: { section: string }) {
             />
           </div>
           
-          <div className="text-xs text-[#5865f2] p-3 border border-[#5865f2]/30 rounded bg-[#5865f2]/10">
-            💡 TIP: Use Tab to autocomplete commands in Discord
+          <div className="flex items-center gap-2 text-xs text-[#dc2626] p-3 border border-[#dc2626]/30 rounded bg-[#dc2626]/10">
+            <Lightbulb className="w-4 h-4 flex-shrink-0" />
+            <span>TIP: Use Tab to autocomplete commands in Discord</span>
           </div>
         </div>
       )
@@ -426,21 +430,22 @@ function SectionContent({ section }: { section: string }) {
           
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-[#00ff88]">↑</span>
+              <ArrowUp className="w-4 h-4 text-[#dc2626]" />
               <span className="text-white/60">Win games to gain MMR</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-red-500">↓</span>
+              <ArrowDown className="w-4 h-4 text-white/40" />
               <span className="text-white/60">Lose games to lose MMR</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-yellow-500">★</span>
+              <Star className="w-4 h-4 text-[#dc2626]" />
               <span className="text-white/60">MVP bonus MMR for top performers</span>
             </div>
           </div>
           
-          <div className="text-xs text-[#dc2626] p-3 border border-[#dc2626]/30 rounded bg-[#dc2626]/10">
-            ⚠️ Initial placement is capped at GRNDS V (1499 MMR). Climb through matches!
+          <div className="flex items-center gap-2 text-xs text-[#dc2626] p-3 border border-[#dc2626]/30 rounded bg-[#dc2626]/10">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>Initial placement is capped at GRNDS V (1499 MMR). Climb through matches!</span>
           </div>
         </div>
       )
@@ -475,8 +480,9 @@ function SectionContent({ section }: { section: string }) {
             />
           </div>
           
-          <div className="text-xs text-[#8b5cf6] p-3 border border-[#8b5cf6]/30 rounded bg-[#8b5cf6]/10">
-            🎨 TIP: Visit your profile to customize your appearance!
+          <div className="flex items-center gap-2 text-xs text-[#dc2626] p-3 border border-[#dc2626]/30 rounded bg-[#dc2626]/10">
+            <Palette className="w-4 h-4 flex-shrink-0" />
+            <span>TIP: Visit your profile to customize your appearance!</span>
           </div>
         </div>
       )
@@ -519,9 +525,9 @@ function SectionContent({ section }: { section: string }) {
             />
           </div>
           
-          <div className="text-center mt-8 p-6 border border-[#00ff88]/30 rounded bg-[#00ff88]/10">
-            <div className="text-2xl mb-2">🚀</div>
-            <div className="text-lg font-bold text-[#00ff88]">YOU&apos;RE READY!</div>
+          <div className="text-center mt-8 p-6 border border-[#dc2626]/30 rounded bg-[#dc2626]/10">
+            <Rocket className="w-8 h-8 mx-auto mb-2 text-[#dc2626]" />
+            <div className="text-lg font-bold text-[#dc2626]">YOU&apos;RE READY!</div>
             <div className="text-xs text-white/50 mt-2">Head to Discord and start your journey</div>
           </div>
         </div>
@@ -534,12 +540,12 @@ function SectionContent({ section }: { section: string }) {
 
 function CommandItem({ cmd, desc, important }: { cmd: string; desc: string; important?: boolean }) {
   return (
-    <div className={`flex items-center gap-4 p-3 rounded ${important ? 'bg-[#5865f2]/10 border border-[#5865f2]/30' : 'bg-white/5'}`}>
-      <code className={`text-sm px-2 py-1 rounded ${important ? 'bg-[#5865f2]/20 text-[#5865f2]' : 'bg-white/10 text-white'}`}>
+    <div className={`flex items-center gap-4 p-3 rounded ${important ? 'bg-[#dc2626]/10 border border-[#dc2626]/30' : 'bg-white/5'}`}>
+      <code className={`text-sm px-2 py-1 rounded ${important ? 'bg-[#dc2626]/20 text-[#dc2626]' : 'bg-white/10 text-white'}`}>
         {cmd}
       </code>
       <span className="text-xs text-white/50">{desc}</span>
-      {important && <span className="text-[10px] text-[#5865f2] ml-auto">REQUIRED</span>}
+      {important && <span className="text-[10px] text-[#dc2626] ml-auto">REQUIRED</span>}
     </div>
   )
 }
@@ -558,10 +564,10 @@ function RankItem({ rank, mmr, color }: { rank: string; mmr: string; color: stri
 
 function WebFeature({ title, desc, current }: { title: string; desc: string; current?: boolean }) {
   return (
-    <div className={`flex items-start gap-4 p-4 rounded ${current ? 'bg-[#8b5cf6]/10 border border-[#8b5cf6]/30' : 'bg-white/5 border border-white/10'}`}>
-      <div className={`w-2 h-2 rounded-full mt-1.5 ${current ? 'bg-[#8b5cf6] animate-pulse' : 'bg-white/30'}`} />
+    <div className={`flex items-start gap-4 p-4 rounded ${current ? 'bg-[#dc2626]/10 border border-[#dc2626]/30' : 'bg-white/5 border border-white/10'}`}>
+      <div className={`w-2 h-2 rounded-full mt-1.5 ${current ? 'bg-[#dc2626] animate-pulse' : 'bg-white/30'}`} />
       <div>
-        <div className={`text-sm font-bold ${current ? 'text-[#8b5cf6]' : 'text-white'}`}>
+        <div className={`text-sm font-bold ${current ? 'text-[#dc2626]' : 'text-white'}`}>
           {title}
           {current && <span className="text-[10px] ml-2 text-white/40">(YOU ARE HERE)</span>}
         </div>
@@ -574,7 +580,7 @@ function WebFeature({ title, desc, current }: { title: string; desc: string; cur
 function ChecklistItem({ step, title, desc }: { step: number; title: string; desc: string }) {
   return (
     <div className="flex items-start gap-4 p-4 bg-white/5 rounded border border-white/10">
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#00ff88]/20 border border-[#00ff88]/50 flex items-center justify-center text-[#00ff88] font-bold">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#dc2626]/20 border border-[#dc2626]/50 flex items-center justify-center text-[#dc2626] font-bold">
         {step}
       </div>
       <div>
