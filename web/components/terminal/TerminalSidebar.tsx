@@ -1,13 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  LayoutDashboard, Trophy, Users, User, LogOut, Shield, HelpCircle, 
-  Terminal, Command, ChevronRight, Menu, X
-} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAccentColor } from '@/lib/AccentColorContext'
 import { useInitiation } from '@/lib/InitiationContext'
@@ -18,22 +14,85 @@ interface TerminalSidebarProps {
   isAdmin?: boolean
 }
 
-interface NavItem {
+interface FileNode {
   id: string
-  label: string
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+  name: string
+  type: 'dir' | 'exe' | 'log' | 'dat' | 'sys'
+  path: string
   href: string
   adminOnly?: boolean
-  command?: string
+  size?: string
+  modified?: string
 }
 
-const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'DASHBOARD', icon: LayoutDashboard, href: '/dashboard', command: 'cd /dashboard' },
-  { id: 'season', label: 'SEASON', icon: Trophy, href: '/season', command: 'cat season.log' },
-  { id: 'leaderboard', label: 'LEADERBOARD', icon: Users, href: '/leaderboard', command: 'top --sort=mmr' },
-  { id: 'profile', label: 'PROFILE', icon: User, href: '', command: 'whoami --stats' },
-  { id: 'hq', label: 'HQ', icon: Shield, href: '/hq', adminOnly: true, command: 'sudo admin' },
+const fileSystem: FileNode[] = [
+  { id: 'dashboard', name: 'dashboard', type: 'exe', path: '/root/dashboard', href: '/dashboard', size: '2.4K', modified: 'NOW' },
+  { id: 'season', name: 'season.log', type: 'log', path: '/root/season.log', href: '/season', size: '847B', modified: '2h' },
+  { id: 'leaderboard', name: 'leaderboard.dat', type: 'dat', path: '/root/leaderboard.dat', href: '/leaderboard', size: '12K', modified: '5m' },
+  { id: 'profile', name: 'user.profile', type: 'sys', path: '/root/user.profile', href: '', size: '1.2K', modified: 'NOW' },
+  { id: 'hq', name: '.admin', type: 'dir', path: '/root/.admin', href: '/hq', adminOnly: true, size: '4.0K', modified: '1d' },
 ]
+
+const fileTypeColors: Record<string, string> = {
+  exe: '#22c55e',
+  log: '#eab308', 
+  dat: '#3b82f6',
+  sys: '#a855f7',
+  dir: '#ef4444',
+}
+
+const fileTypeIcons: Record<string, string> = {
+  exe: '>>',
+  log: '[]',
+  dat: '{}',
+  sys: '<>',
+  dir: '[]',
+}
+
+// Glitch text effect component
+function GlitchText({ text, className = '' }: { text: string; className?: string }) {
+  const [glitchText, setGlitchText] = useState(text)
+  const [isGlitching, setIsGlitching] = useState(false)
+  
+  useEffect(() => {
+    const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?0123456789'
+    let timeout: NodeJS.Timeout
+    
+    const doGlitch = () => {
+      if (Math.random() > 0.97) {
+        setIsGlitching(true)
+        let iterations = 0
+        const maxIterations = 3
+        
+        const interval = setInterval(() => {
+          setGlitchText(text.split('').map((char) => {
+            if (Math.random() > 0.7) {
+              return glitchChars[Math.floor(Math.random() * glitchChars.length)]
+            }
+            return char
+          }).join(''))
+          
+          iterations++
+          if (iterations >= maxIterations) {
+            clearInterval(interval)
+            setGlitchText(text)
+            setIsGlitching(false)
+          }
+        }, 50)
+      }
+      timeout = setTimeout(doGlitch, 100)
+    }
+    
+    doGlitch()
+    return () => clearTimeout(timeout)
+  }, [text])
+  
+  return (
+    <span className={`${className} ${isGlitching ? 'text-red-500' : ''}`}>
+      {glitchText}
+    </span>
+  )
+}
 
 export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSidebarProps) {
   const pathname = usePathname()
@@ -41,8 +100,10 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
   const initiation = useInitiation()
   const openGuide = initiation?.openGuide
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [bootComplete, setBootComplete] = useState(false)
+  const [typedPath, setTypedPath] = useState('')
 
-  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
+  const visibleFiles = fileSystem.filter(file => !file.adminOnly || isAdmin)
 
   const getActiveId = (): string => {
     if (pathname?.startsWith('/dashboard')) return 'dashboard'
@@ -54,7 +115,29 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
   }
 
   const activeId = getActiveId()
-  const activeItem = visibleItems.find(item => item.id === activeId)
+  const activeFile = visibleFiles.find(f => f.id === activeId)
+  const currentPath = activeFile?.path || '/root'
+
+  // Typing animation for current path
+  useEffect(() => {
+    setTypedPath('')
+    let i = 0
+    const interval = setInterval(() => {
+      if (i < currentPath.length) {
+        setTypedPath(currentPath.slice(0, i + 1))
+        i++
+      } else {
+        clearInterval(interval)
+      }
+    }, 30)
+    return () => clearInterval(interval)
+  }, [currentPath])
+
+  // Boot sequence
+  useEffect(() => {
+    const timer = setTimeout(() => setBootComplete(true), 500)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -63,140 +146,166 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
   }
 
   const SidebarContent = () => (
-    <>
-      {/* Logo & Brand */}
-      <div className="p-4 border-b" style={{ borderColor: `${accentColor}20` }}>
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <motion.div whileHover={{ scale: 1.05 }}>
+    <div className="h-full flex flex-col font-mono text-[11px]">
+      {/* Header - System Info */}
+      <div className="p-3 border-b border-white/5">
+        <div className="flex items-center gap-2 mb-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src="/grnds-logo-3d.gif" 
               alt="GRNDS" 
-              className="w-10 h-10 object-contain"
+              className="w-8 h-8 object-contain"
             />
-          </motion.div>
-          <div className="font-mono">
-            <div className="flex items-center gap-1">
-              <span className="text-white/30">$</span>
-              <span className="text-sm font-bold" style={{ color: accentColor }}>grnds</span>
+            <div>
+              <div className="text-white/90 font-bold tracking-wider">GRNDS</div>
+              <div className="text-white/30 text-[9px]">v2.0_TERMINAL</div>
             </div>
-            <div className="text-[10px] text-white/30">v2.0 // hub</div>
-          </div>
-        </Link>
+          </Link>
+        </div>
+        <div className="flex items-center gap-2 text-[9px] text-white/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span>CONN:SECURE</span>
+          <span className="text-white/10">|</span>
+          <span>PID:7742</span>
+        </div>
+      </div>
+
+      {/* Current Path */}
+      <div className="px-3 py-2 bg-black/30 border-b border-white/5">
+        <div className="flex items-center gap-1">
+          <span className="text-green-500">root@grnds</span>
+          <span className="text-white/30">:</span>
+          <span className="text-blue-400">~</span>
+          <span className="text-white/50">{typedPath}</span>
+          <motion.span
+            className="w-2 h-3 bg-white/70 ml-0.5"
+            animate={{ opacity: [1, 0, 1] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
+        </div>
       </div>
 
       {/* Search */}
-      <div className="p-3 border-b" style={{ borderColor: `${accentColor}15` }}>
+      <div className="p-2 border-b border-white/5">
+        <div className="text-[9px] text-white/30 mb-1 px-1">$ grep -r &quot;player&quot;</div>
         <PlayerSearch />
       </div>
 
-      {/* Current Command */}
-      {activeItem && (
-        <div className="px-4 py-3 border-b font-mono" style={{ borderColor: `${accentColor}15` }}>
-          <div className="text-[10px] text-white/30 mb-1">CURRENT_CMD</div>
-          <div className="flex items-center gap-2 text-xs">
-            <span style={{ color: accentColor }}>$</span>
-            <span className="text-white/60">{activeItem.command}</span>
-            <motion.span 
-              className="w-2 h-3 ml-1"
-              style={{ backgroundColor: accentColor }}
-              animate={{ opacity: [1, 0, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
+      {/* File Explorer */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Directory Header */}
+        <div className="px-3 py-2 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span style={{ color: accentColor }}>[</span>
+            <span className="text-white/50">ls -la</span>
+            <span style={{ color: accentColor }}>]</span>
           </div>
+          <span className="text-white/20">{visibleFiles.length} items</span>
         </div>
-      )}
 
-      {/* Navigation */}
-      <div className="flex-1 p-3">
-        <div className="text-[10px] font-mono text-white/30 px-3 mb-2 flex items-center gap-2">
-          <Command className="w-3 h-3" style={{ color: accentColor }} />
-          MODULES
-        </div>
-        <div className="space-y-1">
-          {visibleItems.map((item) => {
-            const Icon = item.icon
-            const isActive = activeId === item.id
-            const href = item.id === 'profile' && discordUserId ? `/profile/${discordUserId}` : item.href
+        {/* File List */}
+        <div className="p-1">
+          {bootComplete && visibleFiles.map((file, index) => {
+            const isActive = activeId === file.id
+            const href = file.id === 'profile' && discordUserId ? `/profile/${discordUserId}` : file.href
+            const typeColor = fileTypeColors[file.type]
+            const typeIcon = fileTypeIcons[file.type]
 
             return (
-              <Link
-                key={item.id}
-                href={href}
-                onClick={() => setMobileOpen(false)}
+              <motion.div
+                key={file.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
               >
-                <motion.div
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all font-mono text-sm cursor-pointer"
-                  style={{
-                    background: isActive ? `${accentColor}15` : 'transparent',
-                    borderLeft: isActive ? `3px solid ${accentColor}` : '3px solid transparent',
-                  }}
-                  whileHover={{ x: 4, backgroundColor: isActive ? undefined : `${accentColor}08` }}
+                <Link
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
                 >
-                  <div 
-                    className="w-6 h-6 rounded flex items-center justify-center"
-                    style={{ 
-                      background: isActive ? `${accentColor}25` : 'rgba(255,255,255,0.05)',
-                    }}
+                  <motion.div
+                    className={`
+                      flex items-center gap-2 px-2 py-1.5 rounded transition-all cursor-pointer
+                      ${isActive ? 'bg-white/10' : 'hover:bg-white/5'}
+                    `}
+                    whileHover={{ x: 2 }}
                   >
-                    <Icon 
-                      className="w-3.5 h-3.5"
-                      style={{ color: isActive ? accentColor : 'rgba(255,255,255,0.4)' }}
-                    />
-                  </div>
-                  <span 
-                    className="flex-1 text-xs font-bold uppercase tracking-wide"
-                    style={{ color: isActive ? accentColor : 'rgba(255,255,255,0.5)' }}
-                  >
-                    {item.label}
-                  </span>
-                  {isActive && (
-                    <ChevronRight className="w-3 h-3" style={{ color: accentColor }} />
-                  )}
-                </motion.div>
-              </Link>
+                    {/* Selection indicator */}
+                    <span className={`text-[10px] ${isActive ? 'text-green-500' : 'text-white/10'}`}>
+                      {isActive ? '>' : ' '}
+                    </span>
+                    
+                    {/* Permissions */}
+                    <span className="text-white/20 text-[9px] w-16 hidden sm:inline">
+                      {file.type === 'dir' ? 'drwxr-x' : '-rwxr--'}
+                    </span>
+                    
+                    {/* Type icon */}
+                    <span 
+                      className="text-[10px] font-bold w-6"
+                      style={{ color: typeColor }}
+                    >
+                      {typeIcon}
+                    </span>
+                    
+                    {/* Filename */}
+                    <span 
+                      className={`flex-1 truncate ${isActive ? 'text-white' : 'text-white/60'}`}
+                      style={{ color: isActive ? accentColor : undefined }}
+                    >
+                      {file.name}
+                    </span>
+                    
+                    {/* Size */}
+                    <span className="text-white/20 text-[9px] w-10 text-right">
+                      {file.size}
+                    </span>
+                    
+                    {/* Modified */}
+                    <span className="text-white/20 text-[9px] w-8 text-right">
+                      {file.modified}
+                    </span>
+                  </motion.div>
+                </Link>
+              </motion.div>
             )
           })}
         </div>
       </div>
 
-      {/* Bottom Actions */}
-      <div className="p-3 border-t space-y-2" style={{ borderColor: `${accentColor}15` }}>
-        {/* Help Button */}
-        {openGuide && (
+      {/* Status Bar */}
+      <div className="border-t border-white/5 bg-black/40">
+        {/* Quick Actions */}
+        <div className="p-2 space-y-1">
+          {openGuide && (
+            <motion.button
+              onClick={() => { openGuide(); setMobileOpen(false); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/5 transition-all text-left"
+              whileHover={{ x: 2 }}
+            >
+              <span className="text-yellow-500/70">[?]</span>
+              <span>./help --guide</span>
+            </motion.button>
+          )}
+          
           <motion.button
-            onClick={() => { openGuide(); setMobileOpen(false); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-mono text-sm transition-all"
-            style={{ background: 'rgba(255,255,255,0.03)' }}
-            whileHover={{ backgroundColor: `${accentColor}10` }}
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all text-left"
+            whileHover={{ x: 2 }}
           >
-            <HelpCircle className="w-4 h-4 text-white/40" />
-            <span className="text-xs text-white/40 uppercase tracking-wide">Initiation Guide</span>
+            <span className="text-red-500/70">[X]</span>
+            <span>exit --logout</span>
           </motion.button>
-        )}
-        
-        {/* Sign Out */}
-        <motion.button
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-mono text-sm transition-all group"
-          style={{ background: 'rgba(255,255,255,0.03)' }}
-          whileHover={{ backgroundColor: 'rgba(239,68,68,0.1)' }}
-        >
-          <LogOut className="w-4 h-4 text-white/40 group-hover:text-red-400 transition-colors" />
-          <span className="text-xs text-white/40 group-hover:text-red-400 uppercase tracking-wide transition-colors">
-            Sign Out
-          </span>
-        </motion.button>
-      </div>
+        </div>
 
-      {/* System Info */}
-      <div className="px-4 py-3 border-t font-mono text-[10px]" style={{ borderColor: `${accentColor}10` }}>
-        <div className="flex items-center gap-2 text-white/20">
-          <Terminal className="w-3 h-3" />
-          <span>sys.author = &quot;chopp&quot;</span>
+        {/* System Footer */}
+        <div className="px-3 py-2 border-t border-white/5 flex items-center justify-between text-[9px]">
+          <GlitchText text="sys.author" className="text-white/20" />
+          <span className="text-white/30">=</span>
+          <span style={{ color: accentColor }}>&quot;chopp&quot;</span>
         </div>
       </div>
-    </>
+    </div>
   )
 
   return (
@@ -205,11 +314,10 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        className="hidden md:flex flex-col w-64 flex-shrink-0 rounded-xl overflow-hidden border"
+        className="hidden md:flex flex-col w-64 flex-shrink-0 rounded-lg overflow-hidden border border-white/10"
         style={{ 
-          borderColor: `${accentColor}25`,
-          background: 'linear-gradient(180deg, rgba(15,15,15,0.98) 0%, rgba(8,8,8,0.99) 100%)',
-          boxShadow: `0 0 40px ${accentColor}08`,
+          background: 'linear-gradient(180deg, rgba(8,8,8,0.98) 0%, rgba(3,3,3,0.99) 100%)',
+          boxShadow: `0 0 60px ${accentColor}05, inset 0 1px 0 rgba(255,255,255,0.03)`,
         }}
       >
         <SidebarContent />
@@ -218,13 +326,13 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
       {/* Mobile Menu Button */}
       <button 
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-[90] p-3 rounded-xl border"
-        style={{ 
-          background: 'rgba(0,0,0,0.9)',
-          borderColor: `${accentColor}30`,
-        }}
+        className="md:hidden fixed top-4 left-4 z-[90] p-2.5 rounded-lg border border-white/10 bg-black/90"
       >
-        <Menu className="w-5 h-5" style={{ color: accentColor }} />
+        <div className="flex flex-col gap-1">
+          <span className="w-4 h-0.5 bg-white/50" />
+          <span className="w-4 h-0.5 bg-white/50" />
+          <span className="w-3 h-0.5 bg-white/50" />
+        </div>
       </button>
 
       {/* Mobile Sidebar Overlay */}
@@ -236,25 +344,24 @@ export function TerminalSidebar({ discordUserId, isAdmin = false }: TerminalSide
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+              className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100]"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-72 z-[110] flex flex-col rounded-r-xl overflow-hidden border-r"
+              className="fixed top-0 left-0 bottom-0 w-72 z-[110] flex flex-col border-r border-white/10"
               style={{ 
-                borderColor: `${accentColor}30`,
-                background: 'linear-gradient(180deg, rgba(10,10,10,0.99) 0%, rgba(5,5,5,1) 100%)',
+                background: 'linear-gradient(180deg, rgba(5,5,5,0.99) 0%, rgba(0,0,0,1) 100%)',
               }}
             >
               {/* Close button */}
               <button 
                 onClick={() => setMobileOpen(false)}
-                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/5"
+                className="absolute top-3 right-3 p-1.5 rounded text-white/30 hover:text-white/60 hover:bg-white/5"
               >
-                <X className="w-5 h-5 text-white/40" />
+                <span className="text-xs font-mono">[X]</span>
               </button>
               <SidebarContent />
             </motion.aside>

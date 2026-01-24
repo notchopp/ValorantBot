@@ -10,85 +10,76 @@ interface ActivityFeedProps {
 export function ActivityFeed({ activities, limit }: ActivityFeedProps) {
   const displayedActivities = limit ? activities.slice(0, limit) : activities
   
-  const getActivityIcon = (type: string) => {
+  // Terminal-style type indicators
+  const getActivityIndicator = (type: string) => {
     switch (type) {
       case 'rank_up':
-        return '📈'
+        return { text: '[++]', color: '#22c55e' }
       case 'rank_down':
-        return '📉'
+        return { text: '[--]', color: '#ef4444' }
       case 'mvp':
-        return '⭐'
+        return { text: '[MVP]', color: '#eab308' }
       case 'big_mmr_gain':
-        return '🔥'
+        return { text: '[+MMR]', color: '#22c55e' }
       case 'big_mmr_loss':
-        return '💔'
+        return { text: '[-MMR]', color: '#ef4444' }
       default:
-        return '🎮'
-    }
-  }
-  
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'rank_up':
-        return 'border-green-500/20 bg-green-500/5'
-      case 'rank_down':
-        return 'border-red-500/20 bg-red-500/5'
-      case 'mvp':
-        return 'border-yellow-500/20 bg-yellow-500/5'
-      case 'big_mmr_gain':
-        return 'border-orange-500/20 bg-orange-500/5'
-      case 'big_mmr_loss':
-        return 'border-blue-500/20 bg-blue-500/5'
-      default:
-        return 'border-white/5 bg-white/[0.02]'
+        return { text: '[LOG]', color: 'var(--term-muted)' }
     }
   }
   
   if (displayedActivities.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <p>No activity yet. Start playing to build your feed!</p>
+      <div className="text-center py-12 font-mono">
+        <div className="text-[var(--term-muted)] text-sm">[NO_ACTIVITY]</div>
+        <div className="text-[10px] text-[var(--term-muted)] mt-1">No events logged. Start playing to populate feed.</div>
       </div>
     )
   }
   
   return (
-    <div className="space-y-3">
-      {displayedActivities.map((activity) => (
-        <div
-          key={activity.id}
-          className={`border rounded-xl p-4 backdrop-blur-xl transition-all duration-200 hover:scale-[1.02] ${getActivityColor(activity.activity_type)}`}
-        >
-          <div className="flex items-start gap-4">
-            <span className="text-2xl">{getActivityIcon(activity.activity_type)}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <h4 className="font-bold text-white">
-                  {activity.player?.discord_username || 'Unknown Player'}
-                </h4>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
-                  {new Date(activity.created_at).toLocaleString()}
-                </span>
-              </div>
-              <p className="text-sm font-semibold text-[#ffd700] mb-1">
-                {activity.title}
-              </p>
-              {activity.description && (
-                <p className="text-sm text-gray-400">
-                  {activity.description}
-                </p>
-              )}
-              {activity.metadata && activity.activity_type === 'rank_up' && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
-                    +{(activity.metadata as { mmr_change?: number }).mmr_change || 0} MMR
+    <div className="space-y-2">
+      {displayedActivities.map((activity) => {
+        const indicator = getActivityIndicator(activity.activity_type)
+        return (
+          <div
+            key={activity.id}
+            className="p-3 bg-[var(--term-panel)] border border-[var(--term-border)] hover:border-[var(--term-accent)]/30 transition-all font-mono"
+          >
+            <div className="flex items-start gap-3">
+              <span 
+                className="text-xs font-bold shrink-0"
+                style={{ color: indicator.color }}
+              >
+                {indicator.text}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-bold text-white truncate">
+                    {activity.player?.discord_username || 'Unknown'}
+                  </span>
+                  <span className="text-[10px] text-[var(--term-muted)] whitespace-nowrap">
+                    [{new Date(activity.created_at).toLocaleDateString()}]
                   </span>
                 </div>
-              )}
+                <p className="text-xs text-[var(--term-accent)] mb-1">
+                  {activity.title}
+                </p>
+                {activity.description && (
+                  <p className="text-[10px] text-[var(--term-muted)]">
+                    {activity.description}
+                  </p>
+                )}
+                {activity.metadata && activity.activity_type === 'rank_up' && (
+                  <div className="mt-1 text-[10px] text-[#22c55e]">
+                    +{(activity.metadata as { mmr_change?: number }).mmr_change || 0} MMR
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
