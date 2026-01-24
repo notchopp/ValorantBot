@@ -1,4 +1,4 @@
-import { Guild, VoiceChannel, Role, ChannelType, PermissionOverwriteOptions, Client } from 'discord.js';
+import { Guild, VoiceChannel, Role, ChannelType, PermissionFlagsBits, Client } from 'discord.js';
 import { Match } from '../models/Match';
 
 /**
@@ -324,13 +324,6 @@ export class VoiceChannelService {
     teamRole: Role
   ): Promise<VoiceChannel | null> {
     try {
-      // Permissions: Only team role can connect
-      const permissions: PermissionOverwriteOptions = {
-        Connect: true,
-        Speak: true,
-        ViewChannel: true,
-      };
-
       const channel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildVoice,
@@ -338,11 +331,11 @@ export class VoiceChannelService {
         permissionOverwrites: [
           {
             id: guild.roles.everyone.id,
-            deny: ['Connect', 'ViewChannel'] as any,
+            deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.ViewChannel],
           },
           {
             id: teamRole.id,
-            allow: permissions as any,
+            allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.ViewChannel],
           },
         ],
       });

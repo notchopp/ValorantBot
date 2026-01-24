@@ -46,8 +46,14 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // Maps for random selection
-const MAPS = [
+const VALORANT_MAPS = [
   'Bind', 'Haven', 'Split', 'Ascent', 'Icebox', 'Breeze', 'Fracture', 'Pearl', 'Lotus', 'Sunset', 'Abyss',
+];
+
+const MARVEL_RIVALS_MAPS = [
+  'Yggsgard', 'Tokyo 2099', 'Shin-Shibuya', 'Intergalactic Empire of Wakanda',
+  'Hall of Djalia', 'Symbiotic Surface', 'Empire of Eternal Night: Midtown',
+  'Krakoa', 'Klyntar', 'Royal Palace', 'Spider-Islands', 'Sanctum Sanctorum',
 ];
 
 /**
@@ -143,8 +149,9 @@ export default async function handler(
 
     const { teamA, teamB } = balanceTeamsAuto(playersWithMMR);
 
-    // Select random map
-    const selectedMap = MAPS[Math.floor(Math.random() * MAPS.length)];
+    // Select random map based on game
+    const mapPool = game === 'marvel_rivals' ? MARVEL_RIVALS_MAPS : VALORANT_MAPS;
+    const selectedMap = mapPool[Math.floor(Math.random() * mapPool.length)];
 
     // Select random host from team A
     const hostUserId = teamA[Math.floor(Math.random() * teamA.length)];

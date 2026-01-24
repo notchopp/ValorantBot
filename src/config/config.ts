@@ -27,6 +27,7 @@ export interface Config {
     numericValues: Record<string, number>;
   };
   maps: string[];
+  marvelRivalsMaps: string[];
   points: {
     win: number;
     loss: number;
@@ -100,6 +101,20 @@ export const defaultConfig: Config = {
     'Lotus',
     'Sunset',
     'Abyss',
+  ],
+  marvelRivalsMaps: [
+    'Yggsgard',
+    'Tokyo 2099',
+    'Shin-Shibuya',
+    'Intergalactic Empire of Wakanda',
+    'Hall of Djalia',
+    'Symbiotic Surface',
+    'Empire of Eternal Night: Midtown',
+    'Krakoa',
+    'Klyntar',
+    'Royal Palace',
+    'Spider-Islands',
+    'Sanctum Sanctorum',
   ],
   points: {
     win: 25,

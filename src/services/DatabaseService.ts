@@ -696,6 +696,77 @@ export class DatabaseService {
   }
 
   /**
+   * Get active match for a user (pending or in-progress where user is a participant or host)
+   */
+  async getActiveMatchForUser(userId: string): Promise<DatabaseMatch | null> {
+    try {
+      const supabase = this.getSupabase();
+      
+      // First try to find match where user is host
+      const { data: hostMatch } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('host_user_id', userId)
+        .in('status', ['pending', 'in-progress'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (hostMatch) return hostMatch;
+
+      // If not host, find any active match where user is in team_a or team_b
+      const { data: matches, error: matchError } = await supabase
+        .from('matches')
+        .select('*')
+        .in('status', ['pending', 'in-progress'])
+        .order('created_at', { ascending: false });
+
+      if (matchError || !matches) return null;
+
+      // Check if user is in any team
+      for (const match of matches) {
+        const teamA = match.team_a as string[];
+        const teamB = match.team_b as string[];
+        if (teamA?.includes(userId) || teamB?.includes(userId)) {
+          return match;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting active match for user', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get any active match (pending or in-progress)
+   */
+  async getAnyActiveMatch(): Promise<DatabaseMatch | null> {
+    try {
+      const supabase = this.getSupabase();
+      const { data, error } = await supabase
+        .from('matches')
+        .select('*')
+        .in('status', ['pending', 'in-progress'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) return null;
+      return data;
+    } catch (error) {
+      console.error('Error getting any active match', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Create match player stats
    */
   async createMatchPlayerStats(

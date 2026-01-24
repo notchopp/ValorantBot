@@ -64,9 +64,21 @@ async function handleInfo(
 
   try {
     const { matchService, databaseService } = services;
-    const currentMatch = matchService.getCurrentMatch();
+    const userId = interaction.user.id;
+    
+    // Try in-memory first, then fall back to database
+    let currentMatch = matchService.getCurrentMatch();
+    let dbMatch = currentMatch ? await databaseService.getMatch(currentMatch.matchId) : null;
+    
+    // If no in-memory match, try to find from database
+    if (!currentMatch || !dbMatch) {
+      dbMatch = await databaseService.getActiveMatchForUser(userId);
+      if (!dbMatch) {
+        dbMatch = await databaseService.getAnyActiveMatch();
+      }
+    }
 
-    if (!currentMatch) {
+    if (!dbMatch) {
       await interaction.editReply('❌ No active match found.');
       return;
     }
@@ -76,69 +88,57 @@ async function handleInfo(
       return;
     }
 
-    // Get host info from database
-    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
-    if (!dbMatch) {
-      await interaction.editReply('❌ Match not found in database.');
-      return;
-    }
-
-    const hostPlayer = currentMatch.host;
+    const hostUserId = dbMatch.host_user_id;
     const gameLabel = getMatchGameLabel(dbMatch.match_type);
-    const hostMember = await interaction.guild.members.fetch(hostPlayer.userId).catch(() => null);
+    const hostMember = hostUserId ? await interaction.guild.members.fetch(hostUserId).catch(() => null) : null;
 
     const embed = new EmbedBuilder()
       .setTitle('🎮 Host Information')
       .setColor(0x0099ff)
       .addFields({
         name: 'Current Host',
-        value: hostMember ? `<@${hostPlayer.userId}>` : hostPlayer.username,
+        value: hostMember ? `<@${hostUserId}>` : (hostUserId || 'Unknown'),
         inline: true,
       })
       .addFields({
         name: 'Status',
-        value: currentMatch.hostConfirmed ? '✅ Confirmed' : '⏳ Pending',
+        value: dbMatch.host_confirmed ? '✅ Confirmed' : '⏳ Pending',
+        inline: true,
+      })
+      .addFields({
+        name: 'Match Status',
+        value: dbMatch.status || 'pending',
         inline: true,
       });
 
-    if (currentMatch.hostInviteCode) {
+    if (dbMatch.map) {
       embed.addFields({
-        name: 'Invite Code',
-        value: `\`${currentMatch.hostInviteCode}\``,
-        inline: false,
+        name: 'Map',
+        value: dbMatch.map,
+        inline: true,
       });
-      embed.setDescription('Share this invite code with all players in the queue!');
-    } else {
-      embed.setDescription(`Host must create a custom game in ${gameLabel} and use \`/host confirm\` to enter the invite code ${gameLabel} generates.`);
     }
 
-    // Show all players in queue
-    const allPlayers = [...currentMatch.teams.teamA.players, ...currentMatch.teams.teamB.players];
-    const playerList = allPlayers
-      .map((p, i) => {
-        const isHost = p.userId === hostPlayer.userId;
-        return `${i + 1}. ${isHost ? '👑 ' : ''}${p.username}`;
-      })
-      .join('\n');
+    embed.setDescription(`Match ID: \`${dbMatch.match_id}\`\nGame: ${gameLabel}`);
 
-    embed.addFields({
-      name: 'Players in Match',
-      value: playerList || 'None',
-      inline: false,
-    });
+    // Show teams
+    const teamA = (dbMatch.team_a as string[]) || [];
+    const teamB = (dbMatch.team_b as string[]) || [];
 
-    if (currentMatch.hostSelectedAt) {
-      const timeSinceSelection = Date.now() - currentMatch.hostSelectedAt.getTime();
-      const minutesElapsed = Math.floor(timeSinceSelection / 60000);
-      const timeRemaining = Math.max(0, 10 - minutesElapsed);
-      
-      if (timeRemaining > 0 && !currentMatch.hostConfirmed) {
-        embed.addFields({
-          name: '⏰ Time Remaining',
-          value: `${timeRemaining} minute(s) until auto-host selection`,
-          inline: false,
-        });
-      }
+    if (teamA.length > 0) {
+      embed.addFields({
+        name: `Team A (${teamA.length})`,
+        value: teamA.map(id => `<@${id}>`).join(', ') || 'None',
+        inline: false,
+      });
+    }
+
+    if (teamB.length > 0) {
+      embed.addFields({
+        name: `Team B (${teamB.length})`,
+        value: teamB.map(id => `<@${id}>`).join(', ') || 'None',
+        inline: false,
+      });
     }
 
     await interaction.editReply({ embeds: [embed] });
@@ -160,35 +160,43 @@ async function handleConfirm(
     config: Config;
   }
 ) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   try {
     const { matchService, databaseService } = services;
-    const currentMatch = matchService.getCurrentMatch();
     const userId = interaction.user.id;
+    
+    // Try in-memory first, then fall back to database
+    let currentMatch = matchService.getCurrentMatch();
+    let dbMatch = currentMatch ? await databaseService.getMatch(currentMatch.matchId) : null;
+    
+    // If no in-memory match, try to find from database
+    if (!currentMatch || !dbMatch) {
+      dbMatch = await databaseService.getActiveMatchForUser(userId);
+      if (!dbMatch) {
+        dbMatch = await databaseService.getAnyActiveMatch();
+      }
+    }
 
-    if (!currentMatch) {
-      await interaction.editReply('❌ No active match found.');
+    if (!dbMatch) {
+      await interaction.reply({ content: '❌ No active match found.', flags: MessageFlags.Ephemeral });
       return;
     }
 
-    if (currentMatch.host.userId !== userId) {
-      await interaction.editReply('❌ Only the selected host can confirm hosting.');
+    if (dbMatch.host_user_id !== userId) {
+      await interaction.reply({ content: '❌ Only the selected host can confirm hosting.', flags: MessageFlags.Ephemeral });
       return;
     }
 
-    if (currentMatch.hostConfirmed) {
-      await interaction.editReply('✅ You have already confirmed hosting.');
+    if (dbMatch.host_confirmed) {
+      await interaction.reply({ content: '✅ You have already confirmed hosting.', flags: MessageFlags.Ephemeral });
       return;
     }
 
-    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
-    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+    const gameLabel = getMatchGameLabel(dbMatch.match_type);
 
     // Host needs to provide the invite code from the game
     // We'll use a modal to get the code
     const modal = new ModalBuilder()
-      .setCustomId('host_confirm_modal')
+      .setCustomId(`host_confirm_modal_${dbMatch.match_id}`)
       .setTitle(`Enter ${gameLabel} Invite Code`);
 
     const codeInput = new TextInputBuilder()
@@ -209,7 +217,7 @@ async function handleConfirm(
       userId: interaction.user.id,
       error: error instanceof Error ? error.message : String(error),
     });
-    await interaction.editReply('❌ An error occurred while confirming host.');
+    await interaction.reply({ content: '❌ An error occurred while confirming host.', flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -229,21 +237,40 @@ export async function handleHostConfirmModal(
 
   try {
     const { matchService, databaseService } = services;
-    const currentMatch = matchService.getCurrentMatch();
     const userId = interaction.user.id;
+    
+    // Extract match ID from modal custom ID if present
+    const customId = interaction.customId;
+    const matchIdFromModal = customId.startsWith('host_confirm_modal_') 
+      ? customId.replace('host_confirm_modal_', '') 
+      : null;
+    
+    // Try in-memory first
+    let currentMatch = matchService.getCurrentMatch();
+    let dbMatch = currentMatch ? await databaseService.getMatch(currentMatch.matchId) : null;
+    
+    // If no in-memory, try from modal ID or find active match
+    if (!dbMatch && matchIdFromModal) {
+      dbMatch = await databaseService.getMatch(matchIdFromModal);
+    }
+    if (!dbMatch) {
+      dbMatch = await databaseService.getActiveMatchForUser(userId);
+    }
+    if (!dbMatch) {
+      dbMatch = await databaseService.getAnyActiveMatch();
+    }
 
-    if (!currentMatch) {
+    if (!dbMatch) {
       await interaction.editReply('❌ No active match found.');
       return;
     }
 
-    if (currentMatch.host.userId !== userId) {
+    if (dbMatch.host_user_id !== userId) {
       await interaction.editReply('❌ Only the selected host can confirm hosting.');
       return;
     }
 
-    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
-    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+    const gameLabel = getMatchGameLabel(dbMatch.match_type);
 
     // Get invite code from modal
     const inviteCode = interaction.fields.getTextInputValue('invite_code').trim().toUpperCase();
@@ -253,19 +280,17 @@ export async function handleHostConfirmModal(
       return;
     }
 
-    // Update match with invite code and confirmation
-    currentMatch.hostInviteCode = inviteCode;
-    currentMatch.hostConfirmed = true;
+    // Update in-memory match if exists
+    if (currentMatch && currentMatch.matchId === dbMatch.match_id) {
+      currentMatch.hostInviteCode = inviteCode;
+      currentMatch.hostConfirmed = true;
+      currentMatch.status = 'in-progress';
+    }
 
     // Update database
-    await databaseService.updateMatch(currentMatch.matchId, {
+    await databaseService.updateMatch(dbMatch.match_id, {
       host_invite_code: inviteCode,
       host_confirmed: true,
-    });
-
-    // Update match status to in-progress now that host is confirmed
-    currentMatch.status = 'in-progress';
-    await databaseService.updateMatch(currentMatch.matchId, {
       status: 'in-progress',
     });
 
@@ -295,7 +320,7 @@ export async function handleHostConfirmModal(
         .setColor(0x00ff00)
         .addFields({
           name: 'Match ID',
-          value: currentMatch.matchId,
+          value: dbMatch.match_id,
           inline: true,
         })
         .addFields({
@@ -330,15 +355,26 @@ async function handlePass(
 
   try {
     const { matchService, databaseService } = services;
-    const currentMatch = matchService.getCurrentMatch();
     const userId = interaction.user.id;
+    
+    // Try in-memory first, then fall back to database
+    let currentMatch = matchService.getCurrentMatch();
+    let dbMatch = currentMatch ? await databaseService.getMatch(currentMatch.matchId) : null;
+    
+    // If no in-memory match, try to find from database
+    if (!currentMatch || !dbMatch) {
+      dbMatch = await databaseService.getActiveMatchForUser(userId);
+      if (!dbMatch) {
+        dbMatch = await databaseService.getAnyActiveMatch();
+      }
+    }
 
-    if (!currentMatch) {
+    if (!dbMatch) {
       await interaction.editReply('❌ No active match found.');
       return;
     }
 
-    if (currentMatch.host.userId !== userId) {
+    if (dbMatch.host_user_id !== userId) {
       await interaction.editReply('❌ Only the current host can pass hosting.');
       return;
     }
@@ -348,44 +384,51 @@ async function handlePass(
       return;
     }
 
-    // Get all players except current host
-    const allPlayers = [...currentMatch.teams.teamA.players, ...currentMatch.teams.teamB.players];
-    const eligiblePlayers = allPlayers.filter((p) => p.userId !== userId);
+    // Get all players from database match
+    const teamA = (dbMatch.team_a as string[]) || [];
+    const teamB = (dbMatch.team_b as string[]) || [];
+    const allPlayerIds = [...teamA, ...teamB];
+    const eligiblePlayerIds = allPlayerIds.filter((id) => id !== userId);
 
-    if (eligiblePlayers.length === 0) {
+    if (eligiblePlayerIds.length === 0) {
       await interaction.editReply('❌ No other players available to pass hosting to.');
       return;
     }
 
     // Select random new host
-    const newHost = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
+    const newHostId = eligiblePlayerIds[Math.floor(Math.random() * eligiblePlayerIds.length)];
 
-    // Update match
-    currentMatch.host = newHost;
-    currentMatch.hostConfirmed = false;
-    currentMatch.hostInviteCode = undefined;
-    currentMatch.hostSelectedAt = new Date();
+    // Update in-memory match if exists
+    if (currentMatch && currentMatch.matchId === dbMatch.match_id) {
+      const newHostPlayer = [...currentMatch.teams.teamA.players, ...currentMatch.teams.teamB.players]
+        .find(p => p.userId === newHostId);
+      if (newHostPlayer) {
+        currentMatch.host = newHostPlayer;
+        currentMatch.hostConfirmed = false;
+        currentMatch.hostInviteCode = undefined;
+        currentMatch.hostSelectedAt = new Date();
+      }
+    }
 
     // Update database
-    await databaseService.updateMatch(currentMatch.matchId, {
-      host_user_id: newHost.userId,
+    await databaseService.updateMatch(dbMatch.match_id, {
+      host_user_id: newHostId,
       host_confirmed: false,
       host_invite_code: null,
       host_selected_at: new Date().toISOString(),
     });
 
-    const dbMatch = await databaseService.getMatch(currentMatch.matchId);
-    const gameLabel = getMatchGameLabel(dbMatch?.match_type);
+    const gameLabel = getMatchGameLabel(dbMatch.match_type);
 
     // Notify in channel
     if (interaction.channel && 'send' in interaction.channel) {
       const embed = new EmbedBuilder()
         .setTitle('🔄 Host Changed')
-        .setDescription(`<@${userId}> passed hosting to <@${newHost.userId}>`)
+        .setDescription(`<@${userId}> passed hosting to <@${newHostId}>`)
         .setColor(0xff9900)
         .addFields({
           name: 'New Host',
-          value: `<@${newHost.userId}>`,
+          value: `<@${newHostId}>`,
           inline: false,
         })
         .addFields({
@@ -397,7 +440,7 @@ async function handlePass(
       await (interaction.channel as any).send({ embeds: [embed] });
     }
 
-    await interaction.editReply(`✅ Hosting passed to <@${newHost.userId}>.`);
+    await interaction.editReply(`✅ Hosting passed to <@${newHostId}>.`);
   } catch (error) {
     console.error('Host pass error', {
       userId: interaction.user.id,
