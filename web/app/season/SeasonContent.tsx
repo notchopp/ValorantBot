@@ -175,8 +175,9 @@ export function SeasonContent({
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-2">
-                <span className="text-[var(--term-muted)]">$</span> <span className="text-[var(--term-accent)]">cat</span> <span className="text-white">/sys/season/active.log</span>
+              <div className="flex items-center gap-2 text-[10px] text-white/30 mb-2">
+                <span className="text-green-500">$</span>
+                <span>cat /sys/season/active.log</span>
               </div>
               <h1 className="text-4xl sm:text-5xl md:text-7xl font-mono font-black text-[var(--term-accent)] mb-2 tracking-tighter leading-none">
                 <GlitchText text={`[${currentSeason.name}]`} />

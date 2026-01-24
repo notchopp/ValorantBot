@@ -172,8 +172,9 @@ export function ProfileContent({
           >
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 md:gap-8 mb-8 md:mb-12">
               <div className="flex-1">
-                <div className="terminal-prompt text-[10px] uppercase tracking-wider mb-3">
-                  <span className="text-[var(--term-muted)]">$</span> <span className="text-[var(--term-accent)]">cat</span> <span className="text-white">/users/{playerData.discord_user_id.slice(0, 8)}/profile.dat</span>
+                <div className="flex items-center gap-2 text-[10px] text-white/30 mb-3">
+                  <span className="text-green-500">$</span>
+                  <span>cat /users/{playerData.discord_user_id.slice(0, 8)}/profile.dat</span>
                 </div>
                 
                 {/* Game Selector */}
