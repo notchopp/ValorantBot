@@ -24,9 +24,20 @@ export default async function LeaderboardPage({
   const leaderboardField = selectedGame === 'marvel_rivals' ? 'marvel_rivals_mmr' : 'valorant_mmr'
   
   // Get all players ordered by MMR with real stats
-  const { data: leaderboard } = await supabaseAdmin
+  // Filter by game-specific requirements (must have MMR > 0 and linked account)
+  let query = supabaseAdmin
     .from('players')
     .select('*')
+    .gt(leaderboardField, 0) // Only players with MMR > 0
+  
+  // Also ensure the player has linked their account for the selected game
+  if (selectedGame === 'marvel_rivals') {
+    query = query.not('marvel_rivals_uid', 'is', null)
+  } else {
+    query = query.not('riot_name', 'is', null)
+  }
+  
+  const { data: leaderboard } = await query
     .order(leaderboardField, { ascending: false })
     .limit(100)
   
