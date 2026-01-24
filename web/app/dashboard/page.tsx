@@ -5,6 +5,7 @@ import { TerminalMMRBar } from '@/components/TerminalMMRBar'
 import { ActivityFeed as ActivityFeedType, calculateRankLabel } from '@/lib/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { InitiationGuide } from '@/components/InitiationGuide'
 
 interface PlayerData {
   id: string
@@ -269,25 +270,28 @@ export default async function DashboardPage({
     .maybeSingle() as { data: { display_name?: string | null; bio?: string | null } | null }
   
   return (
-    <DashboardContent 
-      playerDataToUse={playerDataToUse}
-      totalMatches={totalMatches}
-      userAccentColor={userAccentColor}
-      wins={wins}
-      losses={losses}
-      winRate={winRate}
-      netMMR={netMMR}
-      leaderboardPosition={leaderboardPosition}
-      activityFeed={activityFeed}
-      season={season}
-      matchHistory={matchHistory}
-      rankProgression={rankProgression}
-      userProfile={userProfile}
-      kdRatio={kdRatio}
-      mvpCount={mvpCount}
-      selectedGame={selectedGame}
-      gameLabel={gameLabel}
-    />
+    <>
+      <InitiationGuide username={playerDataToUse.discord_username || 'Operative'} />
+      <DashboardContent 
+        playerDataToUse={playerDataToUse}
+        totalMatches={totalMatches}
+        userAccentColor={userAccentColor}
+        wins={wins}
+        losses={losses}
+        winRate={winRate}
+        netMMR={netMMR}
+        leaderboardPosition={leaderboardPosition}
+        activityFeed={activityFeed}
+        season={season}
+        matchHistory={matchHistory}
+        rankProgression={rankProgression}
+        userProfile={userProfile}
+        kdRatio={kdRatio}
+        mvpCount={mvpCount}
+        selectedGame={selectedGame}
+        gameLabel={gameLabel}
+      />
+    </>
   )
 }
 
