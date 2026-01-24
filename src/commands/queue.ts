@@ -814,7 +814,7 @@ async function handleJoin(
     await queueService.clear(selectedGame);
     queueService.unlock(selectedGame);
 
-    await interaction.editReply(' Queue is full! Match created. Check your team voice channels!');
+    await interaction.editReply('Queue is full. Match created.');
     } else {
       await interaction.editReply(result.message);
     }
@@ -974,75 +974,78 @@ function createMatchEmbed(
   game: 'valorant' | 'marvel_rivals' = 'valorant'
 ): EmbedBuilder {
   const gameLabel = formatGameLabel(game);
+  const gameColor = game === 'marvel_rivals' ? 0xff4444 : 0x00ffcc;
+  
   const embed = new EmbedBuilder()
-    .setTitle(' Match Created!')
-    .setColor(match.hostConfirmed ? 0x00ff00 : 0xff9900)
-    .addFields({
-      name: 'Map',
-      value: match.map,
-      inline: true,
-    })
-    .addFields({
-      name: 'Host',
-      value: `<@${match.host.userId}>`,
-      inline: true,
-    })
-    .addFields({
-      name: 'Match ID',
-      value: match.matchId,
-      inline: true,
-    });
+    .setTitle(`${gameLabel.toUpperCase()} MATCH`)
+    .setColor(gameColor);
 
-  // Add host status
-  if (match.hostConfirmed && match.hostInviteCode) {
-    embed.addFields({
-      name: ' Host Confirmed',
-      value: `Invite Code: \`${match.hostInviteCode}\``,
-      inline: false,
-    });
-    embed.setDescription('Host is ready! Join using the invite code above.');
-  } else {
-      embed.addFields({
-        name: '⏳ Waiting for Host',
-        value: `<@${match.host.userId}> must create a custom game in ${gameLabel} and use \`/host confirm\` to enter the invite code.\n\nUse \`/host info\` to see all players.`,
-        inline: false,
-      });
-      embed.setDescription('Match is pending host confirmation. Host has 10 minutes to create the game and enter the code.');
-  }
-
+  // Build team lists with rank and MMR
   const teamAList = match.teams.teamA.players
     .map((p: any) => {
-      const rank = p.rank ? ` [${p.rank}]` : '';
-      return `• ${p.username}${rank}`;
+      const mmr = p.mmr || p.currentMMR || 0;
+      const rank = p.rank || p.discordRank || 'Unranked';
+      return `${p.username} \`${rank}\` \`${mmr}\``;
     })
     .join('\n');
 
   const teamBList = match.teams.teamB.players
     .map((p: any) => {
-      const rank = p.rank ? ` [${p.rank}]` : '';
-      return `• ${p.username}${rank}`;
+      const mmr = p.mmr || p.currentMMR || 0;
+      const rank = p.rank || p.discordRank || 'Unranked';
+      return `${p.username} \`${rank}\` \`${mmr}\``;
     })
     .join('\n');
 
-  embed
-    .addFields({ name: ' Team A', value: teamAList || 'None', inline: true })
-    .addFields({ name: ' Team B', value: teamBList || 'None', inline: true });
+  // Calculate team average MMR
+  const teamAAvg = Math.round(
+    match.teams.teamA.players.reduce((sum: number, p: any) => sum + (p.mmr || p.currentMMR || 0), 0) / 
+    match.teams.teamA.players.length
+  );
+  const teamBAvg = Math.round(
+    match.teams.teamB.players.reduce((sum: number, p: any) => sum + (p.mmr || p.currentMMR || 0), 0) / 
+    match.teams.teamB.players.length
+  );
 
-  // Add voice channel info if available
-  if (teamAChannel) {
-    embed.addFields({
-      name: ' Team A Voice',
-      value: `<#${teamAChannel.id}>`,
-      inline: true,
-    });
+  embed.addFields(
+    { name: `TEAM A  [${teamAAvg} AVG]`, value: teamAList || 'None', inline: true },
+    { name: `TEAM B  [${teamBAvg} AVG]`, value: teamBList || 'None', inline: true }
+  );
+
+  // Match info line
+  const matchInfo = [
+    `MAP: ${match.map}`,
+    `HOST: <@${match.host.userId}>`,
+    `ID: \`${match.matchId.slice(-8)}\``
+  ].join('  |  ');
+  
+  embed.addFields({ name: '\u200b', value: matchInfo, inline: false });
+
+  // Voice channels if available
+  if (teamAChannel || teamBChannel) {
+    const vcInfo = [
+      teamAChannel ? `Team A: <#${teamAChannel.id}>` : null,
+      teamBChannel ? `Team B: <#${teamBChannel.id}>` : null
+    ].filter(Boolean).join('  |  ');
+    
+    embed.addFields({ name: 'VOICE CHANNELS', value: vcInfo, inline: false });
   }
 
-  if (teamBChannel) {
+  // Host status
+  if (match.hostConfirmed && match.hostInviteCode) {
     embed.addFields({
-      name: ' Team B Voice',
-      value: `<#${teamBChannel.id}>`,
-      inline: true,
+      name: 'STATUS: READY',
+      value: `Invite Code: \`${match.hostInviteCode}\``,
+      inline: false,
     });
+    embed.setDescription('Host is ready. Join using the invite code.');
+  } else {
+    embed.addFields({
+      name: 'STATUS: PENDING',
+      value: `Waiting for <@${match.host.userId}> to use \`/host confirm\``,
+      inline: false,
+    });
+    embed.setFooter({ text: 'Host has 10 minutes to create the lobby' });
   }
 
   return embed;
@@ -1611,7 +1614,7 @@ async function handleJoinButton(
       if (interaction.message && interaction.message.editable) {
         try {
           await interaction.message.edit({
-            content: ' Queue is full! Match created. Check your team voice channels!',
+            content: 'Queue is full. Match created.',
             embeds: [],
             components: [],
           });

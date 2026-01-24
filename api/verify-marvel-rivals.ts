@@ -364,8 +364,23 @@ function computeDiscordRank(params: {
   return { discordRank: valorantRank, discordRankValue: valorantRankValue, currentMMR: valorantMMR };
 }
 
+async function updatePlayerData(api: AxiosInstance, query: string): Promise<boolean> {
+  const encoded = encodeURIComponent(query.trim());
+  try {
+    // Call the update endpoint to refresh player data in the API
+    // NOTE: This endpoint has a 30-minute cooldown per player!
+    console.log('Requesting player data update (30-min cooldown applies):', query);
+    await api.get(`/player/${encoded}/update`);
+    return true;
+  } catch (error) {
+    console.log('Player update call failed:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
 async function fetchMarvelStats(api: AxiosInstance, query: string): Promise<Record<string, unknown> | null> {
   const encoded = encodeURIComponent(query.trim());
+  
   try {
     const v2 = await api.get(`https://marvelrivalsapi.com/api/v2/player/${encoded}`);
     return (v2.data?.data || v2.data) as Record<string, unknown>;
@@ -489,8 +504,30 @@ export default async function handler(
       });
     }
 
-    const rank = stats ? extractRank(stats) : null;
+    let rank = stats ? extractRank(stats) : null;
     console.log('Extracted rank:', rank);
+    
+    // If rank looks invalid (contains 'invalid' or is just a level number), request an update
+    const rankLooksInvalid = rank && (
+      rank.toLowerCase().includes('invalid') ||
+      rank.toLowerCase().includes('level') ||
+      /^\d+$/.test(rank.trim()) // Just a number (probably level)
+    );
+    
+    if (rankLooksInvalid) {
+      console.log('Rank looks invalid, requesting API update for player:', marvelRivalsUid);
+      // Request an update - this queues the player for data refresh (30-min cooldown)
+      await updatePlayerData(marvelAPI, marvelRivalsUid);
+      
+      // Prompt manual rank entry since data is stale
+      res.status(200).json({
+        success: false,
+        requiresManualRank: true,
+        playerFound: true,
+        message: 'Your account data appears to be updating. We\'ve requested a refresh - please select your current Marvel Rivals rank to get started now, or try again in 5-10 minutes for automatic detection.',
+      } as VerifyMarvelResponse);
+      return;
+    }
     
     // Determine the Discord rank from Marvel Rivals rank
     let discordRank: string;
