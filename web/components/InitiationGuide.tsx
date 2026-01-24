@@ -6,10 +6,6 @@ import { X, ChevronRight, ChevronLeft, Terminal, MessageSquare, Trophy, Zap, Che
 // Consistent red accent color
 const ACCENT_COLOR = '#dc2626'
 
-interface InitiationGuideProps {
-  username: string
-}
-
 const SECTIONS = [
   {
     id: 'welcome',
@@ -49,21 +45,36 @@ const SECTIONS = [
   },
 ]
 
-export function InitiationGuide({ username }: InitiationGuideProps) {
+interface InitiationGuideProps {
+  username: string
+  forceOpen?: boolean
+  onClose?: () => void
+}
+
+export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuideProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState(0)
   const [typingText, setTypingText] = useState('')
   const [showContent, setShowContent] = useState(false)
 
+  // Handle forceOpen prop
   useEffect(() => {
-    // Check if user has seen the initiation
+    if (forceOpen) {
+      setActiveSection(0)
+      setIsOpen(true)
+    }
+  }, [forceOpen])
+
+  useEffect(() => {
+    // Check if user has seen the initiation (only auto-show if not forced)
+    if (forceOpen) return
     const hasSeen = localStorage.getItem('grnds_initiation_seen')
     if (!hasSeen) {
       // Small delay before showing
       const timeout = setTimeout(() => setIsOpen(true), 1000)
       return () => clearTimeout(timeout)
     }
-  }, [])
+  }, [forceOpen])
 
   useEffect(() => {
     if (isOpen) {
@@ -90,6 +101,7 @@ export function InitiationGuide({ username }: InitiationGuideProps) {
   const handleClose = () => {
     localStorage.setItem('grnds_initiation_seen', 'true')
     setIsOpen(false)
+    onClose?.()
   }
 
   const handleNext = () => {

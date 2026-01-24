@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  LayoutDashboard, Trophy, Users, User, LogOut, Menu, X, Shield
+  LayoutDashboard, Trophy, Users, User, LogOut, Menu, X, Shield, HelpCircle
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PlayerSearch } from "./PlayerSearch";
 import { useAccentColor } from "@/lib/AccentColorContext";
 import { NotificationsBell } from "./NotificationsBell";
+import { useInitiation } from "@/lib/InitiationContext";
 
 type Tab = "dashboard" | "season" | "leaderboard" | "profile" | "hq";
 
@@ -46,6 +47,8 @@ export function GRNDSTopNav({ discordUserId, isAdmin = false }: GRNDSTopNavProps
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { accentColor } = useAccentColor();
+  const initiation = useInitiation();
+  const openGuide = initiation?.openGuide;
 
   // Filter tabs based on admin status
   const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin);
@@ -151,6 +154,17 @@ export function GRNDSTopNav({ discordUserId, isAdmin = false }: GRNDSTopNavProps
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
+          {openGuide && (
+            <motion.button
+              onClick={openGuide}
+              whileHover={{ scale: 1.05 }}
+              className="p-2 rounded-xl bg-white/5 border border-white/5 transition-all group"
+              style={{ '--accent-color': accentColor } as React.CSSProperties}
+              title="GRNDS Initiation Guide"
+            >
+              <HelpCircle className="w-5 h-5 text-white/60 group-hover:text-[var(--accent-color)] transition-colors" />
+            </motion.button>
+          )}
           <NotificationsBell />
           <motion.button
             onClick={handleSignOut}

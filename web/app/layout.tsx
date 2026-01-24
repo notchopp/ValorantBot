@@ -4,6 +4,7 @@ import { CursorReactiveBackground } from "@/components/CursorReactiveBackground"
 import { GRNDSTopNavWrapper } from "@/components/GRNDSTopNavWrapper";
 import { AuthAwareMain } from "@/components/AuthAwareMain";
 import { AccentColorProvider } from "@/lib/AccentColorContext";
+import { InitiationWrapper } from "@/components/InitiationWrapper";
 
 export const metadata: Metadata = {
   title: "GRNDS Hub - Competitive Dashboard",
@@ -19,11 +20,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased font-sans tracking-tight" suppressHydrationWarning>
         <AccentColorProvider>
-          <CursorReactiveBackground />
-          <GRNDSTopNavWrapper />
-          <AuthAwareMain>
-            {children}
-          </AuthAwareMain>
+          <InitiationWrapper>
+            <CursorReactiveBackground />
+            <GRNDSTopNavWrapper />
+            <AuthAwareMain>
+              {children}
+            </AuthAwareMain>
+          </InitiationWrapper>
         </AccentColorProvider>
       </body>
     </html>
