@@ -87,6 +87,7 @@ interface ValorantMMRResult {
   rank: string
   elo: number
   error?: string
+  rateLimited?: boolean
 }
 
 /**
@@ -111,7 +112,8 @@ async function fetchValorantMMR(puuid: string, region: string): Promise<Valorant
     
     if (!response.ok) {
       const errorText = await response.text()
-      return { rank: '', elo: 0, error: `API ${response.status}: ${errorText.substring(0, 100)}` }
+      const isRateLimited = response.status === 429
+      return { rank: '', elo: 0, error: `API ${response.status}: ${errorText.substring(0, 100)}`, rateLimited: isRateLimited }
     }
     
     const data = await response.json()
@@ -185,6 +187,7 @@ async function fetchValorantMMRHistory(puuid: string, region: string): Promise<V
 interface MarvelRivalsResult {
   rank: string
   error?: string
+  rateLimited?: boolean
 }
 
 /**
@@ -206,7 +209,8 @@ async function fetchMarvelRivalsRank(uid: string): Promise<MarvelRivalsResult | 
     
     if (!response.ok) {
       const errorText = await response.text()
-      return { rank: '', error: `API ${response.status}: ${errorText.substring(0, 100)}` }
+      const isRateLimited = response.status === 429
+      return { rank: '', error: `API ${response.status}: ${errorText.substring(0, 100)}`, rateLimited: isRateLimited }
     }
     
     const data = await response.json()
@@ -319,12 +323,27 @@ export async function POST(request: NextRequest) {
     const roleUpdates: { discordUserId: string; oldRank: string; newRank: string }[] = []
     const errors: string[] = []
     const skipped: string[] = []
+    let rateLimitHit = false
+    const API_DELAY_MS = 3000 // 3 second delay between API calls
 
     for (const player of players || []) {
+      // Stop immediately if rate limited
+      if (rateLimitHit) {
+        skipped.push(`${player.discord_username}: Skipped (rate limit hit)`)
+        continue
+      }
+
       try {
         // ============ VALORANT ============
         if ((game === 'valorant' || game === 'both') && player.riot_puuid) {
           const valorantData = await fetchValorantMMR(player.riot_puuid, player.riot_region || 'na')
+          
+          // Check for rate limit
+          if (valorantData?.rateLimited) {
+            rateLimitHit = true
+            errors.push(`Rate limit hit at ${player.discord_username}. Stopping to avoid more 429s. Try again in a few minutes.`)
+            continue
+          }
           
           if (!valorantData || valorantData.error) {
             if (valorantData?.rank === 'Unranked') {
@@ -366,7 +385,7 @@ export async function POST(request: NextRequest) {
               skipped.push(`${player.discord_username} (${player.riot_name}#${player.riot_tag}): ${valorantData?.error || 'Unknown error'}`)
             }
             
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            await new Promise(resolve => setTimeout(resolve, API_DELAY_MS))
             continue
           }
           
@@ -411,7 +430,7 @@ export async function POST(request: NextRequest) {
             skipped.push(`${player.discord_username}: MMR unchanged (${oldMMR})`)
           }
           
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          await new Promise(resolve => setTimeout(resolve, API_DELAY_MS))
         } else if ((game === 'valorant' || game === 'both') && !player.riot_puuid) {
           if (game === 'valorant') {
             skipped.push(`${player.discord_username}: No PUUID stored`)
@@ -422,9 +441,16 @@ export async function POST(request: NextRequest) {
         if ((game === 'marvel_rivals' || game === 'both') && player.marvel_rivals_uid) {
           const mrData = await fetchMarvelRivalsRank(player.marvel_rivals_uid)
           
+          // Check for rate limit
+          if (mrData?.rateLimited) {
+            rateLimitHit = true
+            errors.push(`Marvel Rivals rate limit hit at ${player.discord_username}. Stopping to avoid more 429s.`)
+            continue
+          }
+          
           if (!mrData || mrData.error || !mrData.rank) {
             skipped.push(`${player.discord_username} (MR: ${player.marvel_rivals_username}): ${mrData?.error || 'No rank data'}`)
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            await new Promise(resolve => setTimeout(resolve, API_DELAY_MS))
             continue
           }
           
@@ -463,7 +489,7 @@ export async function POST(request: NextRequest) {
             skipped.push(`${player.discord_username} (MR): MMR unchanged (${oldMMR})`)
           }
           
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          await new Promise(resolve => setTimeout(resolve, API_DELAY_MS))
         } else if ((game === 'marvel_rivals' || game === 'both') && !player.marvel_rivals_uid) {
           if (game === 'marvel_rivals') {
             skipped.push(`${player.discord_username}: No Marvel Rivals UID stored`)
