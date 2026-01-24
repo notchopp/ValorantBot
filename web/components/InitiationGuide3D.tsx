@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronRight, 
@@ -13,10 +13,16 @@ import {
   TrendingUp, 
   Swords, 
   Target, 
-  Rocket,
+  Sparkles,
   Command,
   Play,
-  Loader2
+  Loader2,
+  X,
+  Brain,
+  Users,
+  Shield,
+  Award,
+  ArrowRight
 } from 'lucide-react'
 
 // GRNDS Red accent
@@ -29,6 +35,115 @@ const TERMINAL_COMMANDS = [
   { cmd: 'connect discord.api', response: 'Connection established.' },
   { cmd: 'ready', response: 'SYSTEM READY. Welcome, Operative.' },
 ]
+
+// Interactive info popups for each element
+const INFO_DETAILS: Record<string, { title: string; description: string; tips?: string[] }> = {
+  // About items
+  'balanced-matches': {
+    title: 'Fair Play, Every Match',
+    description: 'Our system analyzes every player\'s skill level and creates teams that are as balanced as possible. No more lopsided stomps - every match is competitive.',
+    tips: ['Teams are balanced by total MMR', 'Similar skill players face off', 'Win or lose, it\'s always close']
+  },
+  'mmr-system': {
+    title: 'Your True Skill Rating',
+    description: 'MMR (Match Making Rating) is your hidden skill score. It goes up when you win and down when you lose, with performance bonuses for standout games.',
+    tips: ['Based on wins, losses, and performance', 'Updates after every match', 'AI analyzes your gameplay patterns']
+  },
+  'stats-tracking': {
+    title: 'Every Stat, Tracked',
+    description: 'Your entire competitive history is recorded and analyzed. See your K/D, win streaks, rank progression, and more.',
+    tips: ['View detailed match history', 'Track your improvement over time', 'Compare with other players']
+  },
+  // Commands
+  '/account link': {
+    title: 'Link Your Identity',
+    description: 'Connect your game account (Valorant/Marvel Rivals) to your Discord. This is how we track your stats and verify your rank.',
+    tips: ['Only needs to be done once', 'Unlocks all features', 'Your data stays private']
+  },
+  '/verify': {
+    title: 'Get Your Starting Rank',
+    description: 'After linking, verify pulls your current rank from the game and calculates your initial GRNDS rating. This is your starting point.',
+    tips: ['Based on your actual game rank', 'Sets your MMR baseline', 'Can be updated anytime']
+  },
+  '/queue join': {
+    title: 'Enter the Arena',
+    description: 'Jump into matchmaking! You\'ll be placed in a balanced team with other players of similar skill.',
+    tips: ['Games pop when 10 players ready', 'Teams auto-balanced by AI', 'Voice channels auto-created']
+  },
+  '/rank': {
+    title: 'Check Your Standing',
+    description: 'See your current GRNDS rank, MMR, and division. Track your progress through the tiers.',
+    tips: ['Shows rank + MMR', 'See games until next tier', 'Beautiful rank card image']
+  },
+  '/stats': {
+    title: 'Deep Dive Analytics',
+    description: 'Get the full breakdown - K/D ratio, win rate, total games, and more. Know exactly where you stand.',
+    tips: ['Complete stat overview', 'Historical performance', 'Comparison metrics']
+  },
+  '/leaderboard': {
+    title: 'The Best of the Best',
+    description: 'See who\'s dominating the GRNDS ladder. Compete for top spots and seasonal rewards.',
+    tips: ['Top 50 players shown', 'Updated in real-time', 'Seasonal rankings']
+  },
+  // Ranks
+  'grnds': {
+    title: 'GRNDS Tier (0-1499 MMR)',
+    description: 'Where every operative begins their journey. Five divisions (I-V) to climb through as you learn the system and prove yourself.',
+    tips: ['Entry tier for all players', 'Learn the ropes here', 'Focus on fundamentals']
+  },
+  'breakpoint': {
+    title: 'BREAKPOINT Tier (1500-2399 MMR)',
+    description: 'You\'ve broken through. This is where competition gets serious. Five divisions of skilled players fighting for the next level.',
+    tips: ['Competitive middle ground', 'Games get intense', 'Strategy matters more']
+  },
+  'challenger': {
+    title: 'CHALLENGER Tier (2400-2999 MMR)',
+    description: 'The elite. Three divisions of the best players on the platform. Only the dedicated reach this level.',
+    tips: ['Top ~10% of players', 'Highest competition', 'Prestigious status']
+  },
+  'x-rank': {
+    title: 'X RANK (3000+ MMR)',
+    description: 'The pinnacle. No divisions, just pure dominance. Reserved for the absolute best operatives on GRNDS.',
+    tips: ['Invite to exclusive matches', 'Featured on leaderboard', 'Ultimate bragging rights']
+  },
+  // Web features
+  'dashboard': {
+    title: 'Your Command Center',
+    description: 'One place to see everything - your stats, recent matches, rank progress, and quick actions. This is home base.',
+    tips: ['Quick overview of everything', 'One-click actions', 'Personalized for you']
+  },
+  'profile': {
+    title: 'Make It Yours',
+    description: 'Customize your appearance, set your banner, add a bio. Let other operatives know who you are.',
+    tips: ['Custom profile picture', 'Bio and social links', 'Achievement showcase']
+  },
+  'leaderboard-web': {
+    title: 'Full Rankings View',
+    description: 'The complete leaderboard with filtering, search, and detailed stats for every player.',
+    tips: ['Search any player', 'Filter by rank tier', 'Click to view profiles']
+  },
+  'season': {
+    title: 'Seasonal Tracking',
+    description: 'Track your progress through the current season. See rewards, milestones, and time remaining.',
+    tips: ['Season rewards preview', 'Personal milestones', 'Countdown timer']
+  },
+  // AI Features
+  'ai-balancing': {
+    title: 'AI-Powered Team Balancing',
+    description: 'Our AI doesn\'t just look at MMR - it analyzes play styles, recent performance, and chemistry to create the most balanced teams possible.',
+    tips: ['Machine learning algorithms', 'Gets smarter over time', 'Fair matches guaranteed']
+  },
+  'ai-analysis': {
+    title: 'Smart Performance Analysis',
+    description: 'After each match, AI reviews your performance and adjusts your rating based on how you played, not just the outcome.',
+    tips: ['Performance-based adjustments', 'Recognizes improvement', 'Detailed breakdowns']
+  },
+  'ai-predictions': {
+    title: 'Match Predictions',
+    description: 'Before each match, see AI-predicted win chances and key matchups. Understand the battlefield before you enter.',
+    tips: ['Win probability shown', 'Key player matchups', 'Strategic insights']
+  }
+}
 
 interface InitiationGuideProps {
   username: string
@@ -45,37 +160,42 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
   const [activeSection, setActiveSection] = useState(0)
   const [terminalHistory, setTerminalHistory] = useState<string[]>([])
   const [isTyping, setIsTyping] = useState(false)
+  const [activeInfo, setActiveInfo] = useState<string | null>(null)
 
-  // Sections data
-  const sections = [
+  // Sections data - memoized to prevent re-renders
+  const sections = useMemo(() => [
     {
-      id: 'about',
-      title: 'ABOUT_GRNDS',
+      id: 'welcome',
+      title: 'WELCOME',
       icon: Zap,
-      command: 'cat /docs/about.md',
+      command: 'cat /docs/welcome.md',
       content: {
-        title: 'What is GRNDS?',
+        title: 'What is #GRNDS?',
+        subtitle: 'A new way to compete.',
+        description: 'GRNDS is your private competitive arena. We take the chaos of ranked matchmaking and transform it into fair, balanced, skill-based competition. Every match matters. Every player is tracked. Every game is an opportunity to prove yourself.',
         items: [
-          { icon: Swords, label: 'Balanced Matches', desc: 'Fair 5v5 teams based on skill' },
-          { icon: TrendingUp, label: 'MMR System', desc: 'Performance-based rankings' },
-          { icon: Target, label: 'Stats Tracking', desc: 'K/D, matches, and more' },
+          { id: 'balanced-matches', icon: Swords, label: 'Fair Matches', desc: 'AI-balanced teams every game' },
+          { id: 'mmr-system', icon: TrendingUp, label: 'Skill Rating', desc: 'Your true competitive level' },
+          { id: 'stats-tracking', icon: Target, label: 'Full Tracking', desc: 'Every stat, every match' },
         ]
       }
     },
     {
-      id: 'commands',
-      title: 'DISCORD_COMMANDS',
+      id: 'howto',
+      title: 'HOW_IT_WORKS',
       icon: MessageSquare,
-      command: 'grnds --help commands',
+      command: 'grnds --help',
       content: {
-        title: 'Essential Commands',
+        title: 'Your First Steps',
+        subtitle: 'Getting started is easy.',
+        description: 'Everything runs through Discord commands. Link your account, verify your rank, and queue up. The system handles the rest - team creation, voice channels, result tracking, and MMR updates.',
         commands: [
-          { cmd: '/account link', desc: 'Link your game account', required: true },
+          { cmd: '/account link', desc: 'Connect your game account', required: true },
           { cmd: '/verify', desc: 'Get your initial rank', required: true },
-          { cmd: '/queue join', desc: 'Enter matchmaking', required: true },
-          { cmd: '/rank', desc: 'View your current rank' },
+          { cmd: '/queue join', desc: 'Jump into matchmaking', required: true },
+          { cmd: '/rank', desc: 'See your current standing' },
           { cmd: '/stats', desc: 'View your statistics' },
-          { cmd: '/leaderboard', desc: 'See top players' },
+          { cmd: '/leaderboard', desc: 'Check top players' },
         ]
       }
     },
@@ -83,48 +203,70 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
       id: 'ranks',
       title: 'RANK_SYSTEM',
       icon: Trophy,
-      command: 'grnds --show ranks',
+      command: 'grnds --show tiers',
       content: {
-        title: 'Rank Tiers',
+        title: 'The Rank Ladder',
+        subtitle: 'Your journey from rookie to legend.',
+        description: 'Climb through four distinct tiers, each with multiple divisions. Your MMR (skill rating) determines your rank. Win to climb, lose to fall. Simple. The only way up is through performance.',
         ranks: [
-          { tier: 'GRNDS I-V', mmr: '0 - 1499', color: '#ff8c00' },
-          { tier: 'BREAKPOINT I-V', mmr: '1500 - 2399', color: '#888888' },
-          { tier: 'CHALLENGER I-III', mmr: '2400 - 2999', color: '#dc2626' },
-          { tier: 'X', mmr: '3000+', color: '#ffffff' },
+          { id: 'grnds', tier: 'GRNDS I-V', mmr: '0 - 1499', color: '#ff8c00', desc: 'Starting tier' },
+          { id: 'breakpoint', tier: 'BREAKPOINT I-V', mmr: '1500 - 2399', color: '#888888', desc: 'Competitive tier' },
+          { id: 'challenger', tier: 'CHALLENGER I-III', mmr: '2400 - 2999', color: '#dc2626', desc: 'Elite tier' },
+          { id: 'x-rank', tier: 'X', mmr: '3000+', color: '#ffffff', desc: 'The pinnacle' },
+        ]
+      }
+    },
+    {
+      id: 'ai',
+      title: 'AI_FEATURES',
+      icon: Brain,
+      command: 'grnds --ai status',
+      content: {
+        title: 'Powered by Intelligence',
+        subtitle: 'The system learns and adapts.',
+        description: 'GRNDS isn\'t just a queue bot - it\'s a smart competitive platform. AI analyzes matches, balances teams, and tracks performance in ways traditional systems can\'t match.',
+        features: [
+          { id: 'ai-balancing', icon: Users, label: 'Smart Team Balancing', desc: 'AI creates fair matchups every game' },
+          { id: 'ai-analysis', icon: Sparkles, label: 'Performance Analysis', desc: 'Your play is analyzed, not just W/L' },
+          { id: 'ai-predictions', icon: Shield, label: 'Match Insights', desc: 'Predicted outcomes and key matchups' },
         ]
       }
     },
     {
       id: 'web',
-      title: 'WEB_INTERFACE',
+      title: 'WEB_HUB',
       icon: ExternalLink,
       command: 'open hub.grnds.xyz',
       content: {
-        title: 'Web Features',
-        features: [
-          { label: 'Dashboard', desc: 'Your personal stats hub', current: true },
-          { label: 'Profile', desc: 'Customize your appearance' },
-          { label: 'Leaderboard', desc: 'Full rankings' },
-          { label: 'Season', desc: 'Track seasonal progress' },
+        title: 'The Web Interface',
+        subtitle: 'Beyond Discord.',
+        description: 'This website is your extended command center. Check stats on the go, browse the full leaderboard, customize your profile, and track seasonal progress. It\'s all connected.',
+        webFeatures: [
+          { id: 'dashboard', label: 'Dashboard', desc: 'Your personal overview', current: true },
+          { id: 'profile', label: 'Profile', desc: 'Customize your identity' },
+          { id: 'leaderboard-web', label: 'Leaderboard', desc: 'Full competitive standings' },
+          { id: 'season', label: 'Season', desc: 'Track seasonal progress' },
         ]
       }
     },
     {
       id: 'start',
-      title: 'GET_STARTED',
-      icon: Rocket,
+      title: 'BEGIN',
+      icon: Award,
       command: 'grnds --start',
       content: {
-        title: 'Quick Start Checklist',
+        title: 'Ready to Compete?',
+        subtitle: 'Your initiation is almost complete.',
+        description: 'You now understand the system. The only thing left is to enter the arena. Link your account, verify your rank, and queue up. The ladder awaits.',
         steps: [
-          'Link your game account with /account link',
-          'Run /verify to get your initial rank',
-          'Use /queue join to find a match',
-          'Play, win, and climb the ranks!',
+          'Run /account link in Discord',
+          'Use /verify to get your starting rank',
+          'Join the queue with /queue join',
+          'Win, climb, dominate.',
         ]
       }
     },
-  ]
+  ], [])
 
   // Handle forceOpen prop
   useEffect(() => {
@@ -218,6 +360,10 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
     handleClose()
   }, [handleClose])
 
+  const handleInfoClick = useCallback((id: string) => {
+    setActiveInfo(activeInfo === id ? null : id)
+  }, [activeInfo])
+
   if (!isOpen) return null
 
   return (
@@ -273,6 +419,12 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-10 blur-[150px]"
           style={{ backgroundColor: ACCENT }}
         />
+      </div>
+
+      {/* Developed by Chopp - Always present, terminal style, subliminal */}
+      <div className="fixed bottom-4 left-4 z-[250] font-mono text-[10px] text-white/15 flex items-center gap-2">
+        <Terminal className="w-3 h-3" />
+        <span>sys.author = &quot;chopp&quot;</span>
       </div>
 
       {/* Main Content */}
@@ -432,7 +584,7 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
                 transition={{ delay: 0.6 }}
               >
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm font-mono">Initializing training modules...</span>
+                <span className="text-sm font-mono">Preparing initiation sequence...</span>
               </motion.div>
             </motion.div>
           )}
@@ -583,13 +735,15 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
                     </div>
                     
                     {/* Content */}
-                    <div className="p-8 min-h-[400px]">
+                    <div className="p-8 min-h-[450px] max-h-[60vh] overflow-y-auto">
                       <AnimatePresence mode="wait">
                         <SectionContent
                           key={activeSection}
                           section={sections[activeSection]}
                           onNext={handleNext}
                           isLast={activeSection === sections.length - 1}
+                          activeInfo={activeInfo}
+                          onInfoClick={handleInfoClick}
                         />
                       </AnimatePresence>
                     </div>
@@ -633,50 +787,111 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
             </motion.div>
           )}
 
-          {/* Complete Phase */}
+          {/* Complete Phase - Terminal Style */}
           {phase === 'complete' && (
             <motion.div
               key="complete"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center"
+              className="text-center max-w-lg"
             >
-              <motion.img
-                src="/grnds-logo.gif"
-                alt="GRNDS"
-                className="w-40 h-40 mx-auto mb-6"
-                animate={{ 
-                  scale: [1, 1.05, 1],
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
+              {/* Terminal window for completion */}
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
+                className="rounded-xl overflow-hidden border"
+                style={{ 
+                  borderColor: `${ACCENT}40`,
+                  boxShadow: `0 0 80px ${ACCENT}20`,
+                  background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
+                }}
+                animate={{
+                  rotateX: [1, -1, 1],
+                  rotateY: [-0.5, 0.5, -0.5],
+                }}
+                transition={{
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
               >
-                <Rocket className="w-16 h-16 mx-auto mb-4" style={{ color: ACCENT }} />
-                <h2 className="text-3xl md:text-5xl font-black font-mono mb-4">
-                  INITIATION <span style={{ color: ACCENT }}>COMPLETE</span>
-                </h2>
-                <p className="text-white/60 font-mono mb-8">
-                  You&apos;re ready to compete, <span style={{ color: ACCENT }}>{username}</span>
-                </p>
-                <motion.button
-                  onClick={handleComplete}
-                  className="px-8 py-4 rounded-xl font-mono font-bold text-white border-2 transition-all"
+                {/* Title bar */}
+                <div 
+                  className="flex items-center gap-2 px-4 py-3 border-b"
                   style={{ 
-                    borderColor: ACCENT,
-                    background: `${ACCENT}20`,
+                    borderColor: `${ACCENT}30`,
+                    background: `linear-gradient(90deg, ${ACCENT}10, transparent)`,
                   }}
-                  whileHover={{ 
-                    scale: 1.05,
-                    boxShadow: `0 0 30px ${ACCENT}40`,
-                  }}
-                  whileTap={{ scale: 0.95 }}
                 >
-                  ENTER THE GROUNDS
-                </motion.button>
+                  <div className="flex gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                  </div>
+                  <div className="flex-1 text-center">
+                    <span className="text-xs font-mono text-white/40">INITIATION_COMPLETE</span>
+                  </div>
+                  <Terminal className="w-4 h-4" style={{ color: ACCENT }} />
+                </div>
+                
+                {/* Content */}
+                <div className="p-8">
+                  <motion.img
+                    src="/grnds-logo.gif"
+                    alt="GRNDS"
+                    className="w-32 h-32 mx-auto mb-6"
+                    animate={{ 
+                      scale: [1, 1.05, 1],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                  
+                  <div className="font-mono space-y-2 mb-8">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-green-400"
+                    >
+                      &gt; initiation.status = COMPLETE
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-white/60"
+                    >
+                      &gt; user.ready = true
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.6 }}
+                      className="text-2xl md:text-3xl font-black text-white mt-4"
+                    >
+                      YOU ARE READY TO <span style={{ color: ACCENT }}>COMPETE</span>
+                    </motion.div>
+                  </div>
+                  
+                  <motion.button
+                    onClick={handleComplete}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="w-full py-4 rounded-lg font-mono font-bold text-white flex items-center justify-center gap-3 transition-all"
+                    style={{ 
+                      background: `${ACCENT}20`,
+                      border: `2px solid ${ACCENT}`,
+                    }}
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: `0 0 30px ${ACCENT}40`,
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span style={{ color: ACCENT }}>&gt;</span>
+                    ENTER GRNDS
+                    <ArrowRight className="w-5 h-5" style={{ color: ACCENT }} />
+                  </motion.button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -705,18 +920,23 @@ interface SectionContentProps {
     command: string
     content: {
       title: string
-      items?: { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; desc: string }[]
+      subtitle?: string
+      description?: string
+      items?: { id: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; desc: string }[]
       commands?: { cmd: string; desc: string; required?: boolean }[]
-      ranks?: { tier: string; mmr: string; color: string }[]
-      features?: { label: string; desc: string; current?: boolean }[]
+      ranks?: { id: string; tier: string; mmr: string; color: string; desc?: string }[]
+      features?: { id: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; desc: string }[]
+      webFeatures?: { id: string; label: string; desc: string; current?: boolean }[]
       steps?: string[]
     }
   }
   onNext: () => void
   isLast: boolean
+  activeInfo: string | null
+  onInfoClick: (id: string) => void
 }
 
-function SectionContent({ section, onNext, isLast }: SectionContentProps) {
+function SectionContent({ section, onNext, isLast, activeInfo, onInfoClick }: SectionContentProps) {
   const content = section.content
 
   return (
@@ -726,133 +946,404 @@ function SectionContent({ section, onNext, isLast }: SectionContentProps) {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6"
     >
-      {/* Title */}
-      <div className="flex items-center gap-3 mb-8">
-        <div 
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ background: `${ACCENT}20` }}
-        >
-          <Terminal className="w-5 h-5" style={{ color: ACCENT }} />
+      {/* Title with subtitle and description */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ background: `${ACCENT}20` }}
+          >
+            <Terminal className="w-5 h-5" style={{ color: ACCENT }} />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black font-mono text-white">{content.title}</h3>
+            {content.subtitle && (
+              <span className="text-sm font-mono text-white/40">{content.subtitle}</span>
+            )}
+          </div>
         </div>
-        <div>
-          <h3 className="text-2xl font-black font-mono text-white">{content.title}</h3>
-          <span className="text-xs font-mono text-white/40">$ {section.command}</span>
-        </div>
+        {content.description && (
+          <p className="text-white/60 text-sm leading-relaxed mt-4 pl-[52px]">
+            {content.description}
+          </p>
+        )}
       </div>
 
-      {/* Items (About section) */}
+      {/* Items (About section) - Interactive */}
       {content.items && (
         <div className="grid gap-4">
-          {content.items.map((item, i) => (
-            <motion.div
-              key={i}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-start gap-4 p-4 rounded-lg border"
-              style={{ 
-                borderColor: `${ACCENT}30`,
-                background: `${ACCENT}05`,
-              }}
-            >
-              <item.icon className="w-6 h-6 flex-shrink-0" style={{ color: ACCENT }} />
-              <div>
-                <div className="font-bold text-white font-mono">{item.label}</div>
-                <div className="text-sm text-white/50">{item.desc}</div>
-              </div>
-            </motion.div>
-          ))}
+          {content.items.map((item, i) => {
+            const isActive = activeInfo === item.id
+            const info = INFO_DETAILS[item.id]
+            
+            return (
+              <motion.div
+                key={i}
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <motion.button
+                  onClick={() => onInfoClick(item.id)}
+                  className="w-full flex items-start gap-4 p-4 rounded-lg border text-left transition-all"
+                  style={{ 
+                    borderColor: isActive ? ACCENT : `${ACCENT}30`,
+                    background: isActive ? `${ACCENT}15` : `${ACCENT}05`,
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <item.icon className="w-6 h-6 flex-shrink-0" style={{ color: ACCENT }} />
+                  <div className="flex-1">
+                    <div className="font-bold text-white font-mono flex items-center gap-2">
+                      {item.label}
+                      <span className="text-[10px] text-white/30">[CLICK FOR MORE]</span>
+                    </div>
+                    <div className="text-sm text-white/50">{item.desc}</div>
+                  </div>
+                  <ChevronRight 
+                    className="w-5 h-5 transition-transform" 
+                    style={{ 
+                      color: ACCENT,
+                      transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)'
+                    }} 
+                  />
+                </motion.button>
+                
+                {/* Expanded info */}
+                <AnimatePresence>
+                  {isActive && info && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div 
+                        className="p-4 mt-2 rounded-lg border-l-2"
+                        style={{ 
+                          borderColor: ACCENT,
+                          background: 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <div className="text-white font-bold font-mono mb-2">{info.title}</div>
+                        <div className="text-white/60 text-sm mb-3">{info.description}</div>
+                        {info.tips && (
+                          <div className="space-y-1">
+                            {info.tips.map((tip, j) => (
+                              <div key={j} className="flex items-center gap-2 text-xs text-white/40">
+                                <CheckCircle className="w-3 h-3" style={{ color: ACCENT }} />
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
-      {/* Commands (Discord section) */}
+      {/* Commands (Discord section) - Interactive */}
       {content.commands && (
         <div className="space-y-2">
-          {content.commands.map((cmd, i) => (
-            <motion.div
-              key={i}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: i * 0.05 }}
-              className="flex items-center gap-4 p-3 rounded-lg"
-              style={{ 
-                background: cmd.required ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
-                border: cmd.required ? `1px solid ${ACCENT}40` : '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
-              <code 
-                className="px-2 py-1 rounded text-sm font-mono"
-                style={{ 
-                  background: cmd.required ? `${ACCENT}20` : 'rgba(255,255,255,0.1)',
-                  color: cmd.required ? ACCENT : 'white',
-                }}
-              >
-                {cmd.cmd}
-              </code>
-              <span className="text-sm text-white/50 flex-1">{cmd.desc}</span>
-              {cmd.required && (
-                <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ background: `${ACCENT}30`, color: ACCENT }}>
-                  REQUIRED
-                </span>
-              )}
-            </motion.div>
-          ))}
+          {content.commands.map((cmd, i) => {
+            const isActive = activeInfo === cmd.cmd
+            const info = INFO_DETAILS[cmd.cmd]
+            
+            return (
+              <motion.div key={i}>
+                <motion.button
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  onClick={() => onInfoClick(cmd.cmd)}
+                  className="w-full flex items-center gap-4 p-3 rounded-lg text-left transition-all"
+                  style={{ 
+                    background: cmd.required ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
+                    border: isActive ? `1px solid ${ACCENT}` : cmd.required ? `1px solid ${ACCENT}40` : '1px solid rgba(255,255,255,0.05)',
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                >
+                  <code 
+                    className="px-2 py-1 rounded text-sm font-mono"
+                    style={{ 
+                      background: cmd.required ? `${ACCENT}20` : 'rgba(255,255,255,0.1)',
+                      color: cmd.required ? ACCENT : 'white',
+                    }}
+                  >
+                    {cmd.cmd}
+                  </code>
+                  <span className="text-sm text-white/50 flex-1">{cmd.desc}</span>
+                  {cmd.required && (
+                    <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ background: `${ACCENT}30`, color: ACCENT }}>
+                      REQUIRED
+                    </span>
+                  )}
+                </motion.button>
+                
+                {/* Expanded info */}
+                <AnimatePresence>
+                  {isActive && info && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div 
+                        className="p-4 mt-2 rounded-lg border-l-2"
+                        style={{ 
+                          borderColor: ACCENT,
+                          background: 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <div className="text-white font-bold font-mono mb-2">{info.title}</div>
+                        <div className="text-white/60 text-sm mb-3">{info.description}</div>
+                        {info.tips && (
+                          <div className="space-y-1">
+                            {info.tips.map((tip, j) => (
+                              <div key={j} className="flex items-center gap-2 text-xs text-white/40">
+                                <CheckCircle className="w-3 h-3" style={{ color: ACCENT }} />
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
-      {/* Ranks (Rank section) */}
+      {/* Ranks (Rank section) - Interactive */}
       {content.ranks && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {content.ranks.map((rank, i) => (
-            <motion.div
-              key={i}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: i * 0.1 }}
-              className="p-4 rounded-lg border text-center"
-              style={{ 
-                borderColor: `${rank.color}40`,
-                background: `${rank.color}10`,
-              }}
-            >
-              <div className="font-bold font-mono" style={{ color: rank.color }}>{rank.tier}</div>
-              <div className="text-xs text-white/40 mt-1">{rank.mmr} MMR</div>
-            </motion.div>
-          ))}
+          {content.ranks.map((rank, i) => {
+            const isActive = activeInfo === rank.id
+            const info = INFO_DETAILS[rank.id]
+            
+            return (
+              <motion.div key={i} className="relative">
+                <motion.button
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => onInfoClick(rank.id)}
+                  className="w-full p-4 rounded-lg border text-center transition-all"
+                  style={{ 
+                    borderColor: isActive ? rank.color : `${rank.color}40`,
+                    background: `${rank.color}10`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <div className="font-bold font-mono" style={{ color: rank.color }}>{rank.tier}</div>
+                  <div className="text-xs text-white/40 mt-1">{rank.mmr} MMR</div>
+                  <div className="text-[10px] text-white/30 mt-1">[TAP]</div>
+                </motion.button>
+                
+                {/* Popup info for ranks */}
+                <AnimatePresence>
+                  {isActive && info && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute z-50 top-full left-0 right-0 mt-2"
+                    >
+                      <div 
+                        className="p-4 rounded-lg border shadow-xl"
+                        style={{ 
+                          borderColor: rank.color,
+                          background: '#1a1a1a',
+                        }}
+                      >
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onInfoClick(rank.id) }}
+                          className="absolute top-2 right-2"
+                        >
+                          <X className="w-4 h-4 text-white/40 hover:text-white" />
+                        </button>
+                        <div className="text-white font-bold font-mono text-sm mb-2">{info.title}</div>
+                        <div className="text-white/60 text-xs mb-2">{info.description}</div>
+                        {info.tips && (
+                          <div className="space-y-1">
+                            {info.tips.map((tip, j) => (
+                              <div key={j} className="flex items-center gap-2 text-[10px] text-white/40">
+                                <CheckCircle className="w-2 h-2" style={{ color: rank.color }} />
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
-      {/* Features (Web section) */}
+      {/* AI Features - Interactive */}
       {content.features && (
+        <div className="grid gap-4">
+          {content.features.map((feature, i) => {
+            const isActive = activeInfo === feature.id
+            const info = INFO_DETAILS[feature.id]
+            
+            return (
+              <motion.div
+                key={i}
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <motion.button
+                  onClick={() => onInfoClick(feature.id)}
+                  className="w-full flex items-start gap-4 p-4 rounded-lg border text-left transition-all"
+                  style={{ 
+                    borderColor: isActive ? ACCENT : `${ACCENT}30`,
+                    background: isActive ? `${ACCENT}15` : `${ACCENT}05`,
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <feature.icon className="w-6 h-6 flex-shrink-0" style={{ color: ACCENT }} />
+                  <div className="flex-1">
+                    <div className="font-bold text-white font-mono flex items-center gap-2">
+                      {feature.label}
+                      <span className="text-[10px] text-white/30">[CLICK]</span>
+                    </div>
+                    <div className="text-sm text-white/50">{feature.desc}</div>
+                  </div>
+                  <ChevronRight 
+                    className="w-5 h-5 transition-transform" 
+                    style={{ 
+                      color: ACCENT,
+                      transform: isActive ? 'rotate(90deg)' : 'rotate(0deg)'
+                    }} 
+                  />
+                </motion.button>
+                
+                {/* Expanded info */}
+                <AnimatePresence>
+                  {isActive && info && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div 
+                        className="p-4 mt-2 rounded-lg border-l-2"
+                        style={{ 
+                          borderColor: ACCENT,
+                          background: 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <div className="text-white font-bold font-mono mb-2">{info.title}</div>
+                        <div className="text-white/60 text-sm mb-3">{info.description}</div>
+                        {info.tips && (
+                          <div className="space-y-1">
+                            {info.tips.map((tip, j) => (
+                              <div key={j} className="flex items-center gap-2 text-xs text-white/40">
+                                <CheckCircle className="w-3 h-3" style={{ color: ACCENT }} />
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Web Features - Interactive */}
+      {content.webFeatures && (
         <div className="space-y-3">
-          {content.features.map((feature, i) => (
-            <motion.div
-              key={i}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-center gap-4 p-4 rounded-lg"
-              style={{ 
-                background: feature.current ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
-                border: feature.current ? `1px solid ${ACCENT}40` : '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
-              <div 
-                className="w-2 h-2 rounded-full"
-                style={{ 
-                  background: feature.current ? ACCENT : 'rgba(255,255,255,0.3)',
-                  boxShadow: feature.current ? `0 0 10px ${ACCENT}` : 'none',
-                }}
-              />
-              <div>
-                <div className="font-bold text-white font-mono text-sm">
-                  {feature.label}
-                  {feature.current && <span className="text-xs ml-2 text-white/40">(YOU ARE HERE)</span>}
-                </div>
-                <div className="text-xs text-white/50">{feature.desc}</div>
-              </div>
-            </motion.div>
-          ))}
+          {content.webFeatures.map((feature, i) => {
+            const isActive = activeInfo === feature.id
+            const info = INFO_DETAILS[feature.id]
+            
+            return (
+              <motion.div key={i}>
+                <motion.button
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => onInfoClick(feature.id)}
+                  className="w-full flex items-center gap-4 p-4 rounded-lg text-left transition-all"
+                  style={{ 
+                    background: feature.current ? `${ACCENT}10` : 'rgba(255,255,255,0.03)',
+                    border: isActive ? `1px solid ${ACCENT}` : feature.current ? `1px solid ${ACCENT}40` : '1px solid rgba(255,255,255,0.05)',
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                >
+                  <div 
+                    className="w-2 h-2 rounded-full"
+                    style={{ 
+                      background: feature.current ? ACCENT : 'rgba(255,255,255,0.3)',
+                      boxShadow: feature.current ? `0 0 10px ${ACCENT}` : 'none',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold text-white font-mono text-sm">
+                      {feature.label}
+                      {feature.current && <span className="text-xs ml-2 text-white/40">(YOU ARE HERE)</span>}
+                    </div>
+                    <div className="text-xs text-white/50">{feature.desc}</div>
+                  </div>
+                  <span className="text-[10px] text-white/30">[TAP]</span>
+                </motion.button>
+                
+                {/* Expanded info */}
+                <AnimatePresence>
+                  {isActive && info && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div 
+                        className="p-4 mt-2 rounded-lg border-l-2"
+                        style={{ 
+                          borderColor: ACCENT,
+                          background: 'rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        <div className="text-white font-bold font-mono mb-2">{info.title}</div>
+                        <div className="text-white/60 text-sm mb-3">{info.description}</div>
+                        {info.tips && (
+                          <div className="space-y-1">
+                            {info.tips.map((tip, j) => (
+                              <div key={j} className="flex items-center gap-2 text-xs text-white/40">
+                                <CheckCircle className="w-3 h-3" style={{ color: ACCENT }} />
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
