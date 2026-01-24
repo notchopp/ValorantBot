@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { RefreshCw, CheckCircle, AlertCircle, Users, Zap, Terminal, Database, Shield } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { RefreshCw, CheckCircle, AlertCircle, Users, Zap, Terminal, Database, Shield, Maximize2 } from 'lucide-react'
 
 interface PlayerWithStats {
   id: string
@@ -50,13 +50,45 @@ interface RefreshResult {
 export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isRecalculating, setIsRecalculating] = useState(false)
+  const [refreshingPlayer, setRefreshingPlayer] = useState<string | null>(null)
   const [refreshResult, setRefreshResult] = useState<RefreshResult | null>(null)
   const [selectedGame, setSelectedGame] = useState<'valorant' | 'marvel_rivals' | 'both'>('valorant')
   const [showMismatchesOnly, setShowMismatchesOnly] = useState(false)
+  const [players, setPlayers] = useState(initialPlayers)
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
     '> SYSTEM INITIALIZED',
     '> AWAITING COMMAND...',
   ])
+
+  // Auto-enter fullscreen on mount
+  useEffect(() => {
+    const enterFullscreen = async () => {
+      try {
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen()
+        }
+      } catch {
+        // User may have denied fullscreen, that's okay
+        console.log('Fullscreen not available or denied')
+      }
+    }
+    
+    // Small delay to ensure page is loaded
+    const timeout = setTimeout(enterFullscreen, 500)
+    return () => clearTimeout(timeout)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {
+      console.log('Fullscreen toggle failed')
+    }
+  }
 
   const addTerminalLine = (line: string) => {
     setTerminalOutput(prev => [...prev.slice(-50), line])
@@ -155,12 +187,70 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
     }
   }
 
+  const handleRefreshPlayer = async (playerId: string, username: string, game: 'valorant' | 'marvel_rivals') => {
+    setRefreshingPlayer(playerId)
+    addTerminalLine(`> REFRESH_PLAYER: ${username} --game=${game}`)
+    
+    try {
+      const response = await fetch('/api/admin/refresh-player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, game })
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        addTerminalLine(`> ERROR: ${result.error || 'Failed to refresh player'}`)
+      } else {
+        addTerminalLine(`> SUCCESS: ${username} ${result.oldRank}→${result.newRank} (${result.oldMMR}→${result.newMMR}) [${result.sourceRank}]`)
+        
+        // Update local state
+        setPlayers(prev => prev.map(p => {
+          if (p.id !== playerId) return p
+          
+          if (game === 'valorant') {
+            return {
+              ...p,
+              valorant_mmr: result.newMMR,
+              valorant_rank: result.newRank,
+              current_mmr: result.newMMR,
+              discord_rank: result.newRank,
+              expectedRank: result.newRank,
+              rankMismatch: false,
+            }
+          } else {
+            return {
+              ...p,
+              marvel_rivals_mmr: result.newMMR,
+              marvel_rivals_rank: result.newRank,
+            }
+          }
+        }))
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      addTerminalLine(`> ERROR: ${msg}`)
+    } finally {
+      setRefreshingPlayer(null)
+    }
+  }
+
   const filteredPlayers = showMismatchesOnly 
-    ? initialPlayers.filter(p => p.rankMismatch)
-    : initialPlayers
+    ? players.filter(p => p.rankMismatch)
+    : players
 
   return (
     <div className="space-y-6 font-mono">
+      {/* Fullscreen Button */}
+      <button
+        onClick={toggleFullscreen}
+        className="fixed top-4 right-4 z-50 p-2 bg-black/80 border border-[var(--term-border)] rounded hover:border-[var(--term-green)] hover:text-[var(--term-green)] transition-colors"
+        title="Toggle Fullscreen"
+      >
+        <Maximize2 className="w-4 h-4" />
+      </button>
+
       {/* Terminal Output */}
       <div className="bg-black border border-[var(--term-border)] rounded-lg overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2 bg-[var(--term-bg)] border-b border-[var(--term-border)]">
@@ -379,6 +469,7 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
                 <th className="px-3 py-2 text-left text-[10px] uppercase text-[var(--term-muted)]">CURRENT</th>
                 <th className="px-3 py-2 text-left text-[10px] uppercase text-[var(--term-muted)]">EXPECTED</th>
                 <th className="px-3 py-2 text-left text-[10px] uppercase text-[var(--term-muted)]">STATUS</th>
+                <th className="px-3 py-2 text-center text-[10px] uppercase text-[var(--term-muted)]">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--term-border)]">
@@ -413,6 +504,24 @@ export function HQClient({ initialPlayers, mismatchCount }: HQClientProps) {
                         <span className="text-[10px]">OK</span>
                       </span>
                     )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => handleRefreshPlayer(player.id, player.discord_username || 'Unknown', 'valorant')}
+                        disabled={refreshingPlayer === player.id || !player.riot_name}
+                        className={`p-1.5 rounded border transition-colors ${
+                          refreshingPlayer === player.id
+                            ? 'bg-[var(--term-green)]/20 border-[var(--term-green)] text-[var(--term-green)]'
+                            : !player.riot_name
+                            ? 'bg-transparent border-[var(--term-border)] text-[var(--term-muted)] cursor-not-allowed opacity-50'
+                            : 'bg-transparent border-[var(--term-border)] text-[var(--term-muted)] hover:border-red-500 hover:text-red-500'
+                        }`}
+                        title={player.riot_name ? 'Refresh from Valorant API' : 'No Riot ID linked'}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${refreshingPlayer === player.id ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
