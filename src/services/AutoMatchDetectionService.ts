@@ -15,6 +15,7 @@ export class AutoMatchDetectionService {
   private intervalId: NodeJS.Timeout | null = null;
   private readonly CHECK_INTERVAL_MS = 2 * 60 * 1000; // Check every 2 minutes
   private readonly MATCH_AGE_THRESHOLD_MS = 30 * 60 * 1000; // Only check matches from last 30 minutes
+  private readonly API_DELAY_MS = 1500; // 1.5 second delay between API calls to avoid rate limits
   private processedMatches: Set<string> = new Set(); // Track processed match IDs
 
   constructor(
@@ -29,6 +30,13 @@ export class AutoMatchDetectionService {
     // Services reserved for future use
     void _matchService;
     void _playerService;
+  }
+
+  /**
+   * Helper to add delay between API calls
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -101,11 +109,18 @@ export class AutoMatchDetectionService {
 
       console.log(`Checking ${matches.length} active match(es) for completion`);
 
+      let matchIndex = 0;
       for (const match of matches) {
         // Skip if already processed
         if (this.processedMatches.has(match.match_id)) {
           continue;
         }
+
+        // Add delay between checking different matches to spread out API calls
+        if (matchIndex > 0) {
+          await this.delay(this.API_DELAY_MS * 2); // 3 second delay between matches
+        }
+        matchIndex++;
 
         await this.checkMatchCompletion(match);
       }
@@ -143,9 +158,21 @@ export class AutoMatchDetectionService {
       const teamB: string[] = match.team_b || [];
       const allPlayerIds = [...teamA, ...teamB];
 
+      // Only check up to 3 players to avoid rate limits (one from each team + one extra)
+      // Shuffle to distribute load across different players over time
+      const shuffled = allPlayerIds.sort(() => Math.random() - 0.5);
+      const playersToCheck = shuffled.slice(0, 3);
+
       // Check each player's recent matches
       // If we find a match that started around the same time, it's likely our custom match
-      for (const playerId of allPlayerIds) {
+      let playerIndex = 0;
+      for (const playerId of playersToCheck) {
+        // Add delay between API calls (except for the first one)
+        if (playerIndex > 0) {
+          await this.delay(this.API_DELAY_MS);
+        }
+        playerIndex++;
+
         const player = await this.databaseService.getPlayer(playerId);
         if (!player || !player.riot_name || !player.riot_tag || !player.riot_region) {
           continue;
@@ -185,10 +212,20 @@ export class AutoMatchDetectionService {
             }
           }
         } catch (error) {
-          // Continue checking other players if one fails
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // If we hit rate limit (429), stop checking more players for this cycle
+          if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+            console.warn('Rate limited by Valorant API, stopping checks for this cycle', {
+              matchId: match.match_id,
+            });
+            return; // Exit early to avoid more rate limit hits
+          }
+          
+          // Continue checking other players if one fails for other reasons
           console.warn('Error checking player matches', {
             playerId,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage,
           });
           continue;
         }
@@ -228,11 +265,22 @@ export class AutoMatchDetectionService {
         }
       }
 
+      // Only check up to 3 players to avoid rate limits
+      const shuffled = allPlayerIds.sort(() => Math.random() - 0.5);
+      const playersToCheck = shuffled.slice(0, 3);
+
       // Try to find match from any player whose API works
       let foundMatch: any = null;
       let matchPlayers: any[] = [];
       
-      for (const playerId of allPlayerIds) {
+      let playerIndex = 0;
+      for (const playerId of playersToCheck) {
+        // Add delay between API calls (except for the first one)
+        if (playerIndex > 0) {
+          await this.delay(this.API_DELAY_MS);
+        }
+        playerIndex++;
+
         const player = discordToPlayer.get(playerId);
         if (!player?.marvel_rivals_uid) {
           continue;
@@ -266,9 +314,19 @@ export class AutoMatchDetectionService {
 
           if (foundMatch) break;
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // If we hit rate limit (429), stop checking more players for this cycle
+          if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+            console.warn('Rate limited by Marvel Rivals API, stopping checks for this cycle', {
+              matchId: match.match_id,
+            });
+            return; // Exit early to avoid more rate limit hits
+          }
+          
           console.warn('Error checking Marvel Rivals player matches', {
             playerId,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage,
           });
           continue;
         }
