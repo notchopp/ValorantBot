@@ -3,12 +3,15 @@
 import { motion } from 'framer-motion'
 import { Terminal } from 'lucide-react'
 import { useAccentColor } from '@/lib/AccentColorContext'
+import { TerminalSidebar } from './terminal/TerminalSidebar'
 
 interface Terminal3DShellProps {
   children: React.ReactNode
+  discordUserId?: string
+  isAdmin?: boolean
 }
 
-export function Terminal3DShell({ children }: Terminal3DShellProps) {
+export function Terminal3DShell({ children, discordUserId, isAdmin }: Terminal3DShellProps) {
   const { accentColor } = useAccentColor()
   
   return (
@@ -86,73 +89,65 @@ export function Terminal3DShell({ children }: Terminal3DShellProps) {
         />
       </div>
 
-      {/* Main Terminal Window */}
-      <div className="relative z-10 w-full h-full flex flex-col">
+      {/* Main Layout */}
+      <div className="relative z-10 w-full h-full flex flex-col p-2 sm:p-4 md:p-6">
         {/* Terminal Chrome - Top Bar with dots */}
-        <div className="flex-shrink-0 px-2 sm:px-4 md:px-6 pt-2 sm:pt-4">
-          <motion.div
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="max-w-[1920px] mx-auto"
-          >
-            {/* Terminal window header with dots */}
-            <div 
-              className="flex items-center gap-3 px-4 py-2 rounded-t-xl border-t border-l border-r"
-              style={{ 
-                borderColor: `${accentColor}30`,
-                background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 100%)`,
-              }}
-            >
-              {/* Mac-style dots */}
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500/70 hover:bg-red-500 transition-colors cursor-pointer" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/70 hover:bg-yellow-500 transition-colors cursor-pointer" />
-                <div className="w-3 h-3 rounded-full bg-green-500/70 hover:bg-green-500 transition-colors cursor-pointer" />
-              </div>
-              
-              {/* Terminal title */}
-              <div className="flex-1 text-center">
-                <span className="text-[10px] font-mono text-white/30 tracking-wider">
-                  GRNDS_TERMINAL v2.0 // hub.grnds.xyz
-                </span>
-              </div>
-              
-              {/* Terminal icon */}
-              <Terminal className="w-4 h-4 text-white/20" />
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Terminal Body - Contains nav + content */}
-        <div className="flex-1 px-2 sm:px-4 md:px-6 pb-2 sm:pb-4 overflow-hidden">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="max-w-[1920px] mx-auto h-full flex flex-col rounded-b-xl border-b border-l border-r overflow-hidden"
+        <motion.div
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="flex-shrink-0 max-w-[1920px] mx-auto w-full"
+        >
+          <div 
+            className="flex items-center gap-3 px-4 py-2 rounded-t-xl border-t border-l border-r"
             style={{ 
-              borderColor: `${accentColor}20`,
-              background: 'linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(5,5,5,0.98) 100%)',
-              boxShadow: `0 0 100px ${accentColor}10, 0 30px 60px rgba(0,0,0,0.5)`,
+              borderColor: `${accentColor}30`,
+              background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 100%)`,
             }}
           >
-            {/* Scrollable content area */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden">
-              {children}
+            {/* Mac-style dots */}
+            <div className="flex gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500/70 hover:bg-red-500 transition-colors cursor-pointer" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/70 hover:bg-yellow-500 transition-colors cursor-pointer" />
+              <div className="w-3 h-3 rounded-full bg-green-500/70 hover:bg-green-500 transition-colors cursor-pointer" />
             </div>
-          </motion.div>
-        </div>
+            
+            {/* Terminal title */}
+            <div className="flex-1 text-center">
+              <span className="text-[10px] font-mono text-white/30 tracking-wider">
+                GRNDS_TERMINAL v2.0 // hub.grnds.xyz
+              </span>
+            </div>
+            
+            {/* Terminal icon */}
+            <Terminal className="w-4 h-4 text-white/20" />
+          </div>
+        </motion.div>
+
+        {/* Terminal Body - Sidebar + Content */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="flex-1 max-w-[1920px] mx-auto w-full flex gap-4 rounded-b-xl border-b border-l border-r overflow-hidden p-4"
+          style={{ 
+            borderColor: `${accentColor}20`,
+            background: 'linear-gradient(180deg, rgba(10,10,10,0.95) 0%, rgba(5,5,5,0.98) 100%)',
+            boxShadow: `0 0 100px ${accentColor}10, 0 30px 60px rgba(0,0,0,0.5)`,
+          }}
+        >
+          {/* Sidebar */}
+          <TerminalSidebar discordUserId={discordUserId} isAdmin={isAdmin} />
+          
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-xl">
+            {children}
+          </div>
+        </motion.div>
       </div>
 
-      {/* Developed by Chopp - Always present */}
-      <div className="fixed bottom-6 left-6 z-[50] font-mono text-[10px] text-white/25 flex items-center gap-2 pointer-events-none">
-        <Terminal className="w-3 h-3" />
-        <span>sys.author = &quot;chopp&quot;</span>
-      </div>
-      
       {/* Scan line effect */}
       <div 
-        className="fixed inset-0 pointer-events-none z-[60] opacity-[0.02]"
+        className="fixed inset-0 pointer-events-none z-[60] opacity-[0.015]"
         style={{
           background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)',
         }}

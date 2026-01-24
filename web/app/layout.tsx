@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { GRNDSTopNavWrapper } from "@/components/GRNDSTopNavWrapper";
 import { AuthAwareMain } from "@/components/AuthAwareMain";
 import { AccentColorProvider } from "@/lib/AccentColorContext";
 import { InitiationWrapper } from "@/components/InitiationWrapper";
@@ -22,7 +21,6 @@ export default function RootLayout({
         <AccentColorProvider>
           <InitiationWrapper>
             <Terminal3DShellWrapper>
-              <GRNDSTopNavWrapper />
               <AuthAwareMain>
                 {children}
               </AuthAwareMain>
