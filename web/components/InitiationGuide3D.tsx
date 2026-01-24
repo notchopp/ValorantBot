@@ -422,7 +422,7 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
       </div>
 
       {/* Developed by Chopp - Always present, terminal style, subliminal */}
-      <div className="fixed bottom-4 left-4 z-[250] font-mono text-[10px] text-white/15 flex items-center gap-2">
+      <div className="fixed bottom-4 left-4 z-[250] font-mono text-[10px] text-white/30 flex items-center gap-2">
         <Terminal className="w-3 h-3" />
         <span>sys.author = &quot;chopp&quot;</span>
       </div>
@@ -691,20 +691,7 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
                 className="flex-1"
-                style={{ transformStyle: 'preserve-3d' }}
               >
-                <motion.div
-                  animate={{
-                    rotateX: [1, -1, 1],
-                    rotateY: [-0.5, 0.5, -0.5],
-                  }}
-                  transition={{
-                    duration: 10,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                  style={{ transformStyle: 'preserve-3d' }}
-                >
                   <div 
                     className="rounded-xl overflow-hidden border"
                     style={{ 
@@ -748,7 +735,6 @@ export function InitiationGuide({ username, forceOpen, onClose }: InitiationGuid
                       </AnimatePresence>
                     </div>
                   </div>
-                </motion.div>
               </motion.div>
 
               {/* Right sidebar - Mini terminal log */}
