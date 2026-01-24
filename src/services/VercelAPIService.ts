@@ -46,6 +46,7 @@ export interface VerifyMarvelRivalsResponse {
   requiresManualRank?: boolean;
   playerFound?: boolean;
   manualRank?: string; // The rank user entered manually
+  autoSyncQueued?: boolean; // True if API update was requested for auto-sync
 }
 
 export interface CalculateRankRequest {

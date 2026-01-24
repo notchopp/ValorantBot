@@ -147,18 +147,28 @@ export async function execute(
 
         const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
-        // Different message based on whether we found the player
-        const descriptionText = verifyResult.playerFound
-          ? `We found your account **${existingPlayer.marvel_rivals_username}** but couldn't detect your current rank.\n\n` +
+        // Different message based on auto-sync status
+        let descriptionText: string;
+        if (verifyResult.autoSyncQueued) {
+          descriptionText = 
+            `We found your account **${existingPlayer.marvel_rivals_username}** but your rank data is being refreshed.\n\n` +
+            `**Select your rank below to start playing now**, or wait 5-10 minutes and run \`/verify\` again for automatic detection.\n\n` +
+            `✅ *Auto-sync is enabled! Your rank will update automatically once the API refreshes.*`;
+        } else if (verifyResult.playerFound) {
+          descriptionText = 
+            `We found your account **${existingPlayer.marvel_rivals_username}** but couldn't detect your current rank.\n\n` +
             `**Select your Marvel Rivals rank below** to get placed correctly.\n\n` +
-            `⚠️ *Your rank will sync automatically once the API updates. If your selection doesn't match your actual rank, it will be corrected.*`
-          : `We couldn't load your stats right now (the API may be updating).\n\n` +
+            `⚠️ *Your rank will sync automatically once the API updates. If your selection doesn't match your actual rank, it will be corrected.*`;
+        } else {
+          descriptionText = 
+            `We couldn't load your stats right now (the API may be updating).\n\n` +
             `**Select your current Marvel Rivals rank below** to get started playing!\n\n` +
             `⚠️ *Your rank will sync automatically when the API is available. If your selection doesn't match, it will be corrected.*`;
+        }
 
         const embed = new EmbedBuilder()
-          .setTitle('🎮 Help Us Place You')
-          .setColor(0xf5a623)
+          .setTitle(verifyResult.autoSyncQueued ? '🔄 Data Refreshing - Select Your Rank' : '🎮 Help Us Place You')
+          .setColor(verifyResult.autoSyncQueued ? 0x5865f2 : 0xf5a623)
           .setDescription(descriptionText);
 
         const response = await interaction.editReply({

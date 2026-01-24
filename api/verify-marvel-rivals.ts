@@ -23,6 +23,7 @@ export interface VerifyMarvelResponse {
   requiresManualRank?: boolean;
   playerFound?: boolean;
   manualRank?: string; // The rank user entered manually
+  autoSyncQueued?: boolean; // True if we've queued an API refresh
 }
 
 // Maximum MMR for initial placement (cap at GRNDS V)
@@ -514,17 +515,35 @@ export default async function handler(
       /^\d+$/.test(rank.trim()) // Just a number (probably level)
     );
     
-    if (rankLooksInvalid) {
+    if (rankLooksInvalid && !manualRank) {
       console.log('Rank looks invalid, requesting API update for player:', marvelRivalsUid);
       // Request an update - this queues the player for data refresh (30-min cooldown)
       await updatePlayerData(marvelAPI, marvelRivalsUid);
       
-      // Prompt manual rank entry since data is stale
+      // Mark player for auto-resync in database
+      const { data: dbPlayer } = await supabase
+        .from('players')
+        .select('id')
+        .eq('discord_user_id', userId)
+        .single();
+      
+      if (dbPlayer) {
+        await supabase
+          .from('players')
+          .update({ 
+            needs_resync: true,
+            resync_requested_at: new Date().toISOString(),
+          })
+          .eq('id', dbPlayer.id);
+      }
+      
+      // Prompt manual rank entry since data is stale, but let them know auto-sync is queued
       res.status(200).json({
         success: false,
         requiresManualRank: true,
         playerFound: true,
-        message: 'Your account data appears to be updating. We\'ve requested a refresh - please select your current Marvel Rivals rank to get started now, or try again in 5-10 minutes for automatic detection.',
+        autoSyncQueued: true,
+        message: 'Your account data is being refreshed! Select your rank now to start playing, or wait 5-10 minutes and run /verify again for automatic detection. Your rank will auto-sync once the API updates.',
       } as VerifyMarvelResponse);
       return;
     }
