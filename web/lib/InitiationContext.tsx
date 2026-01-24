@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react'
-import { InitiationGuide } from '@/components/InitiationGuide'
+import { InitiationGuide } from '@/components/InitiationGuide3D'
 
 interface InitiationContextType {
   openGuide: () => void
